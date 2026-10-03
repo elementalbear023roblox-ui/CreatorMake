@@ -1,0 +1,29 @@
+"use client";
+
+import { useMemo, useRef, useState } from "react";
+import { FolderOpen, ImageIcon, Plus, Search, Star } from "lucide-react";
+import { IMAGE_ACCEPT } from "@/lib/editor/assets";
+import type { EditorAsset } from "@/lib/editor/types";
+
+type Props={assets:EditorAsset[];folders:string[];onImport:(files:Iterable<File>)=>Promise<unknown>;onPlace:(assetId:string,position?:{x:number;y:number},asButton?:boolean)=>void;onPlaceVector:(assetId:string)=>void;onRename:(assetId:string,name:string)=>void;onFolder:(assetId:string,folder:string)=>void;onFavorite:(assetId:string)=>void;onCreateFolder:(name:string)=>void;onApplyFill:(assetId:string)=>void};
+const fileSize=(bytes:number)=>bytes<1024?`${bytes} B`:bytes<1024*1024?`${(bytes/1024).toFixed(1)} KB`:`${(bytes/1024/1024).toFixed(1)} MB`;
+
+export function AssetsPanel({assets,folders,onImport,onPlace,onPlaceVector,onRename,onFolder,onFavorite,onCreateFolder,onApplyFill}:Props){
+  const inputRef=useRef<HTMLInputElement>(null),[query,setQuery]=useState(""),[folder,setFolder]=useState("All"),[sort,setSort]=useState<"recent"|"oldest"|"name">("recent"),[dragging,setDragging]=useState(false);
+  const visible=useMemo(()=>assets.filter((asset)=>(folder==="All"||folder==="Favorites"?folder==="All"||asset.favorite:asset.folder===folder)&&(`${asset.name} ${asset.originalName} ${asset.format}`.toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="oldest"?a.createdAt-b.createdAt:b.createdAt-a.createdAt),[assets,folder,query,sort]);
+  const importFiles=(files:FileList|File[])=>{const images=[...files].filter((file)=>file.type.startsWith("image/")||/\.(png|jpe?g|webp|gif|svg)$/i.test(file.name));if(images.length)void onImport(images);};
+  const createFolder=()=>{const name=window.prompt("New asset folder name");if(name)onCreateFolder(name);};
+  return <div className={`asset-library ${dragging?"is-drop-target":""}`} onContextMenu={(event)=>{if(event.target===event.currentTarget){event.preventDefault();inputRef.current?.click();}}} onDragEnter={(event)=>{if(event.dataTransfer.types.includes("Files")){event.preventDefault();setDragging(true);}}} onDragOver={(event)=>{if(event.dataTransfer.types.includes("Files"))event.preventDefault();}} onDragLeave={(event)=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false);}} onDrop={(event)=>{event.preventDefault();setDragging(false);importFiles(event.dataTransfer.files);}}>
+    <input ref={inputRef} hidden type="file" multiple accept={IMAGE_ACCEPT} onChange={(event)=>{if(event.target.files?.length)importFiles(event.target.files);event.currentTarget.value="";}}/>
+    <div className="panel-heading"><span>Assets</span><div><button title="Create folder" onClick={createFolder}><FolderOpen size={13}/></button><button className="asset-import" onClick={()=>inputRef.current?.click()}><Plus size={13}/> Import</button></div></div>
+    <div className="asset-toolbar"><label className="layer-search"><Search size={12}/><input aria-label="Search assets" placeholder="Search images" value={query} onChange={(event)=>setQuery(event.target.value)}/></label><div><select aria-label="Asset folder" value={folder} onChange={(event)=>setFolder(event.target.value)}><option>All</option><option>Favorites</option><option value="">Unfiled</option>{folders.map((item)=><option key={item}>{item}</option>)}</select><select aria-label="Sort assets" value={sort} onChange={(event)=>setSort(event.target.value as typeof sort)}><option value="recent">Recent</option><option value="oldest">Oldest</option><option value="name">Name</option></select></div></div>
+    {dragging&&<div className="asset-drop-message">Drop images to import reusable assets</div>}
+    {!assets.length?<button className="asset-empty" onClick={()=>inputRef.current?.click()}><ImageIcon size={28}/><strong>Import your first image</strong><span>PNG, JPEG, WEBP, GIF, or SVG · files persist with this project</span></button>:!visible.length?<div className="empty-panel"><span>No matching assets</span><p>Try another search or folder.</p></div>:<div className="asset-grid">{visible.map((asset)=><article key={asset.id} className="asset-card" draggable onDragStart={(event)=>{event.dataTransfer.setData("application/x-creatormake-asset",asset.id);event.dataTransfer.effectAllowed="copy";}} onDoubleClick={()=>onPlace(asset.id)} title="Drag to the canvas or double-click to place">
+      <div className="asset-card-thumb"><img src={asset.thumbnailDataUrl||asset.dataUrl} alt="" draggable={false}/>{asset.animated&&<b>GIF</b>}<button className={asset.favorite?"favorite active":"favorite"} aria-label={asset.favorite?"Remove from favorites":"Add to favorites"} onClick={()=>onFavorite(asset.id)}><Star size={12} fill={asset.favorite?"currentColor":"none"}/></button></div>
+      <input aria-label={`Rename ${asset.name}`} defaultValue={asset.name} onBlur={(event)=>onRename(asset.id,event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter")event.currentTarget.blur();}}/>
+      <small>{asset.width}×{asset.height} · {asset.format} · {fileSize(asset.fileSize)}</small>{asset.warning&&<em>{asset.warning}</em>}
+      <label><FolderOpen size={10}/><select aria-label={`Folder for ${asset.name}`} value={asset.folder} onChange={(event)=>onFolder(asset.id,event.target.value)}><option value="">Unfiled</option>{folders.map((item)=><option key={item}>{item}</option>)}</select></label>
+      <div><button onClick={()=>onPlace(asset.id)}>Place</button><button onClick={()=>onPlace(asset.id,undefined,true)}>Button</button><button title="Apply as an image fill to selected objects" onClick={()=>onApplyFill(asset.id)}>Fill</button>{asset.format==="SVG"&&<button className="asset-vector-action" title="Convert a compatible single-path SVG into an editable vector" onClick={()=>onPlaceVector(asset.id)}>Vector</button>}</div>
+    </article>)}</div>}
+  </div>;
+}

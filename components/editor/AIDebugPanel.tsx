@@ -1,0 +1,4 @@
+"use client";
+import { X } from "lucide-react";
+import type { AIDebugSummary } from "@/lib/ai/types";
+export function AIDebugPanel({debug,onClose}:{debug:AIDebugSummary|null;onClose:()=>void}){if(!debug)return null;return <aside className="ai-debug-panel"><header><strong>AI INSPECTOR</strong><button aria-label="Close AI inspector" onClick={onClose}><X size={12}/></button></header>{Object.entries({Provider:debug.provider,Model:debug.model,"Generation Mode":debug.quality,"External AI":debug.externalAI,Intent:debug.intent,"Content Planner":debug.contentPlanner,"Geometry Planner":debug.geometryPlanner,Preset:debug.preset,"Tool calls":debug.toolCalls,"Repair passes":debug.repairPasses,Validation:debug.validation}).map(([key,value])=><p key={key}><span>{key}</span><b>{value}</b></p>)}<small>Executed operations only. Private model reasoning is never displayed.</small></aside>;}

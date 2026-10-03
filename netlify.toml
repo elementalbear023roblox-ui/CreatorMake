@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build:netlify"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22.13.0"
+  NPM_FLAGS = "--no-audit --no-fund"
+  CREATORMAKE_NETLIFY_BUILD = "true"
+
+# CreatorMake is a Next.js App Router application for Netlify. Netlify's
+# current OpenNext adapter supplies SSR, route handlers, and asset routing.
+# Do not add a /* -> /index.html SPA rewrite here; it overrides and breaks the
+# generated Next.js routes.

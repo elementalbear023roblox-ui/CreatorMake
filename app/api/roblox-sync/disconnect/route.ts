@@ -1,0 +1,4 @@
+import { bearerToken, hashSyncToken, SyncRouteError, syncDb, syncErrorResponse } from "@/lib/roblox/sync-server";
+import type { RobloxSyncSessionRow } from "@/lib/roblox/sync-server";
+
+export async function POST(request:Request){try{const body=await request.json() as {sessionId?:string};if(!body.sessionId)throw new SyncRouteError(400,"Session id is required.");const db=syncDb(),row=await db.prepare("SELECT * FROM roblox_pairing_sessions WHERE id = ?").bind(body.sessionId).first<RobloxSyncSessionRow>(),hash=await hashSyncToken(bearerToken(request));if(!row||(row.publisher_token_hash!==hash&&row.studio_token_hash!==hash))throw new SyncRouteError(401,"This sync session cannot be disconnected with that token.");await db.prepare("UPDATE roblox_pairing_sessions SET status = 'disconnected', studio_token_hash = NULL WHERE id = ?").bind(body.sessionId).run();return Response.json({ok:true});}catch(error){return syncErrorResponse(error);}}

@@ -1,0 +1,7 @@
+import { createExternalAIPlan } from "@/lib/ai/orchestrator";
+import { AI_DISABLED_MESSAGE, isCreatorMakeAIEnabled } from "@/lib/ai/feature";
+import { AIProviderError } from "@/lib/ai/providers/openai";
+import type { AIPlanRequest } from "@/lib/ai/types";
+
+const qualities=new Set(["FAST","BALANCED","PRECISE"]);
+export async function POST(request:Request){if(!isCreatorMakeAIEnabled())return Response.json({error:AI_DISABLED_MESSAGE,code:"AI_DISABLED"},{status:503,headers:{"Cache-Control":"no-store"}});try{const input=await request.json() as AIPlanRequest;if(!input.prompt?.trim())return Response.json({error:"A prompt is required."},{status:400});if(!qualities.has(input.quality))return Response.json({error:"External AI quality must be FAST, BALANCED, or PRECISE."},{status:400});if(!input.project?.screen||!Array.isArray(input.project.elements))return Response.json({error:"CreatorMake project state is required."},{status:400});if(input.prompt.length>4000)return Response.json({error:"Prompt exceeds 4,000 characters."},{status:413});const events:unknown[]=[];const plan=await createExternalAIPlan(input,request.signal,(event)=>events.push(event));return Response.json({plan,events});}catch(error){if(error instanceof AIProviderError)return Response.json({error:error.message,code:error.code},{status:error.status});if(error instanceof Error&&error.name==="AbortError")return Response.json({error:"AI planning was cancelled."},{status:499});return Response.json({error:error instanceof Error?error.message:"AI planning failed."},{status:500});}}

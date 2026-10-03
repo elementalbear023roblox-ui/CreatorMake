@@ -1,0 +1,6 @@
+import { generateWithExternalAI } from "@/lib/ai/orchestrator";
+import { AI_DISABLED_MESSAGE, isCreatorMakeAIEnabled } from "@/lib/ai/feature";
+import { AIProviderError } from "@/lib/ai/providers/openai";
+import type { AIGenerateRequest } from "@/lib/ai/types";
+
+export async function POST(request:Request){if(!isCreatorMakeAIEnabled())return Response.json({error:AI_DISABLED_MESSAGE,code:"AI_DISABLED"},{status:503,headers:{"Cache-Control":"no-store"}});try{const input=await request.json() as AIGenerateRequest;if(!input.prompt?.trim()||!input.plan)return Response.json({error:"An approved external AI plan is required."},{status:400});const events:unknown[]=[];const result=await generateWithExternalAI(input,request.signal,(event)=>events.push(event));return Response.json({result,events});}catch(error){if(error instanceof AIProviderError)return Response.json({error:error.message,code:error.code},{status:error.status});if(error instanceof Error&&error.name==="AbortError")return Response.json({error:"AI generation was cancelled; no project changes were committed."},{status:499});return Response.json({error:error instanceof Error?error.message:"AI generation failed; no project changes were committed."},{status:500});}}
