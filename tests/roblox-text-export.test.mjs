@@ -24,7 +24,7 @@ test("case A: Frame Name exports a glyph-free plaque below editable native text"
   assert.equal(result.manifest.textExportArchitecture,2);
   assert.equal(root.className,"Frame");assert.deepEqual(root.properties.Size,{kind:"UDim2",xScale:0,xOffset:500,yScale:0,yOffset:100});assert.equal(root.properties.Rotation,-6);assert.equal(root.properties.ClipsDescendants,false);
   assert.equal(background.name,"_Background");assert.equal(background.className,"ImageLabel");assert.deepEqual(background.properties.Position,{kind:"UDim2",xScale:0,xOffset:-70,yScale:0,yOffset:-12});assert.deepEqual(background.properties.Size,{kind:"UDim2",xScale:0,xOffset:588,yScale:0,yOffset:120});assert.equal(background.attributes.CreatorMakeRole,"Background");
-  assert.equal(text.name,"Text");assert.equal(text.className,"TextLabel");assert.equal(text.properties.Text,"Frame Name");assert.equal(text.properties.Active,false);assert.equal(text.properties.Selectable,false);assert.deepEqual(text.properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(text.properties.Size,{kind:"UDim2",xScale:0,xOffset:476,yScale:0,yOffset:76});assert.equal(text.properties.TextSize,42);assert.equal(text.properties.TextScaled,false);assert.equal(text.attributes.CreatorMakeTextScaleMode,"FIXED_DESIGN_SIZE");assert.equal(text.attributes.CreatorMakeTextBoundsWidth,476);assert.equal(text.attributes.CreatorMakeBackgroundLogicalWidth,500);assert.equal(text.attributes.CreatorMakeRasterScale,Math.round(asset.scale*100)/100);assert.equal(text.decorators.length,0);assert.ok(text.properties.ZIndex>background.properties.ZIndex);assert.equal(text.attributes.CreatorMakeFontExact,false);
+  assert.equal(text.name,"Text");assert.equal(text.className,"TextLabel");assert.equal(text.properties.Text,"Frame Name");assert.equal(text.properties.Rotation,0);assert.equal(text.properties.Active,false);assert.equal(text.properties.Selectable,false);assert.deepEqual(text.properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(text.properties.Size,{kind:"UDim2",xScale:0,xOffset:476,yScale:0,yOffset:76});assert.equal(text.properties.TextSize,42);assert.equal(text.properties.TextScaled,false);assert.equal(text.attributes.CreatorMakeTextScaleMode,"FIXED_DESIGN_SIZE");assert.equal(text.attributes.CreatorMakeTextBoundsWidth,476);assert.equal(text.attributes.CreatorMakeBackgroundLogicalWidth,500);assert.equal(text.attributes.CreatorMakeRasterScale,Math.round(asset.scale*100)/100);assert.equal(text.decorators.length,0);assert.ok(text.properties.ZIndex>background.properties.ZIndex);assert.equal(text.attributes.CreatorMakeFontExact,false);
   assert.ok(result.compatibility.some((issue)=>issue.elementId==="frame-name"&&issue.feature==="Font"&&issue.message.includes("no exact Roblox native match")));
   assert.match(result.hierarchy,/FrameName \[Frame\][\s\S]+_Background \[ImageLabel\][\s\S]+Text \[TextLabel\]/);
 });
@@ -51,12 +51,26 @@ test("responsive text is opt-in and constrained",()=>{
 });
 
 test("case C and D: a button plaque stays clickable and text-only changes sync only TextLabel.Text",()=>{
-  const play=createElement("button");Object.assign(play,{id:"play-button",name:"PlayButton",x:100,y:200,width:240,height:72,text:"PLAY",fontFamily:"Roboto",fill:"#0ea5e9",gradientType:"linear",shadow:"0 5px 12px 0 rgba(0,0,0,.3)",textShadows:[]});
+  const play=createElement("button");Object.assign(play,{id:"play-button",name:"PlayButton",x:100,y:200,width:240,height:72,rotation:-4,text:"PLAY",fontFamily:"Roboto",fill:"#0ea5e9",gradientType:"linear",shadow:"0 5px 12px 0 rgba(0,0,0,.3)",textShadows:[]});
   const beforeProject=projectFor(play),beforeAssets=mapped(planPixelAccurateAssets(beforeProject,options)),before=createRobloxExport(beforeProject,options,beforeAssets),byId=new Map(before.manifest.nodes.map((node)=>[node.sourceId,node]));
-  assert.equal(byId.get("play-button").className,"ImageButton");assert.equal(byId.get("play-button").properties.Active,true);assert.equal(byId.get("play-button::background").className,"ImageLabel");assert.equal(byId.get("play-button::text").className,"TextLabel");assert.equal(byId.get("play-button::text").properties.Active,false);assert.ok(byId.get("play-button::text").properties.ZIndex>byId.get("play-button::background").properties.ZIndex);
+  assert.equal(byId.get("play-button").className,"ImageButton");assert.equal(byId.get("play-button").properties.Rotation,-4);assert.equal(byId.get("play-button").properties.Active,true);assert.equal(byId.get("play-button::background").className,"ImageLabel");assert.equal(byId.get("play-button::background").properties.Rotation,0);assert.equal(byId.get("play-button::text").className,"TextLabel");assert.equal(byId.get("play-button::text").properties.Rotation,0);assert.equal(byId.get("play-button::text").properties.Active,false);assert.ok(byId.get("play-button::text").properties.ZIndex>byId.get("play-button::background").properties.ZIndex);
   const shop=structuredClone(play);shop.text="SHOP";const afterProject=projectFor(shop),mappings=Object.fromEntries(beforeAssets.map((asset)=>[`${asset.sourceId}:${asset.visualHash}`,asset.robloxAssetId])),afterAssets=planPixelAccurateAssets(afterProject,options,mappings,beforeAssets).map((asset)=>({...asset,status:"mapped"})),after=createRobloxExport(afterProject,options,afterAssets),operations=diffRobloxManifests(before.manifest,after.manifest),backgroundBefore=beforeAssets.find((asset)=>asset.visualPart==="background"),backgroundAfter=afterAssets.find((asset)=>asset.visualPart==="background");
   assert.equal(backgroundBefore.visualHash,backgroundAfter.visualHash,"text content must not invalidate the plaque raster");assert.equal(visualHash(play,"background"),visualHash(shop,"background"));
   assert.deepEqual(operations,[{type:"update",sourceId:"play-button::text",properties:["Text"]}]);
+});
+
+test("nested rotated text and buttons keep one shared transform root in Roblox",()=>{
+  const panel=createElement("frame"),button=createElement("button");
+  Object.assign(panel,{id:"rotated-panel",name:"RotatedPanel",x:80,y:70,width:520,height:320,rotation:5,fill:"#111827",shadow:"none"});
+  Object.assign(button,{id:"nested-button",name:"NestedButton",parentId:panel.id,x:140,y:130,width:220,height:68,rotation:-8,text:"GARAGE",fontFamily:"Roboto",fill:"#16a34a",shadow:"none",textShadows:[]});
+  const project=projectFor(panel,button),assets=mapped(planPixelAccurateAssets(project,options)),result=createRobloxExport(project,options,assets),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node]));
+  assert.equal(byId.get(panel.id).properties.Rotation,5);
+  assert.equal(byId.get(button.id).parentSourceId,panel.id);
+  assert.equal(byId.get(button.id).properties.Rotation,-8);
+  assert.equal(byId.get(`${button.id}::background`).parentSourceId,button.id);
+  assert.equal(byId.get(`${button.id}::background`).properties.Rotation,0);
+  assert.equal(byId.get(`${button.id}::text`).parentSourceId,button.id);
+  assert.equal(byId.get(`${button.id}::text`).properties.Rotation,0);
 });
 
 test("legacy PIXEL TEXT preferences are ignored and visible glyphs remain native",()=>{

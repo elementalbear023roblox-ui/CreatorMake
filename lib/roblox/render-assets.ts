@@ -5,13 +5,13 @@ import { designFontSize, textPadding, textSizingMode } from "../editor/text-sizi
 import { CREATOR_FONTS, creatorFontRasterStyle, hasLoadedCreatorFontFace, loadCreatorFont, resolveCreatorFontVariant } from "../fonts/font-library.ts";
 import type { CreatorFont, FontLoadStatus } from "../fonts/font-library.ts";
 import type { EditorAsset, EditorElement, EditorProject } from "../editor/types.ts";
-import { classifyRobloxElement, classifyTextExport, hasVisibleTextBackground } from "./classification.ts";
+import { classifyRobloxElement, hasVisibleTextBackground } from "./classification.ts";
 import type { RobloxExportOptions, RobloxRasterPart, RobloxRenderAsset, RobloxRenderAssetRole, RobloxRenderScale } from "./types.ts";
 
 export type RobloxAssetMappings = Record<string,string>;
 // Bump whenever canonical geometry interpretation changes so IndexedDB cannot
 // reuse a pre-fidelity rectangular raster for an unchanged custom path.
-const RENDERER_VERSION=13;
+const RENDERER_VERSION=14;
 const MAX_EDITABLE_IMAGE_DIMENSION=1024;
 const SAMPLE_POINTS=[
   {label:"10%,10%",normalizedX:.1,normalizedY:.1},
@@ -43,7 +43,7 @@ const sharedTextObjectScale=(element:EditorElement,visualPart:RobloxRasterPart)=
 const rasterElementForPart=(element:EditorElement,visualPart:RobloxRasterPart)=>sharedTextObjectScale(element,visualPart)!==1?{...element,scaleX:1,scaleY:1}:element;
 
 export function visualStateForElement(element:EditorElement,visualPart:RobloxRasterPart="full"){
-  const splitTextVisual=(element.type==="text"||element.type==="button")&&visualPart!=="full",rasterElement=rasterElementForPart(element,visualPart),advancedTransform={scaleX:rasterElement.scaleX,scaleY:rasterElement.scaleY,rotation:splitTextVisual?0:element.rotation,rotateX:element.rotateX,rotateY:element.rotateY,skewX:element.skewX,skewY:element.skewY,perspective:element.perspective,perspectiveOriginX:element.perspectiveOriginX,perspectiveOriginY:element.perspectiveOriginY,translateZ:element.translateZ,z:element.z,originX:element.originX,originY:element.originY};
+  const rasterElement=rasterElementForPart(element,visualPart),advancedTransform={scaleX:rasterElement.scaleX,scaleY:rasterElement.scaleY,rotation:0,rotateX:element.rotateX,rotateY:element.rotateY,skewX:element.skewX,skewY:element.skewY,perspective:element.perspective,perspectiveOriginX:element.perspectiveOriginX,perspectiveOriginY:element.perspectiveOriginY,translateZ:element.translateZ,z:element.z,originX:element.originX,originY:element.originY};
   const surface={
     type:element.type,width:element.width,height:element.height,opacity:element.opacity,
     fill:element.fill,borderColor:element.borderColor,borderWidth:element.borderWidth,cornerRadius:element.cornerRadius,corners:element.corners,cornerTypes:element.cornerTypes,
@@ -106,7 +106,7 @@ function canonicalArtworkBounds(element:EditorElement){
 }
 
 export function visualBoundsForElement(element:EditorElement,visualPart:RobloxRasterPart="full"){
-  const splitTextVisual=(element.type==="text"||element.type==="button")&&visualPart!=="full",rasterElement=rasterElementForPart(element,visualPart),padding=shadowPadding(element,visualPart),art=visualPart==="text"?{minX:0,minY:0,maxX:element.width,maxY:element.height}:canonicalArtworkBounds(element),originX=element.width*element.originX/100,originY=element.height*element.originY/100,skewX=Math.tan(element.skewX*Math.PI/180),skewY=Math.tan(element.skewY*Math.PI/180),a=rasterElement.scaleX*Math.cos(element.rotateY*Math.PI/180),b=skewY,c=skewX,d=rasterElement.scaleY*Math.cos(element.rotateX*Math.PI/180),angle=(splitTextVisual?0:element.rotation)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle),points=[[art.minX,art.minY],[art.maxX,art.minY],[art.maxX,art.maxY],[art.minX,art.maxY]].map(([x,y])=>{const tx=a*(x-originX)+c*(y-originY),ty=b*(x-originX)+d*(y-originY);return{x:originX+tx*cos-ty*sin,y:originY+tx*sin+ty*cos};}),minX=Math.min(...points.map((point)=>point.x)),maxX=Math.max(...points.map((point)=>point.x)),minY=Math.min(...points.map((point)=>point.y)),maxY=Math.max(...points.map((point)=>point.y));
+  const rasterElement=rasterElementForPart(element,visualPart),padding=shadowPadding(element,visualPart),art=visualPart==="text"?{minX:0,minY:0,maxX:element.width,maxY:element.height}:canonicalArtworkBounds(element),originX=element.width*element.originX/100,originY=element.height*element.originY/100,skewX=Math.tan(element.skewX*Math.PI/180),skewY=Math.tan(element.skewY*Math.PI/180),a=rasterElement.scaleX*Math.cos(element.rotateY*Math.PI/180),b=skewY,c=skewX,d=rasterElement.scaleY*Math.cos(element.rotateX*Math.PI/180),points=[[art.minX,art.minY],[art.maxX,art.minY],[art.maxX,art.maxY],[art.minX,art.maxY]].map(([x,y])=>{const tx=a*(x-originX)+c*(y-originY),ty=b*(x-originX)+d*(y-originY);return{x:originX+tx,y:originY+ty};}),minX=Math.min(...points.map((point)=>point.x)),maxX=Math.max(...points.map((point)=>point.x)),minY=Math.min(...points.map((point)=>point.y)),maxY=Math.max(...points.map((point)=>point.y));
   return{x:minX-padding,y:minY-padding,width:Math.max(1,maxX-minX+padding*2),height:Math.max(1,maxY-minY+padding*2)};
 }
 

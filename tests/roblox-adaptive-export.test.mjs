@@ -14,6 +14,10 @@ const fixture=()=>{
   return{screen:{width:960,height:600},elements:[panel,button,nativeText,rasterText]};
 };
 const options={...DEFAULT_ROBLOX_EXPORT_OPTIONS,screenGuiName:"AdaptiveGui",visualMode:"ADAPTIVE"};
+const logicalTopLeft=(node)=>{
+  const position=node.properties.Position,size=node.properties.Size,anchor=node.properties.AnchorPoint;
+  return{x:position.xOffset-size.xOffset*anchor.x,y:position.yOffset-size.yOffset*anchor.y};
+};
 
 test("adaptive classification keeps exact-native layers editable and rasterizes unsupported geometry",()=>{
   const project=fixture(),[panel,button,nativeText,rasterText]=project.elements;
@@ -39,7 +43,7 @@ test("adaptive manifest keeps original local coordinates under one global scale"
   assert.equal(byId.get("button::background").name,"_Background");assert.equal(byId.get("button::text").className,"TextLabel");assert.equal(byId.get("button::text").properties.Text,"PLAY");assert.equal(byId.get("button::text").properties.TextSize,15);assert.equal(byId.get("button::text").properties.TextScaled,false);assert.deepEqual(byId.get("button::text").properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(byId.get("button::text").properties.Size,{kind:"UDim2",xScale:0,xOffset:196,yScale:0,yOffset:36});assert.equal(byId.get("button::text").decorators.length,0);
   assert.equal(byId.get("native-text").className,"TextLabel");assert.equal(byId.get("native-text").parentSourceId,"panel");
   assert.equal(byId.get("raster-text").className,"TextLabel");assert.equal(byId.get("raster-text").properties.Text,"LIMITED");assert.equal(byId.get("raster-text::pixel-text"),undefined);
-  assert.deepEqual(byId.get("button").properties.Position,{kind:"UDim2",xScale:0,xOffset:60,yScale:0,yOffset:270});
+  assert.deepEqual(logicalTopLeft(byId.get("button")),{x:60,y:270});
   assert.deepEqual(byId.get("button").properties.Size,{kind:"UDim2",xScale:0,xOffset:220,yScale:0,yOffset:60});
   assert.equal(result.manifest.nodes.flatMap((node)=>node.decorators).filter((decorator)=>decorator.className==="UIScale").length,1);
   for(const id of ["panel","button"]){assert.equal(byId.get(id).decorators.filter((item)=>item.className==="UIAspectRatioConstraint").length,1);}

@@ -36,7 +36,7 @@ export function useEditor() {
   const pendingTransient=useRef<{operations:Array<(draft:EditorProject)=>void>;affectedIds:Set<string>|null}|null>(null);
   const nudgeTimer=useRef<number|null>(null);
   const duplicateTransform=useRef({x:16,y:16});
-  projectRef.current=project;
+  useEffect(()=>{projectRef.current=project;},[project]);
 
   const refreshLibrary=useCallback(async()=>{const[projectList,recoveryList]=await Promise.all([listProjects(),listRecoverySnapshots()]);setProjects(projectList);setRecoveries(recoveryList);},[]);
 
@@ -87,8 +87,8 @@ export function useEditor() {
   const transient=useCallback((mutate:(draft:EditorProject)=>void,affectedIds?:Iterable<string>)=>{
     if(transientBlocked.current)return;
     if(!transactionRef.current)transactionRef.current={label:"Edit",before:projectRef.current};
-    const pending=pendingTransient.current??{operations:[],affectedIds:new Set<string>()};pending.operations.push(mutate);
-    if(affectedIds===undefined)pending.affectedIds=null;else if(pending.affectedIds)for(const id of affectedIds)pending.affectedIds.add(id);
+    const current=pendingTransient.current,pending={operations:[...(current?.operations??[]),mutate],affectedIds:affectedIds===undefined||current?.affectedIds===null?null:new Set(current?.affectedIds??[])};
+    if(affectedIds!==undefined&&pending.affectedIds)for(const id of affectedIds)pending.affectedIds.add(id);
     pendingTransient.current=pending;
     if(transientFrame.current===null)transientFrame.current=requestAnimationFrame(()=>{transientFrame.current=null;const value=pendingTransient.current;pendingTransient.current=null;if(value)applyTransientNow(value);});
   },[applyTransientNow]);

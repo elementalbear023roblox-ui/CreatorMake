@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { isCreatorMakeAIEnabled } from "../lib/ai/feature.ts";
 import { alignSelection, distributeSelection } from "../lib/editor/operations.ts";
 import { createElement, createProject, createScrollingInventoryElements, exportProjectData, importProjectData, listProjects, listRecoverySnapshots, loadProject, normalizeProject, saveProject } from "../lib/editor/project.ts";
+import { contentClipBounds, contentClipPath } from "../lib/editor/clipping.ts";
 
 test("a new CreatorMake project is genuinely blank",()=>{
   const project=createProject("Blank");
@@ -58,7 +59,7 @@ test("legacy projects migrate to the current schema and IndexedDB-compatible sav
   const legacyText=createElement("text");legacyText.fontSize=37;legacyText.fontSizeDesign=37;project.elements=[legacyText];
   const legacy=structuredClone(project);delete legacy.schemaVersion;delete legacy.elements[0].fontSizeDesign;delete legacy.elements[0].textSizingMode;delete legacy.elements[0].responsiveMinTextSize;delete legacy.elements[0].responsiveMaxTextSize;delete legacy.elements[0].textPadding;legacy.elements[0].autoFit=true;
   const normalized=normalizeProject(legacy);
-  assert.equal(normalized.schemaVersion,9);
+  assert.equal(normalized.schemaVersion,10);
   assert.equal(normalized.elements[0].automaticCanvasSize,"None");
   assert.equal(normalized.elements[0].fontId,"inter");
   assert.equal(normalized.elements[0].fontSizeDesign,37);
@@ -71,15 +72,41 @@ test("legacy projects migrate to the current schema and IndexedDB-compatible sav
   assert.equal((await listRecoverySnapshots()).length,1);
   assert.equal((await loadProject(project.id)).elements[0].x,project.elements[0].x);
   const imported=await importProjectData({format:"creatormake-project",formatVersion:1,project:JSON.parse(JSON.stringify(project))});
-  assert.equal(imported.schemaVersion,9);
+  assert.equal(imported.schemaVersion,10);
   assert.notEqual(imported.id,project.id);
   assert.equal(imported.elements[0].x,project.elements[0].x);
   const exported=exportProjectData(imported);
   assert.equal(exported.format,"creatormake-project");
-  assert.equal(exported.schemaVersion,9);
+  assert.equal(exported.schemaVersion,10);
   assert.equal(exported.project.id,imported.id);
   const summary=(await listProjects()).find((item)=>item.id===imported.id);
   assert.equal(summary.platform,"Roblox");
   assert.ok(summary.thumbnail.startsWith("data:image/svg+xml"));
   await assert.rejects(()=>importProjectData({schemaVersion:999,screen:project.screen,elements:project.elements}),/update CreatorMake/);
+});
+
+test("ordinary containers default to unclipped content while scrolling viewports always clip",()=>{
+  for(const type of ["frame","container","button","image-button"]){
+    assert.equal(createElement(type).clipContent,false,`${type} should not silently clip descendants`);
+  }
+  assert.equal(createElement("scrolling-frame").clipContent,true);
+});
+
+test("schema 10 preserves an explicit Clip Contents choice and migrates legacy implicit clipping off",()=>{
+  const legacy=createProject("Legacy clipping"),legacyFrame=createElement("frame");legacy.schemaVersion=9;legacyFrame.clipContent=true;legacy.elements=[legacyFrame];
+  assert.equal(normalizeProject(structuredClone(legacy)).elements[0].clipContent,false);
+  const current=createProject("Explicit clipping"),currentFrame=createElement("frame");currentFrame.clipContent=true;current.elements=[currentFrame];
+  assert.equal(normalizeProject(structuredClone(current)).elements[0].clipContent,true);
+});
+
+test("Clip Contents computes the same nested crop used by the editor preview",()=>{
+  const outer=createElement("frame"),inner=createElement("container"),child=createElement("button");
+  Object.assign(outer,{id:"outer",x:100,y:100,width:200,height:100,clipContent:true});
+  Object.assign(inner,{id:"inner",parentId:outer.id,x:80,y:70,width:180,height:100,clipContent:false});
+  Object.assign(child,{id:"child",parentId:inner.id,x:80,y:70,width:100,height:60});
+  assert.deepEqual(contentClipBounds(child,[outer,inner,child]),{left:100,top:100,right:300,bottom:200});
+  assert.equal(contentClipPath(child,[outer,inner,child]),"inset(30px 0px 0px 20px)");
+  outer.clipContent=false;
+  assert.equal(contentClipBounds(child,[outer,inner,child]),null);
+  assert.equal(contentClipPath(child,[outer,inner,child]),undefined);
 });

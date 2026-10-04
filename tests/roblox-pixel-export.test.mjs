@@ -17,22 +17,27 @@ const projectFixture=()=>{
   return{screen:{width:1920,height:1080},elements:[frame,title,button,shape]};
 };
 const options={...DEFAULT_ROBLOX_EXPORT_OPTIONS,screenGuiName:"PixelGui",visualMode:"PIXEL_ACCURATE"};
+const logicalTopLeft=(node)=>{
+  const position=node.properties.Position,size=node.properties.Size,anchor=node.properties.AnchorPoint;
+  return{x:position.xOffset-size.xOffset*anchor.x,y:position.yOffset-size.yOffset*anchor.y};
+};
 
-test("visual and layout hashes isolate movement while baked transforms invalidate the raster",()=>{
+test("visual and layout hashes isolate movement and keep 2D rotation on the Roblox transform root",()=>{
   const button=createElement("button"),moved=structuredClone(button),rotated=structuredClone(button),styled=structuredClone(button);
   Object.assign(moved,{x:button.x+40,y:button.y+20,anchorX:.5,parentId:"new-parent",zIndex:99});
   rotated.rotation=12;
   styled.gradientType="radial";
   assert.equal(visualHash(moved),visualHash(button));
   assert.notEqual(layoutHash(moved),layoutHash(button));
-  assert.notEqual(visualHash(rotated),visualHash(button));
+  assert.equal(visualHash(rotated),visualHash(button));
+  assert.notEqual(layoutHash(rotated),layoutHash(button));
   assert.notEqual(visualHash(styled),visualHash(button));
 });
 
 test("split text transforms stay on the shared Roblox container",()=>{
   const project=projectFixture(),title=project.elements.find((element)=>element.id==="text-1"),before=visualHash(title);title.rotation=-8;
   const assets=planPixelAccurateAssets(project,options).map((asset,index)=>({...asset,status:"mapped",robloxAssetId:`rbxassetid://${9000+index}`})),result=createRobloxExport(project,options,assets),titleNode=result.manifest.nodes.find((node)=>node.sourceId==="text-1");
-  assert.notEqual(visualHash(title),before);assert.equal(titleNode.properties.Rotation,-8);assert.equal(titleNode.className,"Frame");assert.ok(result.manifest.nodes.find((node)=>node.sourceId==="text-1::background"));assert.ok(result.manifest.nodes.find((node)=>node.sourceId==="text-1::text"));
+  assert.equal(visualHash(title),before);assert.equal(titleNode.properties.Rotation,-8);assert.equal(titleNode.className,"Frame");assert.ok(result.manifest.nodes.find((node)=>node.sourceId==="text-1::background"));assert.ok(result.manifest.nodes.find((node)=>node.sourceId==="text-1::text"));
 });
 
 test("Pixel Accurate export maps frames, text, buttons, and shapes to rendered Roblox images",()=>{
@@ -44,9 +49,9 @@ test("Pixel Accurate export maps frames, text, buttons, and shapes to rendered R
   assert.equal(viewport.className,"Frame");assert.deepEqual(viewport.properties.Size,{kind:"UDim2",xScale:0,xOffset:1920,yScale:0,yOffset:1080});assert.deepEqual(viewport.properties.Position,{kind:"UDim2",xScale:.5,xOffset:0,yScale:.5,yOffset:0});assert.equal(viewport.decorators.filter((item)=>item.className==="UIScale").length,1);
   assert.equal(frame.className,"Frame");assert.equal(frame.parentSourceId,"__creatormake_viewport");assert.equal(frame.properties.BackgroundTransparency,1);assert.equal(frame.decorators[0].className,"UIAspectRatioConstraint");
   assert.equal(visual.className,"ImageLabel");assert.equal(visual.name,"_Visual");assert.equal(visual.parentSourceId,"frame-1");assert.equal(visual.properties.Active,false);assert.equal(visual.attributes.CreatorMakeSourceId,"frame-1");
-  assert.equal(title.className,"Frame");assert.deepEqual(title.properties.Size,{kind:"UDim2",xScale:0,xOffset:500,yScale:0,yOffset:110});assert.deepEqual(title.properties.Position,{kind:"UDim2",xScale:0,xOffset:-100,yScale:0,yOffset:-40});assert.equal(titleBackground.className,"ImageLabel");assert.equal(titleBackground.properties.Image,"rbxassetid://1001");assert.equal(titleText.className,"TextLabel");assert.equal(titleText.properties.Text,"Frame Name");
+  assert.equal(title.className,"Frame");assert.deepEqual(title.properties.Size,{kind:"UDim2",xScale:0,xOffset:500,yScale:0,yOffset:110});assert.deepEqual(logicalTopLeft(title),{x:-100,y:-40});assert.deepEqual(title.properties.AnchorPoint,{kind:"Vector2",x:.5,y:.5});assert.equal(titleBackground.className,"ImageLabel");assert.equal(titleBackground.properties.Image,"rbxassetid://1001");assert.equal(titleText.className,"TextLabel");assert.equal(titleText.properties.Text,"Frame Name");
   assert.equal(title.attributes.CreatorMakeGeometryType,"trapezoid");assert.equal(title.attributes.CreatorMakeRenderStrategy,"Canonical Vector");
-  assert.equal(button.className,"ImageButton");assert.equal(button.properties.Active,true);assert.equal(button.properties.AutoButtonColor,false);assert.ok(!("Text" in button.properties));assert.deepEqual(button.properties.Size,{kind:"UDim2",xScale:0,xOffset:120,yScale:0,yOffset:110});assert.deepEqual(button.properties.Position,{kind:"UDim2",xScale:0,xOffset:720,yScale:0,yOffset:-30});assert.equal(buttonBackground.className,"ImageLabel");assert.equal(buttonText.className,"TextLabel");assert.equal(buttonText.properties.Active,false);
+  assert.equal(button.className,"ImageButton");assert.equal(button.properties.Active,true);assert.equal(button.properties.AutoButtonColor,false);assert.ok(!("Text" in button.properties));assert.deepEqual(button.properties.Size,{kind:"UDim2",xScale:0,xOffset:120,yScale:0,yOffset:110});assert.deepEqual(logicalTopLeft(button),{x:720,y:-30});assert.deepEqual(button.properties.AnchorPoint,{kind:"Vector2",x:.5,y:.5});assert.equal(buttonBackground.className,"ImageLabel");assert.equal(buttonText.className,"TextLabel");assert.equal(buttonText.properties.Active,false);
   assert.equal(title.properties.Size.xOffset/frame.properties.Size.xOffset,500/768);assert.equal(button.properties.Size.xOffset/frame.properties.Size.xOffset,120/768);assert.equal(title.properties.Size.yOffset/frame.properties.Size.yOffset,110/572);assert.equal(button.properties.Size.yOffset/frame.properties.Size.yOffset,110/572);
   assert.deepEqual(result.layoutDiagnostics.filter((row)=>["frame-1","text-1","button-1"].includes(row.sourceId)).map((row)=>({id:row.sourceId,creator:row.creatorMake,roblox:row.robloxDesign})),[
     {id:"frame-1",creator:{parent:null,x:125,y:118,width:768,height:572},roblox:{parent:null,x:125,y:118,width:768,height:572}},
@@ -151,7 +156,7 @@ test("one FIT scale preserves the entire composition at common Studio viewports"
 test("regression A: negative custom path expansion changes only the inner visual",()=>{
   const path=createVectorElement("custom-path");Object.assign(path,{id:"overflow-path",name:"Overflow Path",x:300,y:140,width:200,height:100,borderWidth:0,shadow:"none",geometry:{...path.geometry,kind:"custom-path",pathData:"M -20 0 L 100 0 L 100 100 L -20 100 Z",nodes:[],closed:true}});
   const project={screen:{width:960,height:600},elements:[path]},assets=planPixelAccurateAssets(project,options),asset=assets[0],result=createRobloxExport(project,options,assets),container=result.manifest.nodes.find((node)=>node.sourceId===path.id),visual=result.manifest.nodes.find((node)=>node.sourceId===`${path.id}::visual`);
-  assert.deepEqual(container.properties.Position,{kind:"UDim2",xScale:0,xOffset:300,yScale:0,yOffset:140});
+  assert.deepEqual(logicalTopLeft(container),{x:300,y:140});
   assert.deepEqual(container.properties.Size,{kind:"UDim2",xScale:0,xOffset:200,yScale:0,yOffset:100});
   assert.deepEqual(asset.visualBounds,{x:-40,y:0,width:240,height:100});assert.equal(visual.properties.Position.xOffset,-40);assert.equal(visual.properties.Size.xOffset,240);
 });
@@ -177,7 +182,7 @@ test("regression C: unavailable runtime fonts block while nearest registered var
 test("regression D: plaque silhouette stays canonical while its layout box stays authoritative",()=>{
   const plaque=createElement("text");Object.assign(plaque,{id:"plaque-regression",x:20,y:-30,width:510,height:110,fill:"#6d28d9",shadow:"none",textShadows:[],geometry:{...plaque.geometry,kind:"plaque",inset:18}});
   const project={screen:{width:960,height:600},elements:[plaque]},assets=planPixelAccurateAssets(project,options),result=createRobloxExport(project,options,assets),node=result.manifest.nodes.find((item)=>item.sourceId===plaque.id),path=geometryPresentation(plaque).path;
-  assert.deepEqual(node.properties.Position,{kind:"UDim2",xScale:0,xOffset:20,yScale:0,yOffset:-30});assert.deepEqual(node.properties.Size,{kind:"UDim2",xScale:0,xOffset:510,yScale:0,yOffset:110});
+  assert.deepEqual(logicalTopLeft(node),{x:20,y:-30});assert.deepEqual(node.properties.Size,{kind:"UDim2",xScale:0,xOffset:510,yScale:0,yOffset:110});
   assert.equal(node.decorators[0].properties.AspectRatio,Number((510/110).toFixed(6)));assert.equal(path,"M 91.8 0 L 418.2 0 L 510 55 L 418.2 110 L 91.8 110 L 0 55 Z");
 });
 
@@ -190,7 +195,7 @@ test("regression E: a 20px shadow expands only the visual surface",()=>{
 test("regression F: exact slanted-title overflow changes only the inner visual rectangle",()=>{
   const title=createElement("text");Object.assign(title,{id:"slanted-title",name:"Title Plaque",x:85,y:58,width:500,height:100,fill:"#6d28d9",shadow:"none",textShadows:[]});
   const project={screen:{width:960,height:600},elements:[title]},planned=planPixelAccurateAssets(project,{...options,renderScale:2})[0],visualBounds={x:-70,y:-12,width:588,height:120},asset={...planned,visualBounds,bounds:visualBounds,width:1176,height:240,renderPixelWidth:1176,renderPixelHeight:240,scale:2,status:"needs-publish"},result=createRobloxExport(project,{...options,renderScale:2},[asset]),container=result.manifest.nodes.find((node)=>node.sourceId===title.id),visual=result.manifest.nodes.find((node)=>node.sourceId===`${title.id}::background`);
-  assert.equal(container.className,"Frame");assert.deepEqual(container.properties.Position,{kind:"UDim2",xScale:0,xOffset:85,yScale:0,yOffset:58});assert.deepEqual(container.properties.Size,{kind:"UDim2",xScale:0,xOffset:500,yScale:0,yOffset:100});assert.equal(container.properties.ClipsDescendants,false);
+  assert.equal(container.className,"Frame");assert.deepEqual(logicalTopLeft(container),{x:85,y:58});assert.deepEqual(container.properties.Size,{kind:"UDim2",xScale:0,xOffset:500,yScale:0,yOffset:100});assert.equal(container.properties.ClipsDescendants,false);
   assert.deepEqual(visual.properties.Position,{kind:"UDim2",xScale:0,xOffset:-70,yScale:0,yOffset:-12});assert.deepEqual(visual.properties.Size,{kind:"UDim2",xScale:0,xOffset:588,yScale:0,yOffset:120});assert.equal(visual.properties.ScaleType.item,"Stretch");assert.equal(container.decorators[0].properties.AspectRatio,5);
   assert.equal(asset.renderPixelWidth,1176);assert.equal(asset.renderPixelHeight,240);
 });
@@ -199,7 +204,7 @@ test("regression G: explicit descendant clipping never clips the owner's expande
   const parent=createElement("container"),child=createElement("text");Object.assign(parent,{id:"clip-parent",x:100,y:80,width:300,height:100,clipContent:true,shadow:"0 0 20px 0 rgba(0,0,0,.5)"});Object.assign(child,{id:"clip-child",parentId:parent.id,x:120,y:90,width:120,height:40,shadow:"none",textShadows:[]});
   const project={screen:{width:960,height:600},elements:[parent,child]},assets=planPixelAccurateAssets(project,options),result=createRobloxExport(project,options,assets),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node])),container=byId.get(parent.id),visual=byId.get(`${parent.id}::visual`),clip=byId.get(`${parent.id}::content`),childNode=byId.get(child.id);
   assert.equal(container.properties.ClipsDescendants,false);assert.equal(visual.parentSourceId,parent.id);assert.equal(visual.properties.Position.xOffset,-20);assert.equal(visual.properties.Position.yOffset,-20);
-  assert.equal(clip.className,"Frame");assert.equal(clip.properties.ClipsDescendants,true);assert.equal(clip.parentSourceId,parent.id);assert.equal(childNode.parentSourceId,clip.sourceId);assert.deepEqual(childNode.properties.Position,{kind:"UDim2",xScale:0,xOffset:20,yScale:0,yOffset:10});
+  assert.equal(clip.className,"Frame");assert.equal(clip.properties.ClipsDescendants,true);assert.equal(clip.parentSourceId,parent.id);assert.equal(childNode.parentSourceId,clip.sourceId);assert.deepEqual(logicalTopLeft(childNode),{x:20,y:10});
 });
 
 test("regression H: alpha bounds retain transparent safety pixels on every raster edge",()=>{
@@ -218,11 +223,11 @@ test("development assertion rejects any raster or visual bounds substituted into
 test("hidden parents fall back to viewport coordinates without subtracting hidden bounds",()=>{
   const parent=createElement("frame"),child=createElement("text");Object.assign(parent,{id:"hidden-parent",x:200,y:100,width:400,height:300,hidden:true});Object.assign(child,{id:"visible-child",parentId:parent.id,x:260,y:140,width:180,height:50,shadow:"none",textShadows:[]});
   const project={screen:{width:960,height:600},elements:[parent,child]},assets=planPixelAccurateAssets(project,options),result=createRobloxExport(project,options,assets),node=result.manifest.nodes.find((item)=>item.sourceId===child.id);
-  assert.equal(node.parentSourceId,"__creatormake_viewport");assert.deepEqual(node.properties.Position,{kind:"UDim2",xScale:0,xOffset:260,yScale:0,yOffset:140});
+  assert.equal(node.parentSourceId,"__creatormake_viewport");assert.deepEqual(logicalTopLeft(node),{x:260,y:140});
 });
 
 test("pixel layout containers with no owned pixels stay in the hierarchy without a fake image",()=>{
-  const group=createElement("container"),child=createElement("button");Object.assign(group,{id:"layout-group",x:100,y:80,width:500,height:300,fill:"transparent",borderColor:"transparent",borderWidth:0,shadow:"none"});Object.assign(child,{id:"visible-button",parentId:group.id,x:140,y:120,width:160,height:48,shadow:"none",textShadows:[]});
+  const group=createElement("container"),child=createElement("button");Object.assign(group,{id:"layout-group",x:100,y:80,width:500,height:300,fill:"transparent",borderColor:"transparent",borderWidth:0,shadow:"none",clipContent:true});Object.assign(child,{id:"visible-button",parentId:group.id,x:140,y:120,width:160,height:48,shadow:"none",textShadows:[]});
   const project={screen:{width:960,height:600},elements:[group,child]},childAsset=planPixelAccurateAssets(project,options).find((asset)=>asset.sourceElementId===child.id),result=createRobloxExport(project,options,[childAsset]),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node]));
-  assert.equal(byId.get(group.id).className,"Frame");assert.equal(byId.get(group.id).properties.ClipsDescendants,false);assert.equal(byId.get(`${group.id}::visual`),undefined);assert.equal(byId.get(`${group.id}::content`).properties.ClipsDescendants,true);assert.equal(byId.get(child.id).parentSourceId,`${group.id}::content`);assert.deepEqual(byId.get(child.id).properties.Position,{kind:"UDim2",xScale:0,xOffset:40,yScale:0,yOffset:40});
+  assert.equal(byId.get(group.id).className,"Frame");assert.equal(byId.get(group.id).properties.ClipsDescendants,false);assert.equal(byId.get(`${group.id}::visual`),undefined);assert.equal(byId.get(`${group.id}::content`).properties.ClipsDescendants,true);assert.equal(byId.get(child.id).parentSourceId,`${group.id}::content`);assert.deepEqual(logicalTopLeft(byId.get(child.id)),{x:40,y:40});
 });

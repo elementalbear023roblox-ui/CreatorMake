@@ -225,7 +225,7 @@ export type Screen = {
 };
 
 export type EditorProject = {
-  schemaVersion: 9;
+  schemaVersion: 10;
   id: string;
   name: string;
   createdAt: number;

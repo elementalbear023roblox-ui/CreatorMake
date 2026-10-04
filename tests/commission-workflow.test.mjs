@@ -10,7 +10,7 @@ test("blank and commission projects both start with a truly empty canvas",()=>{
 test("commission metadata and canonical Roblox fonts survive save/load normalization",()=>{
   const project=createProject("Client HUD","commission"),title=createElement("text");Object.assign(title,{fontId:"builder-sans",fontFamily:"Builder Sans",fontWeight:800,fontStyle:"italic"});project.elements.push(title);Object.assign(project.commissionBrief,{clientLabel:"Client A",gameName:"Racing",requestedStyle:"Clean neon",notes:"Increase the close button"});
   const normalized=normalizeProject(structuredClone(project));
-  assert.equal(normalized.schemaVersion,9);assert.deepEqual(normalized.commissionBrief,project.commissionBrief);assert.equal(normalized.elements[0].fontFamily,"Builder Sans");assert.equal(normalized.elements[0].fontWeight,800);assert.equal(normalized.elements[0].fontStyle,"normal");
+  assert.equal(normalized.schemaVersion,10);assert.deepEqual(normalized.commissionBrief,project.commissionBrief);assert.equal(normalized.elements[0].fontFamily,"Builder Sans");assert.equal(normalized.elements[0].fontWeight,800);assert.equal(normalized.elements[0].fontStyle,"normal");
   const exported=exportProjectData(normalized);assert.equal(exported.project.projectKind,"commission");assert.equal(exported.project.commissionBrief.notes,"Increase the close button");
 });
 
