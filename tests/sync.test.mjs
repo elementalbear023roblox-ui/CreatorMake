@@ -30,6 +30,8 @@ test("generated Studio plugin validates local health and retains deduplicated Ed
   assert.match(source,/manifest\.visualMode~="PIXEL_ACCURATE"/);assert.match(source,/node\.attributes/);assert.match(source,/CreatorMakeVisualMode/);assert.match(source,/PREVIEW READY/);assert.match(source,/PREVIEW CURRENT CREATORMAKE PROJECT/);assert.match(source,/AutoButtonColor=false/);assert.match(source,/verifyTextArchitecture/);assert.match(source,/textArchitecture=result\.textArchitecture/);assert.match(source,/nativeText:IsA\("TextLabel"\)/);assert.match(source,/role=="EditableText" or role=="EditableTextBox" or role=="ButtonText"/);
   assert.match(source,/IMPORT CURRENT CREATORMAKE PROJECT/);assert.match(source,/\/project\/current\/manifest/);assert.match(source,/manifest\.kind=="preset-library"/);assert.match(source,/manifest\.kind~="project"/);assert.match(source,/PROJECT_MANIFEST/);assert.match(source,/PROJECT_SYNC_PROGRESS/);assert.match(source,/PROJECT_SYNC_RESULT/);assert.match(source,/projectObjects\[owner\]/);
   assert.match(source,/CreatorMakeGlobalScale/);assert.match(source,/ViewportSize/);assert.match(source,/math\.min\(viewportSize\.X\/referenceWidth,viewportSize\.Y\/referenceHeight\)/);
+  assert.match(source,/TEXT EXPORT DEBUG\\nName:/);
+  assert.doesNotMatch(source,/TEXT EXPORT DEBUG\r?\nName:/);
   const model=createRobloxPluginModel("https://creator.example");assert.match(model,/CreatorMake Studio Sync/);assert.match(model,/<!\[CDATA\[/);
 });
 
