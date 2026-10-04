@@ -1,6 +1,7 @@
 import { PRESET_BY_ID } from "./system-presets";
 import type { DesignPlan } from "./types";
 import type { EditorElement } from "@/lib/editor/types";
+import { designFontSize, textPadding, textSizingMode } from "../editor/text-sizing.ts";
 
 export type ValidationIssue = { code: string; elementId: string; message: string; repaired: boolean };
 export type ValidationResult = { elements: EditorElement[]; issues: ValidationIssue[]; repaired: number; passed: boolean };
@@ -27,7 +28,7 @@ export function validateAndRepairGeneration(input: EditorElement[], plan: Design
     if(geometry?.gradients.default==="off"&&element.gradientType!=="none"){const repaired=precise;issues.push({code:"preset-gradient",elementId:element.id,message:`${element.name} used a gradient forbidden by ${geometry.name}.`,repaired});if(repaired)element.gradientType="none";}
     const invalidCorner=Object.values(element.corners).some((value)=>!Number.isFinite(value)||value<0)||!Number.isFinite(element.cornerRadius)||element.cornerRadius<0;
     if(invalidCorner){const repaired=precise;issues.push({code:"invalid-corners",elementId:element.id,message:`${element.name} had an invalid corner radius.`,repaired});if(repaired){const fallback=geometry?.geometry.radius??0;element.cornerRadius=fallback;element.corners={tl:fallback,tr:fallback,br:fallback,bl:fallback};}}
-    if((element.type==="text"||element.type==="button")&&element.text){const charsPerLine=Math.max(1,Math.floor((element.width-element.padding*2)/Math.max(4,element.fontSize*.58)));const lines=Math.ceil(element.text.length/charsPerLine);const needed=lines*element.fontSize*element.lineHeight+element.padding*2;if(needed>element.height+2){const repaired=precise;issues.push({code:"text-overflow",elementId:element.id,message:`${element.name} text exceeded its box.`,repaired});if(repaired){if(element.textBoxMode==="fixed"&&element.autoFit)element.fontSize=Math.max(7,Math.floor(element.fontSize*(element.height/needed)));else element.height=Math.ceil(needed);}}
+    if((element.type==="text"||element.type==="button")&&element.text){const padding=textPadding(element),size=designFontSize(element),charsPerLine=Math.max(1,Math.floor((element.width-padding.left-padding.right)/Math.max(4,size*.58))),lines=Math.ceil(element.text.length/charsPerLine),needed=lines*size*element.lineHeight+padding.top+padding.bottom;if(needed>element.height+2&&textSizingMode(element)==="fixed"){const repaired=precise;issues.push({code:"text-overflow",elementId:element.id,message:`${element.name} text exceeded its box.`,repaired});if(repaired)element.height=Math.ceil(needed);}
     }
   }
   const byParent=new Map<string,EditorElement[]>(); elements.forEach((item)=>{if(item.parentId){const list=byParent.get(item.parentId)??[];list.push(item);byParent.set(item.parentId,list);}});

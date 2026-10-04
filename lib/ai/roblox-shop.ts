@@ -23,6 +23,9 @@ const PREMIUM: ShopTheme = { premium:true,shell:"#07080c",panel:"#12141b",card:"
 function patchElement(type: ElementType, name: string, patch: Partial<EditorElement>) {
   const element=createElement(type);
   Object.assign(element,{name,...patch});
+  if(patch.fontSize!==undefined){element.fontSizeDesign=patch.fontSize;element.responsiveMaxTextSize=Math.max(element.responsiveMinTextSize,patch.fontSize);}
+  if(patch.padding!==undefined&&!patch.textPadding)element.textPadding={top:patch.padding,right:patch.padding,bottom:patch.padding,left:patch.padding};
+  if(patch.autoFit!==undefined)element.textSizingMode=patch.autoFit?"responsive":"fixed";
   if(patch.cornerRadius!==undefined&&!patch.corners) element.corners={tl:patch.cornerRadius,tr:patch.cornerRadius,br:patch.cornerRadius,bl:patch.cornerRadius};
   return element;
 }

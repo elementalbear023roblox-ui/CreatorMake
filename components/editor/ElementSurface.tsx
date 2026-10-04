@@ -4,6 +4,7 @@ import { elementBackground, elementSurfaceStyle } from "@/lib/editor/render";
 import { geometryPresentation, openGeometryStrokeWidth, usesVectorSurface } from "@/lib/editor/geometry";
 import type { CSSProperties } from "react";
 import type { EditorAsset, EditorElement } from "@/lib/editor/types";
+import { textPadding } from "@/lib/editor/text-sizing";
 
 const shadowFilter=(shadow:string)=>{
   if(!shadow||shadow==="none")return undefined;
@@ -39,6 +40,6 @@ export function ElementSurface({element,asset}:{element:EditorElement;asset?:Edi
       {!geometry.open&&<foreignObject x="0" y="0" width={Math.max(1,element.width)} height={Math.max(1,element.height)} clipPath={`url(#${clipId})`}><div className="vector-geometry-fill" style={{background:asset?"transparent":elementBackground(element),position:"relative"}}>{asset&&<i className="editor-image-fill" style={imageFillStyle(element,asset)}/>}</div></foreignObject>}
       <path d={geometry.path} transform={geometry.transform} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={stroke==="transparent"?0:1} fillRule={geometry.fillRule} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
-    {text&&<span className="vector-text-content" style={{alignItems:vertical,justifyContent:element.type==="button"?"center":undefined,padding:element.padding}}>{text}</span>}
+    {text&&<span className="vector-text-content" style={{alignItems:vertical,justifyContent:element.type==="button"?"center":undefined,padding:`${textPadding(element).top}px ${textPadding(element).right}px ${textPadding(element).bottom}px ${textPadding(element).left}px`}}>{text}</span>}
   </span>;
 }

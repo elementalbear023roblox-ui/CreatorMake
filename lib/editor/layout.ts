@@ -1,8 +1,9 @@
 import type { EditorElement, EditorProject } from "./types";
+import { designFontSize, textPadding } from "./text-sizing.ts";
 
 const clamp=(value:number,min:number|null,max:number|null)=>Math.max(min??-Infinity,Math.min(max??Infinity,value));
-const textWidth=(element:EditorElement)=>Math.max(12,element.text.length*element.fontSize*.58+element.layoutPadding.left+element.layoutPadding.right+element.padding*2);
-const textHeight=(element:EditorElement)=>Math.max(12,element.fontSize*element.lineHeight+element.layoutPadding.top+element.layoutPadding.bottom+element.padding*2);
+const textWidth=(element:EditorElement)=>{const padding=textPadding(element);return Math.max(12,element.text.length*designFontSize(element)*.58+element.layoutPadding.left+element.layoutPadding.right+padding.left+padding.right);};
+const textHeight=(element:EditorElement)=>{const padding=textPadding(element);return Math.max(12,designFontSize(element)*element.lineHeight+element.layoutPadding.top+element.layoutPadding.bottom+padding.top+padding.bottom);};
 const mainSize=(element:EditorElement,horizontal:boolean)=>horizontal?element.width:element.height;
 const crossSize=(element:EditorElement,horizontal:boolean)=>horizontal?element.height:element.width;
 const mainSizing=(element:EditorElement,horizontal:boolean)=>horizontal?element.sizingX:element.sizingY;

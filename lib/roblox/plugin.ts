@@ -174,6 +174,40 @@ local function validateManifest(manifest)
     end
     if not standaloneNative and not nativeChild then error("TEXT_INSTANCE_MISSING: "..tostring(rootNode.name).." must contain a real TextLabel or TextBox.") end
   end
+  local manifestNodesById={}
+  for _,node in ipairs(manifest.nodes) do manifestNodesById[node.sourceId]=node end
+  for _,node in ipairs(manifest.nodes) do
+    if node.className=="TextLabel" or node.className=="TextButton" or node.className=="TextBox" then
+      local attributes=type(node.attributes)=="table" and node.attributes or {}
+      local properties=type(node.properties)=="table" and node.properties or {}
+      local mode=attributes.CreatorMakeTextScaleMode
+      local constraintCount=0
+      for _,decorator in ipairs(node.decorators or {}) do if decorator.className=="UITextSizeConstraint" then constraintCount+=1 end end
+      local globalScaleCount=0
+      local objectScaleCount=0
+      local cursor=node
+      local scaleGuard=0
+      while cursor and scaleGuard<=#manifest.nodes do
+        scaleGuard+=1
+        for _,decorator in ipairs(cursor.decorators or {}) do
+          if decorator.className=="UIScale" and decorator.name=="CreatorMakeGlobalScale" then globalScaleCount+=1 end
+          if decorator.className=="UIScale" and decorator.name=="CreatorMakeObjectScale" then objectScaleCount+=1 end
+        end
+        cursor=cursor.parentSourceId and manifestNodesById[cursor.parentSourceId] or nil
+      end
+      if mode=="FIXED_DESIGN_SIZE" or mode=="RESPONSIVE_CONSTRAINED" then
+        if (manifest.visualMode=="PIXEL_ACCURATE" or manifest.visualMode=="ADAPTIVE") and globalScaleCount~=1 then error("TEXT_ROOT_SCALE_INVALID: "..tostring(node.name).." must inherit exactly one CreatorMakeGlobalScale; received "..tostring(globalScaleCount)..".") end
+        if objectScaleCount>1 then error("TEXT_OBJECT_SCALE_INVALID: "..tostring(node.name).." inherits duplicate CreatorMakeObjectScale objects.") end
+      end
+      if mode=="FIXED_DESIGN_SIZE" then
+        if properties.TextScaled~=false then error("TEXT_SCALE_INVALID: "..tostring(node.name).." fixed text must use TextScaled=false.") end
+        if type(attributes.CreatorMakeTextSize)~="number" or type(properties.TextSize)~="number" or math.abs(attributes.CreatorMakeTextSize-properties.TextSize)>.001 then error("TEXT_SIZE_INVALID: "..tostring(node.name).." must keep the exact CreatorMake design-space TextSize.") end
+        if constraintCount~=0 then error("TEXT_CONSTRAINT_INVALID: "..tostring(node.name).." fixed text must not use UITextSizeConstraint.") end
+      elseif mode=="RESPONSIVE_CONSTRAINED" then
+        if properties.TextScaled~=true or constraintCount~=1 then error("TEXT_CONSTRAINT_INVALID: "..tostring(node.name).." responsive text requires TextScaled=true and one UITextSizeConstraint.") end
+      end
+    end
+  end
   for index,asset in ipairs(manifest.assets or {}) do
     if type(asset.sourceId)~="string" or type(asset.visualHash)~="string" then error("MANIFEST_ASSET_INVALID: assets["..tostring(index).."] requires sourceId and visualHash.") end
     if not validAssetId(asset.robloxAssetId) and type(asset.localPath)~="string" then error("MANIFEST_ASSET_NOT_STAGED: assets["..tostring(index).."] has no staged PNG or permanent Roblox ID.") end
@@ -331,6 +365,35 @@ local function configureViewportScale(manifest, instances)
   bindCamera()
 end
 
+local function printTextScaleDiagnostics(manifest, instances)
+  task.defer(function()
+    RunService.Heartbeat:Wait()
+    for _,node in ipairs(manifest.nodes or {}) do
+      if node.className=="TextLabel" or node.className=="TextButton" or node.className=="TextBox" then
+        local instance=instances[node.sourceId]
+        if instance and (instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox")) then
+          local scaleItems={}
+          local scaleProduct=1
+          local cursor=instance
+          while cursor do
+            for _,child in ipairs(cursor:GetChildren()) do
+              if child:IsA("UIScale") then table.insert(scaleItems,cursor.Name.."/"..child.Name.."="..tostring(child.Scale));scaleProduct*=child.Scale end
+            end
+            cursor=cursor.Parent
+            if cursor and cursor:IsA("ScreenGui") then break end
+          end
+          local constraintCount=0
+          for _,child in ipairs(instance:GetChildren()) do if child:IsA("UITextSizeConstraint") then constraintCount+=1 end end
+          local attributes=type(node.attributes)=="table" and node.attributes or {}
+          local viewport=workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.zero
+          local parentSize=instance.Parent and instance.Parent:IsA("GuiObject") and instance.Parent.AbsoluteSize or Vector2.zero
+          print("TEXT EXPORT DEBUG\nName: "..instance.Name.."\nCreatorMake TextSize: "..tostring(attributes.CreatorMakeTextSize).."\nExported TextSize: "..tostring(instance.TextSize).."\nEditor zoom: ignored by export\nReference viewport: "..tostring(manifest.referenceResolution.width).."x"..tostring(manifest.referenceResolution.height).."\nRoblox viewport: "..tostring(viewport.X).."x"..tostring(viewport.Y).."\nRoot/Object UIScale chain: "..table.concat(scaleItems,", ").."\nCombined inherited scale: "..tostring(scaleProduct).."\nTextScaled: "..tostring(instance.TextScaled).."\nUITextSizeConstraint count: "..tostring(constraintCount).."\nCreatorMake text box: "..tostring(attributes.CreatorMakeTextBoundsWidth).."x"..tostring(attributes.CreatorMakeTextBoundsHeight).."\nRoblox text box: "..tostring(instance.AbsoluteSize.X).."x"..tostring(instance.AbsoluteSize.Y).."\nCreatorMake parent: "..tostring(attributes.CreatorMakeBackgroundLogicalWidth).."x"..tostring(attributes.CreatorMakeBackgroundLogicalHeight).."\nRoblox parent: "..tostring(parentSize.X).."x"..tostring(parentSize.Y).."\nFontFace: "..tostring(instance.FontFace.Family).."\nFont weight: "..tostring(instance.FontFace.Weight))
+        end
+      end
+    end
+  end)
+end
+
 local function manifestProjectId(manifest)
   return tostring(manifest.projectId or manifest.screenGuiName)
 end
@@ -417,6 +480,7 @@ local function applyManifest(manifest, deployTarget)
   end
   for id,instance in pairs(existing) do if not retained[id] then instance:Destroy() end end
   configureViewportScale(manifest,existing)
+  printTextScaleDiagnostics(manifest,existing)
   return screenGui,existing
 end
 
@@ -438,7 +502,7 @@ local function verifyTextArchitecture(manifest, instances)
           local visualPart=type(candidate.attributes)=="table" and candidate.attributes.CreatorMakeVisualPart or nil
           local instance=instances[candidate.sourceId]
           if role=="Background" then background=instance end
-          if role=="EditableText" or role=="EditableTextBox" then nativeText=instance end
+          if role=="EditableText" or role=="EditableTextBox" or role=="ButtonText" then nativeText=instance end
           if role=="PixelText" then pixelText=instance end
           if role=="Visual" or visualPart=="full" then combinedVisual=true end
         end

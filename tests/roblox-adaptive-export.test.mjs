@@ -8,7 +8,7 @@ import { DEFAULT_ROBLOX_EXPORT_OPTIONS } from "../lib/roblox/types.ts";
 
 const fixture=()=>{
   const panel=createElement("frame");Object.assign(panel,{id:"panel",name:"StarPanel",x:180,y:120,width:600,height:360,shadow:"none",geometry:{...panel.geometry,kind:"star"}});
-  const button=createElement("button");Object.assign(button,{id:"button",name:"PlayButton",parentId:"panel",x:240,y:390,width:220,height:60,text:"PLAY",fontFamily:"Roboto",shadow:"none",textShadows:[],geometry:{...button.geometry,kind:"plaque"}});
+  const button=createElement("button");Object.assign(button,{id:"button",name:"PlayButton",parentId:"panel",x:240,y:390,width:220,height:60,text:"PLAY",fontFamily:"Roboto",autoFit:true,shadow:"none",textShadows:[],geometry:{...button.geometry,kind:"plaque"}});
   const nativeText=createElement("text");Object.assign(nativeText,{id:"native-text",name:"EditableTitle",parentId:"panel",x:240,y:160,width:320,height:54,text:"SHOP",fontFamily:"Roboto",fill:"transparent",borderColor:"transparent",shadow:"none",textShadows:[],clipContent:false,corners:{tl:0,tr:0,br:0,bl:0}});
   const rasterText=createElement("text");Object.assign(rasterText,{id:"raster-text",name:"EffectTitle",parentId:"panel",x:240,y:230,width:320,height:54,text:"LIMITED",fontFamily:"Inter",fill:"transparent",borderColor:"transparent",shadow:"none",textShadows:["0 2px 5px #000000"],clipContent:false,corners:{tl:0,tr:0,br:0,bl:0}});
   return{screen:{width:960,height:600},elements:[panel,button,nativeText,rasterText]};
@@ -36,7 +36,7 @@ test("adaptive manifest keeps original local coordinates under one global scale"
   assert.equal(byId.get("panel").className,"Frame");assert.equal(byId.get("panel").properties.BackgroundTransparency,1);assert.equal(byId.get("panel").attributes.CreatorMakeExportClassification,"HYBRID");
   assert.equal(byId.get("panel::visual").className,"ImageLabel");assert.equal(byId.get("panel::visual").parentSourceId,"panel");assert.equal(byId.get("panel::visual").attributes.CreatorMakeSourceId,"panel");
   assert.equal(byId.get("button").className,"ImageButton");assert.equal(byId.get("button").properties.Active,true);assert.equal(byId.get("button").properties.AutoButtonColor,false);
-  assert.equal(byId.get("button::background").name,"_Background");assert.equal(byId.get("button::text").className,"TextLabel");assert.equal(byId.get("button::text").properties.Text,"PLAY");
+  assert.equal(byId.get("button::background").name,"_Background");assert.equal(byId.get("button::text").className,"TextLabel");assert.equal(byId.get("button::text").properties.Text,"PLAY");assert.equal(byId.get("button::text").properties.TextSize,15);assert.equal(byId.get("button::text").properties.TextScaled,false);assert.deepEqual(byId.get("button::text").properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(byId.get("button::text").properties.Size,{kind:"UDim2",xScale:0,xOffset:196,yScale:0,yOffset:36});assert.equal(byId.get("button::text").decorators.length,0);
   assert.equal(byId.get("native-text").className,"TextLabel");assert.equal(byId.get("native-text").parentSourceId,"panel");
   assert.equal(byId.get("raster-text").className,"TextLabel");assert.equal(byId.get("raster-text").properties.Text,"LIMITED");assert.equal(byId.get("raster-text::pixel-text"),undefined);
   assert.deepEqual(byId.get("button").properties.Position,{kind:"UDim2",xScale:0,xOffset:60,yScale:0,yOffset:270});

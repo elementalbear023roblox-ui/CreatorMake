@@ -48,3 +48,52 @@ export function groupSelection(project: EditorProject) {
 export function ungroupSelection(project: EditorProject) {
   const groups = new Set(project.selectedIds); const childIds: string[] = []; project.elements.forEach((item) => { if (item.parentId && groups.has(item.parentId)) { item.parentId = null; childIds.push(item.id); } }); project.elements = project.elements.filter((item) => !groups.has(item.id) || item.name !== "Group"); project.selectedIds = childIds;
 }
+
+export type LayerDropPosition="before"|"inside"|"after";
+export type LayerReparentRequest={draggedIds:string[];targetId:string|null;position:LayerDropPosition;keepLocalPosition?:boolean};
+export type LayerReparentResult={ok:boolean;movedIds:string[];reason?:string};
+const CONTAINER_TYPES=new Set<EditorElement["type"]>(["frame","container","scrolling-frame","button","image-button"]);
+
+export function canContainChildren(element:EditorElement|null){return element===null||CONTAINER_TYPES.has(element.type);}
+function descendantSet(elements:EditorElement[],roots:Iterable<string>){const result=new Set(roots);let changed=true;while(changed){changed=false;elements.forEach((element)=>{if(element.parentId&&result.has(element.parentId)&&!result.has(element.id)){result.add(element.id);changed=true;}});}return result;}
+export function hierarchyRootIds(elements:EditorElement[],ids:Iterable<string>){const selected=new Set(ids);return elements.filter((element)=>{if(!selected.has(element.id))return false;let parent=element.parentId;while(parent){if(selected.has(parent))return false;parent=elements.find((candidate)=>candidate.id===parent)?.parentId??null;}return true;}).map((element)=>element.id);}
+
+export function validateLayerReparent(project:EditorProject,request:LayerReparentRequest):LayerReparentResult{
+  const byId=new Map(project.elements.map((element)=>[element.id,element])),roots=hierarchyRootIds(project.elements,request.draggedIds),rootSet=new Set(roots);
+  if(!roots.length)return{ok:false,movedIds:[],reason:"Select at least one layer to move."};
+  if(roots.some((id)=>byId.get(id)?.locked))return{ok:false,movedIds:[],reason:"Unlock the selected layer before moving it."};
+  const target=request.targetId?byId.get(request.targetId):null;
+  if(request.targetId&&!target)return{ok:false,movedIds:[],reason:"The drop target no longer exists."};
+  if(target?.locked)return{ok:false,movedIds:[],reason:"Unlock the target container before adding or reordering children."};
+  const descendants=descendantSet(project.elements,rootSet);
+  if(request.targetId&&descendants.has(request.targetId))return{ok:false,movedIds:[],reason:"A layer cannot be moved inside itself or one of its descendants."};
+  const newParentId=request.position==="inside"?request.targetId:(target?.parentId??null),newParent=newParentId?byId.get(newParentId)??null:null;
+  if(!canContainChildren(newParent))return{ok:false,movedIds:[],reason:`${newParent?.name??"This layer"} cannot contain child layers.`};
+  if(request.position==="inside"&&!canContainChildren(target??null))return{ok:false,movedIds:[],reason:`${target?.name??"This layer"} cannot contain child layers.`};
+  return{ok:true,movedIds:roots};
+}
+
+export function reparentLayers(project:EditorProject,request:LayerReparentRequest):LayerReparentResult{
+  const validation=validateLayerReparent(project,request);if(!validation.ok)return validation;
+  const byId=new Map(project.elements.map((element)=>[element.id,element])),roots=validation.movedIds.map((id)=>byId.get(id)!).filter(Boolean),target=request.targetId?byId.get(request.targetId)??null:null,newParentId=request.position==="inside"?target?.id??null:target?.parentId??null,newParent=newParentId?byId.get(newParentId)??null:null;
+  roots.forEach((element)=>{if(request.keepLocalPosition){const oldParent=element.parentId?byId.get(element.parentId):null,localX=element.x-(oldParent?.x??0),localY=element.y-(oldParent?.y??0);element.x=(newParent?.x??0)+localX;element.y=(newParent?.y??0)+localY;}element.parentId=newParentId;});
+  const moved=new Set(roots.map((element)=>element.id)),siblings=project.elements.filter((element)=>element.parentId===newParentId&&!moved.has(element.id)).sort((a,b)=>b.zIndex-a.zIndex||project.elements.indexOf(b)-project.elements.indexOf(a));
+  let insertion=0;if(request.position!=="inside"&&target){const targetIndex=siblings.findIndex((element)=>element.id===target.id);insertion=targetIndex<0?siblings.length:targetIndex+(request.position==="after"?1:0);}
+  const visualOrder=[...siblings.slice(0,insertion),...roots,...siblings.slice(insertion)],base=Math.max(visualOrder.length,...visualOrder.map((element)=>element.zIndex));visualOrder.forEach((element,index)=>{element.zIndex=base-index;});
+  project.selectedIds=roots.map((element)=>element.id);
+  return{ok:true,movedIds:roots.map((element)=>element.id)};
+}
+
+export function indentSelection(project:EditorProject):LayerReparentResult{
+  const roots=hierarchyRootIds(project.elements,project.selectedIds);if(!roots.length)return{ok:false,movedIds:[],reason:"Select a layer to indent."};
+  const first=project.elements.find((element)=>element.id===roots[0])!,siblings=project.elements.filter((element)=>element.parentId===first.parentId&&!roots.includes(element.id)).sort((a,b)=>b.zIndex-a.zIndex),index=siblings.findIndex((element)=>element.zIndex<first.zIndex),target=siblings[index>=0?index:siblings.length-1];
+  if(!target)return{ok:false,movedIds:[],reason:"There is no previous container to move into."};
+  return reparentLayers(project,{draggedIds:roots,targetId:target.id,position:"inside"});
+}
+
+export function outdentSelection(project:EditorProject):LayerReparentResult{
+  const roots=hierarchyRootIds(project.elements,project.selectedIds);if(!roots.length)return{ok:false,movedIds:[],reason:"Select a layer to outdent."};
+  const first=project.elements.find((element)=>element.id===roots[0])!,parent=first.parentId?project.elements.find((element)=>element.id===first.parentId):null;
+  if(!parent)return{ok:false,movedIds:[],reason:"The selected layer is already at the screen root."};
+  return reparentLayers(project,{draggedIds:roots,targetId:parent.id,position:"after"});
+}

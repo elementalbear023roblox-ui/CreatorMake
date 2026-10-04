@@ -21,5 +21,6 @@ export function createPresetTestScene(preset:SystemPreset,index=0):EditorElement
   const body=component("text","Text",304,316,220,34,"Readable system text");body.fill="transparent";body.borderWidth=0;body.shadow="none";body.padding=0;
   const icon=component("star","Icon",548,310,54,54);icon.fill=preset.colors.accent;
   const progress=component("container","Progress Bar",304,380,298,28);progress.fill=preset.colors.surfaceAlt;const fill=apply(createElement("rectangle"),preset,"accent");fill.name="Progress Fill";fill.parentId=progress.id;fill.x=progress.x+4;fill.y=progress.y+4;fill.width=190;fill.height=20;fill.borderWidth=0;fill.shadow="none";elements.push(fill);
+  elements.filter((element)=>element.type==="text"||element.type==="button").forEach((element)=>{element.fontSizeDesign=element.fontSize;element.responsiveMaxTextSize=Math.max(element.responsiveMinTextSize,element.fontSize);element.textPadding={top:element.padding,right:element.padding,bottom:element.padding,left:element.padding};});
   return elements;
 }

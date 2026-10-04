@@ -63,7 +63,7 @@ function sendJson(response, statusCode, value, origin) {
 }
 
 const SUPPORTED_NODE_CLASSES = new Set(["Frame", "ImageLabel", "ImageButton", "TextLabel", "TextButton", "TextBox", "ScrollingFrame"]);
-const SUPPORTED_DECORATOR_CLASSES = new Set(["UIAspectRatioConstraint", "UICorner", "UIGradient", "UIGridLayout", "UIListLayout", "UIPadding", "UIScale", "UISizeConstraint", "UIStroke"]);
+const SUPPORTED_DECORATOR_CLASSES = new Set(["UIAspectRatioConstraint", "UICorner", "UIGradient", "UIGridLayout", "UIListLayout", "UIPadding", "UIScale", "UISizeConstraint", "UIStroke", "UITextSizeConstraint"]);
 const plainObject = (value) => Boolean(value && typeof value === "object" && !Array.isArray(value));
 const manifestFieldError = (node, index, field, reason) => new Error(`Manifest validation failed: Object: ${node?.sourceId || `nodes[${index}]`} | Type: ${node?.attributes?.CreatorMakeElementType || node?.className || "Unknown"} | Field: ${field} | Reason: ${reason}`);
 
@@ -133,6 +133,27 @@ function validateManifest(value) {
     const rootIndex=value.nodes.indexOf(root);
     if (combinedVisual) throw manifestFieldError(root,rootIndex,"children","LEGACY_TEXT_RASTER_REJECTED: combined _Visual is not valid for split text");
     if (!standaloneNative && !nativeChild) throw manifestFieldError(root,rootIndex,"children","TEXT_INSTANCE_MISSING: expected a real TextLabel or TextBox");
+  }
+  const manifestNodesById=new Map(value.nodes.map((node)=>[node.sourceId,node]));
+  for(const [index,node] of value.nodes.entries()){
+    if(!["TextLabel","TextButton","TextBox"].includes(node.className))continue;
+    const mode=node.attributes?.CreatorMakeTextScaleMode,sourceSize=Number(node.attributes?.CreatorMakeTextSize),exportedSize=Number(node.properties?.TextSize),constraints=node.decorators.filter((decorator)=>decorator.className==="UITextSizeConstraint");
+    const inheritedScales=[];let scaleCursor=node,scaleGuard=0;
+    while(scaleCursor&&scaleGuard++<value.nodes.length+1){for(const decorator of scaleCursor.decorators??[]){if(decorator.className==="UIScale")inheritedScales.push({name:decorator.name,scale:Number(decorator.properties?.Scale),sourceId:scaleCursor.sourceId});}scaleCursor=scaleCursor.parentSourceId?manifestNodesById.get(scaleCursor.parentSourceId):undefined;}
+    const globalScales=inheritedScales.filter((item)=>item.name==="CreatorMakeGlobalScale"),objectScales=inheritedScales.filter((item)=>item.name==="CreatorMakeObjectScale");
+    if(mode==="FIXED_DESIGN_SIZE"||mode==="RESPONSIVE_CONSTRAINED"){
+      if((value.visualMode==="PIXEL_ACCURATE"||value.visualMode==="ADAPTIVE")&&globalScales.length!==1)throw manifestFieldError(node,index,"decorators",`expected exactly one inherited CreatorMakeGlobalScale, received ${globalScales.length}`);
+      if(objectScales.length>1)throw manifestFieldError(node,index,"decorators",`expected at most one inherited CreatorMakeObjectScale, received ${objectScales.length}`);
+    }
+    if(mode==="FIXED_DESIGN_SIZE"){
+      if(node.properties.TextScaled!==false)throw manifestFieldError(node,index,"properties.TextScaled","fixed CreatorMake text must remain false and inherit its shared object/root UIScale hierarchy");
+      if(!Number.isFinite(sourceSize)||!Number.isFinite(exportedSize)||Math.abs(sourceSize-exportedSize)>.001)throw manifestFieldError(node,index,"properties.TextSize",`expected exact design-space TextSize ${sourceSize}, received ${exportedSize}`);
+      if(constraints.length)throw manifestFieldError(node,index,"decorators","fixed CreatorMake text must not have UITextSizeConstraint");
+    }
+    if(mode==="RESPONSIVE_CONSTRAINED"){
+      if(node.properties.TextScaled!==true)throw manifestFieldError(node,index,"properties.TextScaled","responsive CreatorMake text requires TextScaled=true");
+      if(constraints.length!==1)throw manifestFieldError(node,index,"decorators","responsive CreatorMake text requires exactly one UITextSizeConstraint");
+    }
   }
   if ((value.visualMode === "PIXEL_ACCURATE" || value.visualMode === "ADAPTIVE") && !Array.isArray(value.assets)) throw new Error("Manifest validation failed: Object: project | Type: ScreenGui | Field: assets | Reason: rendered visual mode requires an asset array");
   for (const [index, asset] of (value.assets ?? []).entries()) {
@@ -334,6 +355,15 @@ function createLayoutDiagnostics(manifest) {
       robloxContainer: { x, y, width, height, aspect: width / Math.max(1, height) },
       robloxVisual: visualNode?{x:visualX,y:visualY,width:visualWidth,height:visualHeight}:null,
     };
+  });
+}
+
+function createTextScaleDiagnostics(manifest){
+  const nodes=new Map((manifest?.nodes??[]).map((node)=>[node.sourceId,node])),reference=manifest?.referenceResolution??{},viewport=(manifest?.nodes??[]).find((node)=>node.attributes?.CreatorMakeRole==="Viewport");
+  return (manifest?.nodes??[]).filter((node)=>["TextLabel","TextButton","TextBox"].includes(node.className)).map((node)=>{
+    const scales=[];let cursor=node,guard=0;while(cursor&&guard++<(manifest.nodes?.length??0)+1){for(const decorator of cursor.decorators??[]){if(decorator.className==="UIScale")scales.push({name:decorator.name,scale:Number(decorator.properties?.Scale),sourceId:cursor.sourceId});}cursor=cursor.parentSourceId?nodes.get(cursor.parentSourceId):undefined;}
+    const font=node.properties?.FontFace??{},constraints=(node.decorators??[]).filter((decorator)=>decorator.className==="UITextSizeConstraint");
+    return{name:node.name,sourceId:node.sourceId,creatorMakeTextSize:node.attributes?.CreatorMakeTextSize,exportedTextSize:node.properties?.TextSize,textScaled:node.properties?.TextScaled,textSizeConstraints:constraints.length,creatorMakeTextBox:{x:node.attributes?.CreatorMakeTextBoundsX,y:node.attributes?.CreatorMakeTextBoundsY,width:node.attributes?.CreatorMakeTextBoundsWidth,height:node.attributes?.CreatorMakeTextBoundsHeight},creatorMakeParentBox:{width:node.attributes?.CreatorMakeBackgroundLogicalWidth,height:node.attributes?.CreatorMakeBackgroundLogicalHeight},referenceViewport:{width:reference.width,height:reference.height},robloxViewport:{width:viewport?.attributes?.CreatorMakeViewportWidth??"runtime",height:viewport?.attributes?.CreatorMakeViewportHeight??"runtime"},editorZoom:"not exported; intentionally ignored",rootUIScale:scales.find((item)=>item.name==="CreatorMakeGlobalScale")?.scale??null,objectScale:node.attributes?.CreatorMakeObjectScale??scales.find((item)=>item.name==="CreatorMakeObjectScale")?.scale??1,parentUIScales:scales,fontFace:font.family??font.enumName??null,fontWeight:font.weight??node.attributes?.CreatorMakeFontWeight??null,robloxParent:node.parentSourceId,rasterScale:node.attributes?.CreatorMakeRasterScale??1};
   });
 }
 
@@ -958,8 +988,10 @@ export async function startStudioSyncServer({
         lastUpdatedAt = new Date().toISOString();
         currentManifestRevision += 1;
         const layoutDiagnostics = createLayoutDiagnostics(currentManifest);
+        const textScaleDiagnostics = createTextScaleDiagnostics(currentManifest);
         if (!quiet) console.log(`[CreatorMake] PROJECT_MANIFEST staged\nProject: ${currentManifest.projectName}\nProject id: ${currentManifest.projectId}\nProject object count: ${currentManifest.exportDiagnostics.projectObjectCount}\nExport object count: ${currentManifest.exportDiagnostics.exportedProjectObjectCount}\nRoblox node count: ${currentManifest.nodes.length}\nPresets exported: ${currentManifest.exportDiagnostics.presetsExported}\nManifest version: ${currentManifest.manifestVersion}\n${JSON.stringify(currentManifest, null, 2)}`);
         if (!quiet) console.log(`[CreatorMake] Layout / visual / raster diagnostics · reference ${currentManifest.referenceResolution?.width}×${currentManifest.referenceResolution?.height} · global scale mode ${currentManifest.viewportScaleMode??"none"}\n${JSON.stringify(layoutDiagnostics, null, 2)}`);
+        if (!quiet) console.log(`[CreatorMake] TEXT EXPORT DEBUG · design TextSize must equal exported TextSize before inherited UIScale\n${JSON.stringify(textScaleDiagnostics, null, 2)}`);
         sendJson(response, 200, {
           status: "ok",
           messageType: "PROJECT_MANIFEST_STORED",

@@ -13,7 +13,7 @@ const mapped=(assets)=>assets.map((asset,index)=>({...asset,status:"mapped",robl
 
 test("case A: Frame Name exports a glyph-free plaque below editable native text",()=>{
   const title=createElement("text");
-  Object.assign(title,{id:"frame-name",name:"FrameName",x:85,y:58,width:500,height:100,text:"Frame Name",fontFamily:"Inter",fontSize:42,padding:12,fill:"#6d28d9",gradientType:"freeform",shadow:"0 8px 18px 0 rgba(0,0,0,.35)",textShadows:[],geometry:{...title.geometry,kind:"trapezoid",skew:14},rotation:-6});
+  Object.assign(title,{id:"frame-name",name:"FrameName",x:85,y:58,width:500,height:100,text:"Frame Name",fontFamily:"Inter",fontSize:42,fontSizeDesign:42,padding:12,textPadding:{top:12,right:12,bottom:12,left:12},fill:"#6d28d9",gradientType:"freeform",shadow:"0 8px 18px 0 rgba(0,0,0,.35)",textShadows:[],geometry:{...title.geometry,kind:"trapezoid",skew:14},rotation:-6});
   assert.equal(classifyTextExport(title).mode,"NATIVE","AUTO keeps normal text runtime-editable even with a declared font mismatch");
   const planned=planPixelAccurateAssets(projectFor(title),options);
   assert.deepEqual(planned.map((asset)=>({sourceId:asset.sourceId,sourceElementId:asset.sourceElementId,part:asset.visualPart})),[{sourceId:"frame-name::background",sourceElementId:"frame-name",part:"background"}]);
@@ -24,7 +24,7 @@ test("case A: Frame Name exports a glyph-free plaque below editable native text"
   assert.equal(result.manifest.textExportArchitecture,2);
   assert.equal(root.className,"Frame");assert.deepEqual(root.properties.Size,{kind:"UDim2",xScale:0,xOffset:500,yScale:0,yOffset:100});assert.equal(root.properties.Rotation,-6);assert.equal(root.properties.ClipsDescendants,false);
   assert.equal(background.name,"_Background");assert.equal(background.className,"ImageLabel");assert.deepEqual(background.properties.Position,{kind:"UDim2",xScale:0,xOffset:-70,yScale:0,yOffset:-12});assert.deepEqual(background.properties.Size,{kind:"UDim2",xScale:0,xOffset:588,yScale:0,yOffset:120});assert.equal(background.attributes.CreatorMakeRole,"Background");
-  assert.equal(text.name,"Text");assert.equal(text.className,"TextLabel");assert.equal(text.properties.Text,"Frame Name");assert.equal(text.properties.Active,false);assert.equal(text.properties.Selectable,false);assert.deepEqual(text.properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(text.properties.Size,{kind:"UDim2",xScale:0,xOffset:476,yScale:0,yOffset:76});assert.ok(text.properties.ZIndex>background.properties.ZIndex);assert.equal(text.attributes.CreatorMakeFontExact,false);
+  assert.equal(text.name,"Text");assert.equal(text.className,"TextLabel");assert.equal(text.properties.Text,"Frame Name");assert.equal(text.properties.Active,false);assert.equal(text.properties.Selectable,false);assert.deepEqual(text.properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(text.properties.Size,{kind:"UDim2",xScale:0,xOffset:476,yScale:0,yOffset:76});assert.equal(text.properties.TextSize,42);assert.equal(text.properties.TextScaled,false);assert.equal(text.attributes.CreatorMakeTextScaleMode,"FIXED_DESIGN_SIZE");assert.equal(text.attributes.CreatorMakeTextBoundsWidth,476);assert.equal(text.attributes.CreatorMakeBackgroundLogicalWidth,500);assert.equal(text.attributes.CreatorMakeRasterScale,Math.round(asset.scale*100)/100);assert.equal(text.decorators.length,0);assert.ok(text.properties.ZIndex>background.properties.ZIndex);assert.equal(text.attributes.CreatorMakeFontExact,false);
   assert.ok(result.compatibility.some((issue)=>issue.elementId==="frame-name"&&issue.feature==="Font"&&issue.message.includes("no exact Roblox native match")));
   assert.match(result.hierarchy,/FrameName \[Frame\][\s\S]+_Background \[ImageLabel\][\s\S]+Text \[TextLabel\]/);
 });
@@ -34,6 +34,20 @@ test("case B: transparent Coins text exports as a single TextLabel",()=>{
   const project=projectFor(coins),planned=planPixelAccurateAssets(project,options),result=createRobloxExport(project,options,planned),owned=result.manifest.nodes.filter((node)=>node.sourceId==="coins"||node.parentSourceId==="coins");
   assert.equal(planned.length,0);assert.equal(owned.length,1);assert.equal(owned[0].sourceId,"coins");assert.equal(owned[0].className,"TextLabel");assert.equal(owned[0].properties.Text,"Coins: 500");
   const native=createNativeTextLabel(coins,"parent",5);assert.equal(native.name,"Text");assert.equal(native.className,"TextLabel");assert.equal(native.properties.Text,"Coins: 500");
+});
+
+test("CreatorMake design-space font size stays authoritative when auto-fit was requested",()=>{
+  const label=createElement("text");Object.assign(label,{id:"fixed-scale",name:"FixedScale",text:"Select a Color",fontFamily:"Roboto",fontSize:28,fontSizeDesign:28,autoFit:true,textSizingMode:"fixed",padding:12,textPadding:{top:12,right:12,bottom:12,left:12},fill:"transparent",gradientType:"none",borderColor:"transparent",borderWidth:0,shadow:"none",textShadows:[]});
+  const native=createNativeTextLabel(label,"parent",5);
+  assert.equal(native.properties.TextSize,28);assert.equal(native.properties.TextScaled,false);assert.deepEqual(native.properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(native.properties.Size,{kind:"UDim2",xScale:0,xOffset:216,yScale:0,yOffset:24});assert.equal(native.attributes.CreatorMakeAutoFitRequested,true);assert.equal(native.attributes.CreatorMakeTextScaleMode,"FIXED_DESIGN_SIZE");assert.equal(native.decorators.length,0);
+  const result=createRobloxExport(projectFor(label),options,[]),exported=result.manifest.nodes.find((node)=>node.sourceId==="fixed-scale"),viewport=result.manifest.nodes.find((node)=>node.attributes?.CreatorMakeRole==="Viewport");
+  assert.equal(exported.properties.TextSize,28);assert.equal(exported.properties.TextScaled,false);assert.equal(exported.decorators.filter((item)=>item.className==="UIPadding").length,1);assert.equal(viewport.decorators.filter((item)=>item.className==="UIScale").length,1);
+});
+
+test("responsive text is opt-in and constrained",()=>{
+  const label=createElement("text");Object.assign(label,{id:"responsive",name:"Responsive",text:"Responsive",fontFamily:"Roboto",fontSize:36,fontSizeDesign:36,textSizingMode:"responsive",autoFit:true,responsiveMinTextSize:14,responsiveMaxTextSize:40,textPadding:{top:5,right:8,bottom:5,left:8},fill:"transparent",borderColor:"transparent",borderWidth:0,shadow:"none",textShadows:[]});
+  const native=createNativeTextLabel(label,"parent",5),constraint=native.decorators.find((item)=>item.className==="UITextSizeConstraint");
+  assert.equal(native.properties.TextSize,36);assert.equal(native.properties.TextScaled,true);assert.equal(native.attributes.CreatorMakeTextScaleMode,"RESPONSIVE_CONSTRAINED");assert.deepEqual(constraint.properties,{MinTextSize:14,MaxTextSize:40});
 });
 
 test("case C and D: a button plaque stays clickable and text-only changes sync only TextLabel.Text",()=>{

@@ -5,17 +5,17 @@ export type FontFailureReason="NETWORK_ERROR"|"CSS_LOAD_ERROR"|"FACE_LOAD_ERROR"
 export type FontDiagnostic={status:FontLoadStatus;failureReason?:FontFailureReason;message?:string;loadDurationMs?:number;attempts:number};
 
 const groups: Array<{ categories: FontCategory[]; families: string[] }> = [
-  { categories:["Sans Serif"], families:["Inter","Roboto","Open Sans","Lato","Montserrat","Poppins","Nunito","Nunito Sans","Raleway","Ubuntu","Work Sans","Manrope","DM Sans","Plus Jakarta Sans","Outfit","Rubik","Mulish","Karla","Figtree","Urbanist","Public Sans","Noto Sans","Source Sans 3","Merriweather Sans","Libre Franklin"] },
+  { categories:["Sans Serif"], families:["Inter","Roboto","Arimo","Josefin Sans","Titillium Web","Open Sans","Lato","Montserrat","Poppins","Nunito","Nunito Sans","Raleway","Ubuntu","Work Sans","Manrope","DM Sans","Plus Jakarta Sans","Outfit","Rubik","Mulish","Karla","Figtree","Urbanist","Public Sans","Noto Sans","Source Sans 3","Merriweather Sans","Libre Franklin"] },
   { categories:["Sans Serif","Industrial"], families:["Barlow","Barlow Condensed","Barlow Semi Condensed","Archivo","Archivo Narrow","IBM Plex Sans","PT Sans"] },
-  { categories:["Serif","Elegant"], families:["IBM Plex Serif","Noto Serif","Source Serif 4","Merriweather","PT Serif","Libre Baskerville","Bitter","Crimson Pro","Lora","Playfair Display","EB Garamond","Cormorant Garamond","Spectral","Roboto Slab","Zilla Slab","Arvo","Bree Serif","Cinzel","Cinzel Decorative"] },
+  { categories:["Serif","Elegant"], families:["Balthazar","Fondamento","IBM Plex Serif","Noto Serif","Source Serif 4","Merriweather","PT Serif","Libre Baskerville","Bitter","Crimson Pro","Lora","Playfair Display","EB Garamond","Cormorant Garamond","Spectral","Roboto Slab","Zilla Slab","Arvo","Bree Serif","Cinzel","Cinzel Decorative"] },
   { categories:["Monospace","Computer"], families:["IBM Plex Mono","Noto Sans Mono","Source Code Pro","Space Mono","JetBrains Mono","Fira Code","Fira Mono","Roboto Mono","Inconsolata","Ubuntu Mono","Anonymous Pro","Cousine","Cutive Mono","DM Mono","Martian Mono","Overpass Mono","Spline Sans Mono"] },
   { categories:["Terminal","Retro"], families:["VT323","Share Tech Mono","Nova Mono","Azeret Mono","Chivo Mono","Major Mono Display","Syne Mono"] },
   { categories:["Pixel","Arcade","Game UI"], families:["Press Start 2P","Silkscreen","Pixelify Sans","Tiny5","Jersey 10","Jersey 15","Jersey 20","Jersey 25","DotGothic16","Micro 5","Handjet","Jacquard 12","Kode Mono"] },
-  { categories:["Sci-Fi","Game UI"], families:["Oxanium","Orbitron","Audiowide","Rajdhani","Chakra Petch","Exo 2","Teko","Michroma","Electrolize","Quantico","Saira","Saira Condensed","Tomorrow"] },
-  { categories:["Display","Industrial"], families:["Russo One","Black Ops One","Bungee","Bungee Shade","Bungee Inline","Bebas Neue","Anton","Oswald","League Spartan","Archivo Black","Alfa Slab One","Righteous","Staatliches","Graduate","Fjalla One","Big Shoulders Display","Big Shoulders Stencil Display"] },
+  { categories:["Sci-Fi","Game UI"], families:["Jura","Oxanium","Orbitron","Audiowide","Rajdhani","Chakra Petch","Exo 2","Teko","Michroma","Electrolize","Quantico","Saira","Saira Condensed","Tomorrow"] },
+  { categories:["Display","Industrial"], families:["Bangers","Denk One","Sarpanch","Russo One","Black Ops One","Bungee","Bungee Shade","Bungee Inline","Bebas Neue","Anton","Oswald","League Spartan","Archivo Black","Alfa Slab One","Righteous","Staatliches","Graduate","Fjalla One","Big Shoulders Display","Big Shoulders Stencil Display"] },
   { categories:["Cartoon","Game Show"], families:["Fredoka","Baloo 2","Luckiest Guy","Lilita One","Titan One","Concert One","Modak","Chewy","Bubblegum Sans","Boogaloo","Coiny","Fascinate","Faster One"] },
-  { categories:["Handwritten","Comic"], families:["Permanent Marker","Rock Salt","Caveat","Patrick Hand","Comic Neue","Special Elite","Kalam","Gloria Hallelujah","Schoolbell","Shadows Into Light","Covered By Your Grace","Gochi Hand","Walter Turncoat"] },
-  { categories:["Horror","Display"], families:["Creepster","Butcherman","Eater","Nosifer","Rubik Wet Paint","Rubik Glitch","Metal Mania","UnifrakturCook","Pirata One"] },
+  { categories:["Handwritten","Comic"], families:["Amatic SC","Indie Flower","Permanent Marker","Rock Salt","Caveat","Patrick Hand","Comic Neue","Special Elite","Kalam","Gloria Hallelujah","Schoolbell","Shadows Into Light","Covered By Your Grace","Gochi Hand","Walter Turncoat"] },
+  { categories:["Horror","Display"], families:["Creepster","Grenze Gotisch","Butcherman","Eater","Nosifer","Rubik Wet Paint","Rubik Glitch","Metal Mania","UnifrakturCook","Pirata One"] },
   { categories:["Broadcast","Condensed"], families:["Roboto Condensed","Open Sans Condensed","News Cycle","Encode Sans Condensed","Pathway Gothic One","Abel","Asap Condensed"] },
   { categories:["Wide","Display"], families:["Syncopate","Monoton","Zen Dots","Bruno Ace","Bruno Ace SC","Goldman","Days One"] },
 ];
@@ -26,6 +26,18 @@ const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g,"-").r
 // exposes 300/700). Keeping this explicit prevents a successful family load from
 // masking a missing bold or italic face during a full-library audit.
 const verifiedVariants: Record<string,{weights:number[];styles:Array<"normal"|"italic">}> = {
+  "Amatic SC":{weights:[400,700],styles:["normal"]},
+  "Arimo":{weights:[400,700],styles:["normal","italic"]},
+  "Balthazar":{weights:[400],styles:["normal"]},
+  "Bangers":{weights:[400],styles:["normal"]},
+  "Denk One":{weights:[400],styles:["normal"]},
+  "Fondamento":{weights:[400],styles:["normal","italic"]},
+  "Grenze Gotisch":{weights:[400,700],styles:["normal"]},
+  "Indie Flower":{weights:[400],styles:["normal"]},
+  "Josefin Sans":{weights:[400,700],styles:["normal","italic"]},
+  "Jura":{weights:[400,700],styles:["normal"]},
+  "Sarpanch":{weights:[400,500,600,700,800,900],styles:["normal"]},
+  "Titillium Web":{weights:[300,400,600,700],styles:["normal","italic"]},
   "Inter":{weights:[400,500,700],styles:["normal","italic"]},
   "Abel":{weights:[400],styles:["normal"]},
   "Audiowide":{weights:[400],styles:["normal"]},

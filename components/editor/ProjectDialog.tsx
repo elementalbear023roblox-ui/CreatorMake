@@ -2,17 +2,17 @@
 
 import { useRef, useState } from "react";
 import { Archive, Copy, Download, FolderOpen, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
-import type { ProjectSummary, RecoverySnapshot } from "@/lib/editor/types";
+import type { ProjectKind, ProjectSummary, RecoverySnapshot } from "@/lib/editor/types";
 
 type MaybePromise=void|Promise<void>;
 type Props = {
   open:boolean;onOpenChange:(open:boolean)=>void;activeId:string;currentName:string;projects:ProjectSummary[];recoveries:RecoverySnapshot[];
-  onCreate:(name:string)=>MaybePromise;onOpen:(id:string)=>MaybePromise;onRename:(name:string)=>MaybePromise;onDuplicate:()=>MaybePromise;onDelete:(id:string)=>MaybePromise;
+  onCreate:(name:string,projectKind?:ProjectKind)=>MaybePromise;onOpen:(id:string)=>MaybePromise;onRename:(name:string)=>MaybePromise;onDuplicate:()=>MaybePromise;onDelete:(id:string)=>MaybePromise;
   onImport:(value:unknown)=>MaybePromise;onExport:(id:string)=>MaybePromise;onArchive:(id:string)=>MaybePromise;onRecover:(id:string)=>MaybePromise;onDiscardRecovery:(id:string)=>MaybePromise;
 };
 
 export function ProjectDialog(props:Props){
-  const[newName,setNewName]=useState("New UI Project"),[error,setError]=useState(""),[busy,setBusy]=useState(false);
+  const[newName,setNewName]=useState("New UI Project"),[projectKind,setProjectKind]=useState<ProjectKind>("blank"),[error,setError]=useState(""),[busy,setBusy]=useState(false);
   const importInput=useRef<HTMLInputElement>(null),renameInput=useRef<HTMLInputElement>(null);
   if(!props.open)return null;
   const run=async(action:()=>MaybePromise,close=false)=>{setBusy(true);setError("");try{await action();if(close)props.onOpenChange(false);}catch(problem){setError(problem instanceof Error?problem.message:"CreatorMake could not complete that project action.");}finally{setBusy(false);}};
@@ -20,7 +20,7 @@ export function ProjectDialog(props:Props){
   const active=props.projects.filter((project)=>!project.archived),archived=props.projects.filter((project)=>project.archived);
   const cards=(items:ProjectSummary[])=>items.map((project)=><article key={project.id} className={`project-card ${project.id===props.activeId?"active":""}`}>
     <button className="project-card-open" onClick={()=>void run(()=>props.onOpen(project.id),true)} disabled={busy}>
-      <img src={project.thumbnail} alt=""/><span className="project-card-title"><strong>{project.name}</strong><em>{project.status}</em></span>
+      <img src={project.thumbnail} alt=""/><span className="project-card-title"><strong>{project.name}</strong><em>{project.projectKind==="commission"?"Commission":project.status}</em></span>
       <small>{project.platform} · {project.width}×{project.height} · {project.frameCount} frame{project.frameCount===1?"":"s"}</small>
       <small>Edited {new Date(project.updatedAt).toLocaleString()} · Created {new Date(project.createdAt).toLocaleDateString()}</small>
     </button>
@@ -29,7 +29,8 @@ export function ProjectDialog(props:Props){
   return <div className="dialog-overlay" onMouseDown={()=>props.onOpenChange(false)}><section className="project-dialog project-library" role="dialog" aria-modal="true" aria-labelledby="project-dialog-title" onMouseDown={(event)=>event.stopPropagation()}>
     <button className="dialog-close" aria-label="Close" onClick={()=>props.onOpenChange(false)}>×</button>
     <header><h2 id="project-dialog-title">Projects</h2><p>Local-first CreatorMake projects stored in IndexedDB, with automatic saves and recovery.</p></header>
-    <div className="project-create"><input value={newName} onChange={(event)=>setNewName(event.target.value)} aria-label="New project name"/><button disabled={busy} onClick={()=>void run(()=>props.onCreate(newName),true)}><Plus size={14}/> Create</button><button disabled={busy} onClick={()=>importInput.current?.click()}><Upload size={14}/> Import .creatormake</button><input ref={importInput} className="visually-hidden" type="file" accept=".creatormake,.creatormake-project,.json,application/json" onChange={(event)=>void importFile(event.target.files?.[0])}/></div>
+    <div className="project-kind"><button className={projectKind==="blank"?"active":""} onClick={()=>setProjectKind("blank")}><strong>Blank Project</strong><small>Empty canvas · design tools only</small></button><button className={projectKind==="commission"?"active":""} onClick={()=>setProjectKind("commission")}><strong>Commission Project</strong><small>Empty canvas · brief, references, and delivery helpers</small></button></div>
+    <div className="project-create"><input value={newName} onChange={(event)=>setNewName(event.target.value)} aria-label="New project name"/><button disabled={busy} onClick={()=>void run(()=>props.onCreate(newName,projectKind),true)}><Plus size={14}/> Create {projectKind==="commission"?"Commission":"Blank"}</button><button disabled={busy} onClick={()=>importInput.current?.click()}><Upload size={14}/> Import .creatormake</button><input ref={importInput} className="visually-hidden" type="file" accept=".creatormake,.creatormake-project,.json,application/json" onChange={(event)=>void importFile(event.target.files?.[0])}/></div>
     {error&&<output className="project-error">{error}</output>}
     <div className="project-rename"><input ref={renameInput} defaultValue={props.currentName} aria-label="Current project name"/><button disabled={busy} onClick={()=>void run(()=>props.onRename(renameInput.current?.value??props.currentName))}>Rename current</button><button disabled={busy} onClick={()=>void run(props.onDuplicate,true)}><Copy size={14}/> Duplicate</button></div>
     <div className="project-card-grid">{cards(active)}{active.length===0&&<p className="project-empty">No active projects. Restore one from Archive.</p>}</div>

@@ -3,6 +3,7 @@ export type ElementType = "frame" | "container" | "scrolling-frame" | "text" | "
 export type ImageFitMode = "fit" | "fill" | "stretch" | "original" | "tile";
 export type ImageState = "default" | "hover" | "pressed" | "disabled" | "selected";
 export type TextRobloxExportMode = "AUTO" | "NATIVE_TEXT" | "PIXEL_ACCURATE" | "NATIVE" | "PIXEL";
+export type TextSizingMode = "fixed" | "responsive";
 export type EditorAsset = {
   id:string;
   name:string;
@@ -21,6 +22,18 @@ export type EditorAsset = {
   animated:boolean;
   warning:string | null;
   favorite:boolean;
+};
+
+export type ProjectKind="blank"|"commission";
+export type CommissionBrief={
+  clientLabel:string;
+  gameName:string;
+  targetDevices:string[];
+  requestedStyle:string;
+  colorPalette:string;
+  fonts:string;
+  deliverables:string;
+  notes:string;
 };
 
 export type GeometryKind = "rectangle" | "rounded-rectangle" | "ellipse" | "circle" | "line" | "triangle" | "polygon" | "star" | "diamond" | "trapezoid" | "parallelogram" | "chevron" | "arrow" | "capsule" | "ring" | "arc" | "pie" | "notched-rectangle" | "cut-corner-rectangle" | "ticket" | "bracket" | "tab" | "banner" | "plaque" | "ribbon" | "custom-path";
@@ -131,6 +144,7 @@ export type EditorElement = {
   fontId: string;
   fontFamily: string;
   fontSize: number;
+  fontSizeDesign: number;
   fontWeight: number;
   fontStyle: "normal" | "italic";
   lineHeight: number;
@@ -147,8 +161,12 @@ export type EditorElement = {
   textShadows: string[];
   textBoxMode: "auto-width" | "auto-height" | "fixed";
   autoFit: boolean;
+  textSizingMode: TextSizingMode;
+  responsiveMinTextSize: number;
+  responsiveMaxTextSize: number;
   textAlign: "left" | "center" | "right";
   padding: number;
+  textPadding: EdgeInsets;
   z: number;
   rotateX: number;
   rotateY: number;
@@ -207,7 +225,7 @@ export type Screen = {
 };
 
 export type EditorProject = {
-  schemaVersion: 7;
+  schemaVersion: 9;
   id: string;
   name: string;
   createdAt: number;
@@ -216,6 +234,8 @@ export type EditorProject = {
   status: "Draft" | "In Progress" | "Client Review" | "Final";
   tags: string[];
   archived: boolean;
+  projectKind:ProjectKind;
+  commissionBrief:CommissionBrief;
   screen: Screen;
   elements: EditorElement[];
   assets: EditorAsset[];
@@ -256,7 +276,7 @@ export type GenerationHistoryEntry = {
   before: { elements: EditorElement[]; selectedIds: string[] };
 };
 
-export type ProjectSummary = Pick<EditorProject, "id" | "name" | "createdAt" | "updatedAt" | "platform" | "status" | "tags" | "archived"> & {
+export type ProjectSummary = Pick<EditorProject, "id" | "name" | "createdAt" | "updatedAt" | "platform" | "status" | "tags" | "archived" | "projectKind"> & {
   thumbnail: string;
   width: number;
   height: number;

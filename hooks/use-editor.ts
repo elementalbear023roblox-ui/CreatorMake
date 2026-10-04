@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createElement, createProject, createScrollingInventoryElements, createVectorElement, deleteStoredProject, discardRecoverySnapshot, duplicateProject, importProjectData, listProjects, listRecoverySnapshots, loadActiveProject, loadProject, restoreRecoverySnapshot, saveProject } from "@/lib/editor/project";
-import { alignSelection, convertSelectionToAutoLayout, distributeSelection, groupSelection, repeatGridSelection, stackSelection, ungroupSelection, type RepeatGridOptions } from "@/lib/editor/operations";
+import { alignSelection, convertSelectionToAutoLayout, distributeSelection, groupSelection, indentSelection, outdentSelection, reparentLayers, repeatGridSelection, stackSelection, ungroupSelection, validateLayerReparent, type LayerReparentRequest, type LayerReparentResult, type RepeatGridOptions } from "@/lib/editor/operations";
 import { applyAutoLayout } from "@/lib/editor/layout";
 import { applySharedPerspective } from "@/lib/editor/transforms";
+import { synchronizeTextSizingMutation } from "@/lib/editor/text-sizing";
 import { createImageElementForAsset, createVectorElementForSvgAsset, importImageFile } from "@/lib/editor/assets";
-import type { Alignment, AlignmentTarget, EditorElement, EditorHistoryCommand, EditorProject, ElementType, GenerationHistoryEntry, GeometryKind, ProjectSummary, RecoverySnapshot } from "@/lib/editor/types";
+import type { Alignment, AlignmentTarget, CommissionBrief, EditorElement, EditorHistoryCommand, EditorProject, ElementType, GenerationHistoryEntry, GeometryKind, ProjectKind, ProjectSummary, RecoverySnapshot } from "@/lib/editor/types";
 import type { EditorReference, FrameRecipe, ResearchResult } from "@/lib/design-intelligence/types";
 
 const descendantIds=(elements:EditorElement[],roots:string[])=>{const ids=new Set(roots);let changed=true;while(changed){changed=false;elements.forEach((item)=>{if(item.parentId&&ids.has(item.parentId)&&!ids.has(item.id)){ids.add(item.id);changed=true;}});}return ids;};
@@ -69,7 +70,7 @@ export function useEditor() {
   },[]);
 
   const applyTransientNow=useCallback((pending:{operations:Array<(draft:EditorProject)=>void>;affectedIds:Set<string>|null})=>{
-    const current=projectRef.current,next=mutableProject(current,pending.affectedIds??undefined);pending.operations.forEach((operation)=>operation(next));projectRef.current=next;setProject(next);
+    const current=projectRef.current,next=mutableProject(current,pending.affectedIds??undefined);pending.operations.forEach((operation)=>operation(next));synchronizeTextSizingMutation(current,next);projectRef.current=next;setProject(next);
   },[]);
 
   const flushTransient=useCallback(()=>{
@@ -94,7 +95,7 @@ export function useEditor() {
 
   const finishGesture=useCallback(()=>{
     flushTransient();const transaction=transactionRef.current;transactionRef.current=null;transientBlocked.current=false;if(!transaction)return;
-    const current=projectRef.current,next=mutableProject(current);applyAutoLayout(next);next.updatedAt=Date.now();projectRef.current=next;setProject(next);recordHistory(transaction.label,transaction.before,next);
+    const current=projectRef.current,next=mutableProject(current);synchronizeTextSizingMutation(transaction.before,next);applyAutoLayout(next);next.updatedAt=Date.now();projectRef.current=next;setProject(next);recordHistory(transaction.label,transaction.before,next);
   },[flushTransient,recordHistory]);
 
   const cancelHistoryTransaction=useCallback(()=>{
@@ -102,7 +103,7 @@ export function useEditor() {
   },[]);
 
   const commit = useCallback((mutate:(draft:EditorProject)=>void,label="Edit")=>{
-    flushTransient();const current=projectRef.current,next=mutableProject(current);mutate(next);applyAutoLayout(next);next.updatedAt=Date.now();
+    flushTransient();const current=projectRef.current,next=mutableProject(current);mutate(next);synchronizeTextSizingMutation(current,next);applyAutoLayout(next);next.updatedAt=Date.now();
     if(JSON.stringify(historyComparable(current))===JSON.stringify(historyComparable(next)))return;
     projectRef.current=next;setProject(next);
     if(transactionRef.current)return;
@@ -129,6 +130,9 @@ export function useEditor() {
     if (index < 0 || target < 0 || target >= draft.elements.length) return;
     [draft.elements[index], draft.elements[target]] = [draft.elements[target], draft.elements[index]];
   });
+  const reparent=(request:LayerReparentRequest):LayerReparentResult=>{const validation=validateLayerReparent(projectRef.current,request);if(!validation.ok)return validation;let result:LayerReparentResult=validation;commit((draft)=>{result=reparentLayers(draft,request);},request.position==="inside"?"Reparent Layers":"Reorder Layers");return result;};
+  const indent=():LayerReparentResult=>{let result:LayerReparentResult={ok:false,movedIds:[],reason:"Nothing moved."};commit((draft)=>{result=indentSelection(draft);},"Move Into Previous Container");return result;};
+  const outdent=():LayerReparentResult=>{let result:LayerReparentResult={ok:false,movedIds:[],reason:"Nothing moved."};commit((draft)=>{result=outdentSelection(draft);},"Move Out One Level");return result;};
   const align = (alignment: Alignment,target:AlignmentTarget="selection") => commit((draft) => alignSelection(draft, alignment,target),`Align ${alignment}`);
   const distribute = (axis: "horizontal" | "vertical",exactSpacing?:number) => commit((draft) => distributeSelection(draft, axis,exactSpacing),`Distribute ${axis}`);
   const stack = (axis:"horizontal"|"vertical",gap:number,alignment:"start"|"center"|"end"="center")=>commit((draft)=>stackSelection(draft,axis,gap,alignment),`Stack ${axis}`);
@@ -143,6 +147,7 @@ export function useEditor() {
   const toggleFavoritePreset = (id: string) => commit((draft) => { draft.favoritePresetIds = draft.favoritePresetIds.includes(id) ? draft.favoritePresetIds.filter((item) => item !== id) : [...draft.favoritePresetIds,id]; });
   const applyFont = (id: string, family: string, weight = 400, style: EditorElement["fontStyle"] = "normal") => commit((draft) => { draft.elements.forEach((item) => { if (draft.selectedIds.includes(item.id) && (item.type === "text" || item.type === "button")) { item.fontId=id; item.fontFamily = family; item.fontWeight = weight; item.fontStyle = style; } }); draft.recentFontIds = [id,...draft.recentFontIds.filter((item) => item !== id)].slice(0,12); });
   const toggleFavoriteFont = (id: string) => commit((draft) => { draft.favoriteFontIds = draft.favoriteFontIds.includes(id) ? draft.favoriteFontIds.filter((item) => item !== id) : [...draft.favoriteFontIds,id]; });
+  const updateCommissionBrief=(patch:Partial<CommissionBrief>)=>commit((draft)=>{draft.commissionBrief={...draft.commissionBrief,...patch};},"Update Commission Brief");
   const saveFrameRecipe = (recipe: FrameRecipe) => commit((draft) => { const index = draft.customFrameRecipes.findIndex((item) => item.id === recipe.id); if (index >= 0) draft.customFrameRecipes[index] = recipe; else draft.customFrameRecipes.push(recipe); });
   const cacheResearch = (key: string, result: ResearchResult) => commit((draft) => { draft.researchCache[key] = result; });
   const restoreGeneration = (entry: GenerationHistoryEntry) => commit((draft) => { draft.elements = structuredClone(entry.before.elements); draft.selectedIds = [...entry.before.selectedIds]; });
@@ -163,7 +168,7 @@ export function useEditor() {
   const applyAssetToSelection=(assetId:string)=>commit((draft)=>{draft.elements.forEach((item)=>{if(draft.selectedIds.includes(item.id))item.imageAssetId=assetId;});},"Apply Image Asset");
   const applyAssetToElement=(assetId:string,elementId:string)=>commit((draft)=>{const item=draft.elements.find((element)=>element.id===elementId),asset=draft.assets.find((candidate)=>candidate.id===assetId);if(!item||!asset)return;item.imageAssetId=assetId;item.imageFit=item.imageFit??"fill";draft.selectedIds=[item.id];},"Apply Image Fill");
 
-  const createNewProject = async(name: string) => { await forceSave();const next = createProject(name || "Untitled UI"); await saveProject(next,{createRecovery:false});setProject(next); setPast([]); setFuture([]); await refreshLibrary(); };
+  const createNewProject = async(name:string,projectKind:ProjectKind="blank") => { await forceSave();const next = createProject(name || (projectKind==="commission"?"New Commission":"Untitled UI"),projectKind); await saveProject(next,{createRecovery:false});setProject(next); setPast([]); setFuture([]); await refreshLibrary(); };
   const openProject = async(id: string) => { await forceSave();const next = await loadProject(id); if (next) { setProject(next); setPast([]); setFuture([]); } };
   const renameProject = (name: string) => commit((draft) => { draft.name = name.trim() || draft.name; });
   const duplicateCurrent = async() => { await forceSave();const next = duplicateProject(projectRef.current); await saveProject(next,{createRecovery:false});setProject(next); setPast([]); setFuture([]); await refreshLibrary(); };
@@ -173,7 +178,7 @@ export function useEditor() {
   const discardRecovery=async(id:string)=>{await discardRecoverySnapshot(id);await refreshLibrary();};
   const archiveProject=async(id:string)=>{const target=await loadProject(id);if(!target)return;target.archived=!target.archived;target.updatedAt=Date.now();await saveProject(target,{createRecovery:false});if(id===projectRef.current.id)setProject(target);await refreshLibrary();};
 
-  return { project, setProject, past, future, historyEntries:[...past].reverse(), status, projects, recoveries, commit, beginHistoryTransaction, transient, finishGesture, cancelHistoryTransaction, importImages, placeAsset, placeSvgAsVector, renameAsset, setAssetFolder, toggleFavoriteAsset, createAssetFolder, applyAssetToSelection, applyAssetToElement, addElement, addGeometry, select, setSelection, updateSelected, deleteSelected, duplicateSelected, rememberDuplicateTransform, repeatGrid, reorder, align, distribute, stack, autoLayoutSelection, group, ungroup, nudge, addReferences, updateReference, removeReference, togglePreset, toggleFavoritePreset, applyFont, toggleFavoriteFont, saveFrameRecipe, cacheResearch, restoreGeneration, undo, redo, forceSave, createNewProject, openProject, renameProject, duplicateCurrent, removeProject, importProject, recoverProject, discardRecovery, archiveProject };
+  return { project, setProject, past, future, historyEntries:[...past].reverse(), status, projects, recoveries, commit, beginHistoryTransaction, transient, finishGesture, cancelHistoryTransaction, importImages, placeAsset, placeSvgAsVector, renameAsset, setAssetFolder, toggleFavoriteAsset, createAssetFolder, applyAssetToSelection, applyAssetToElement, addElement, addGeometry, select, setSelection, updateSelected, deleteSelected, duplicateSelected, rememberDuplicateTransform, repeatGrid, reorder, reparent, indent, outdent, align, distribute, stack, autoLayoutSelection, group, ungroup, nudge, addReferences, updateReference, removeReference, togglePreset, toggleFavoritePreset, applyFont, toggleFavoriteFont, updateCommissionBrief, saveFrameRecipe, cacheResearch, restoreGeneration, undo, redo, forceSave, createNewProject, openProject, renameProject, duplicateCurrent, removeProject, importProject, recoverProject, discardRecovery, archiveProject };
 }
 
 function propertyLabel(patch:Partial<EditorElement>,project:EditorProject){const keys=Object.keys(patch),count=project.selectedIds.length,name=count>1?`${count} Objects`:`"${project.elements.find((item)=>item.id===project.selectedIds[0])?.name??"Object"}"`;if(keys.some((key)=>["x","y"].includes(key)))return`Move ${name}`;if(keys.some((key)=>["width","height"].includes(key)))return`Resize ${name}`;if(keys.includes("rotation"))return`Rotate ${name}`;if(keys.includes("fontFamily")||keys.includes("fontId"))return"Change Font";if(keys.some((key)=>key.startsWith("gradient")))return"Change Gradient";if(keys.includes("geometry"))return"Edit Path";if(keys.includes("imageAssetId"))return"Replace Image";return`Change ${keys[0]??"Property"}`;}

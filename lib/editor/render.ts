@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { EditorElement } from "./types";
+import { designFontSize, textPadding } from "./text-sizing.ts";
 
 const alpha = (hex: string, opacity: number) => {
   if (!hex.startsWith("#") || hex.length !== 7) return hex;
@@ -28,7 +29,7 @@ export function elementStyle(element: EditorElement): CSSProperties {
   return {
     left: element.x, top: element.y, width: element.width, height: element.height,
     transform: `perspective(${element.perspective}px) translateZ(${element.translateZ + element.z}px) rotateX(${element.rotateX}deg) rotateY(${element.rotateY}deg) rotateZ(${element.rotation}deg) skew(${element.skewX}deg,${element.skewY}deg) scale(${element.scaleX},${element.scaleY})`,
-    transformOrigin: `${element.originX}% ${element.originY}%`, perspectiveOrigin: `${element.perspectiveOriginX}% ${element.perspectiveOriginY}%`, zIndex: element.zIndex, opacity: element.opacity / 100, color: element.textColor, fontFamily: element.fontFamily, fontSize: element.fontSize,
+    transformOrigin: `${element.originX}% ${element.originY}%`, perspectiveOrigin: `${element.perspectiveOriginX}% ${element.perspectiveOriginY}%`, zIndex: element.zIndex, opacity: element.opacity / 100, color: element.textColor, fontFamily: element.fontFamily, fontSize: designFontSize(element),
     fontWeight: element.fontWeight, fontStyle: element.fontStyle, textAlign: element.textAlign, lineHeight: element.lineHeight, letterSpacing: element.letterSpacing, wordSpacing: element.wordSpacing,
     textTransform: element.textTransform, textDecoration: element.textDecoration, textShadow: element.textShadows.join(", ") || undefined,
     WebkitTextStroke: element.textStrokeWidth ? `${element.textStrokeWidth}px ${alpha(element.textStrokeColor, element.textStrokeOpacity)}` : undefined,
@@ -39,5 +40,6 @@ export function elementStyle(element: EditorElement): CSSProperties {
 export function elementSurfaceStyle(element: EditorElement): CSSProperties {
   const clipPath = element.type === "ellipse" ? "ellipse(50% 50% at 50% 50%)" : element.type === "polygon" ? "polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%)" : element.type === "star" ? "polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 94%,50% 72%,21% 94%,32% 57%,2% 35%,39% 35%)" : undefined;
   const alignItems=element.type === "button" || element.type === "text" ? element.verticalAlign === "top" ? "flex-start" : element.verticalAlign === "bottom" ? "flex-end" : "center" : "flex-start";
-  return { position: "absolute", inset: 0, display: "flex", alignItems, justifyContent: element.type === "button" ? "center" : undefined, background: elementBackground(element), borderColor: element.borderColor, borderWidth: element.borderWidth, borderStyle: "solid", borderRadius: `${element.corners.tl}px ${element.corners.tr}px ${element.corners.br}px ${element.corners.bl}px`, boxShadow: element.shadow, padding: element.padding, clipPath, overflow: element.clipContent ? "hidden" : "visible", boxSizing: "border-box" };
+  const padding=element.type==="text"||element.type==="button"?textPadding(element):element.padding;
+  return { position: "absolute", inset: 0, display: "flex", alignItems, justifyContent: element.type === "button" ? "center" : undefined, background: elementBackground(element), borderColor: element.borderColor, borderWidth: element.borderWidth, borderStyle: "solid", borderRadius: `${element.corners.tl}px ${element.corners.tr}px ${element.corners.br}px ${element.corners.bl}px`, boxShadow: element.shadow, padding:typeof padding==="number"?padding:`${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`, clipPath, overflow: element.clipContent ? "hidden" : "visible", boxSizing: "border-box" };
 }

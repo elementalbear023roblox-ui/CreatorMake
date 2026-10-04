@@ -1,6 +1,7 @@
 import { elementBackground } from "../editor/render.ts";
 import { geometryPresentation, openGeometryStrokeWidth, usesVectorSurface } from "../editor/geometry.ts";
 import { rasterizeWithCreatorMakeRenderer } from "../editor/canvas-rasterizer.ts";
+import { designFontSize, textPadding, textSizingMode } from "../editor/text-sizing.ts";
 import { CREATOR_FONTS, creatorFontRasterStyle, hasLoadedCreatorFontFace, loadCreatorFont, resolveCreatorFontVariant } from "../fonts/font-library.ts";
 import type { CreatorFont, FontLoadStatus } from "../fonts/font-library.ts";
 import type { EditorAsset, EditorElement, EditorProject } from "../editor/types.ts";
@@ -10,7 +11,7 @@ import type { RobloxExportOptions, RobloxRasterPart, RobloxRenderAsset, RobloxRe
 export type RobloxAssetMappings = Record<string,string>;
 // Bump whenever canonical geometry interpretation changes so IndexedDB cannot
 // reuse a pre-fidelity rectangular raster for an unchanged custom path.
-const RENDERER_VERSION=11;
+const RENDERER_VERSION=13;
 const MAX_EDITABLE_IMAGE_DIMENSION=1024;
 const SAMPLE_POINTS=[
   {label:"10%,10%",normalizedX:.1,normalizedY:.1},
@@ -35,8 +36,14 @@ const mappingKey=(sourceId:string,visualHash:string)=>`${sourceId}:${visualHash}
 export function normalizeRobloxAssetId(value:string){const trimmed=value.trim();if(/^\d+$/.test(trimmed))return`rbxassetid://${trimmed}`;return validAssetId(trimmed)?trimmed:"";}
 export function assetMappingKey(sourceId:string,visualHash:string){return mappingKey(sourceId,visualHash);}
 
+const sharedTextObjectScale=(element:EditorElement,visualPart:RobloxRasterPart)=>{
+  if((element.type!=="text"&&element.type!=="button")||visualPart==="full")return 1;
+  return Number.isFinite(element.scaleX)&&element.scaleX>0&&Math.abs(element.scaleX-element.scaleY)<.0001?element.scaleX:1;
+};
+const rasterElementForPart=(element:EditorElement,visualPart:RobloxRasterPart)=>sharedTextObjectScale(element,visualPart)!==1?{...element,scaleX:1,scaleY:1}:element;
+
 export function visualStateForElement(element:EditorElement,visualPart:RobloxRasterPart="full"){
-  const splitTextVisual=(element.type==="text"||element.type==="button")&&visualPart!=="full",advancedTransform={scaleX:element.scaleX,scaleY:element.scaleY,rotation:splitTextVisual?0:element.rotation,rotateX:element.rotateX,rotateY:element.rotateY,skewX:element.skewX,skewY:element.skewY,perspective:element.perspective,perspectiveOriginX:element.perspectiveOriginX,perspectiveOriginY:element.perspectiveOriginY,translateZ:element.translateZ,z:element.z,originX:element.originX,originY:element.originY};
+  const splitTextVisual=(element.type==="text"||element.type==="button")&&visualPart!=="full",rasterElement=rasterElementForPart(element,visualPart),advancedTransform={scaleX:rasterElement.scaleX,scaleY:rasterElement.scaleY,rotation:splitTextVisual?0:element.rotation,rotateX:element.rotateX,rotateY:element.rotateY,skewX:element.skewX,skewY:element.skewY,perspective:element.perspective,perspectiveOriginX:element.perspectiveOriginX,perspectiveOriginY:element.perspectiveOriginY,translateZ:element.translateZ,z:element.z,originX:element.originX,originY:element.originY};
   const surface={
     type:element.type,width:element.width,height:element.height,opacity:element.opacity,
     fill:element.fill,borderColor:element.borderColor,borderWidth:element.borderWidth,cornerRadius:element.cornerRadius,corners:element.corners,cornerTypes:element.cornerTypes,
@@ -46,8 +53,8 @@ export function visualStateForElement(element:EditorElement,visualPart:RobloxRas
     image:{assetId:element.imageAssetId,fit:element.imageFit,crop:element.imageCrop,offsetX:element.imageOffsetX,offsetY:element.imageOffsetY,scale:element.imageScale,scaleX:element.imageScaleX,scaleY:element.imageScaleY,rotation:element.imageRotation,opacity:element.imageOpacity,flipX:element.imageFlipX,flipY:element.imageFlipY,tileWidth:element.imageTileWidth,tileHeight:element.imageTileHeight,brightness:element.imageBrightness,contrast:element.imageContrast,saturation:element.imageSaturation,hue:element.imageHue,blur:element.imageBlur,tint:element.imageTint,tintOpacity:element.imageTintOpacity,sliceCenter:element.sliceCenter},
   };
   if(visualPart==="background")return{...surface,visualPart};
-  const text={type:element.type,width:element.width,height:element.height,opacity:element.opacity,padding:element.padding,clipContent:element.clipContent,advancedTransform,visualPart,
-    text:element.text,textColor:element.textColor,fontFamily:element.fontFamily,fontSize:element.fontSize,fontWeight:element.fontWeight,fontStyle:element.fontStyle,
+  const text={type:element.type,width:element.width,height:element.height,opacity:element.opacity,padding:textPadding(element),clipContent:element.clipContent,advancedTransform,visualPart,
+    text:element.text,textColor:element.textColor,fontFamily:element.fontFamily,fontSizeDesign:designFontSize(element),textSizingMode:textSizingMode(element),fontWeight:element.fontWeight,fontStyle:element.fontStyle,
     lineHeight:element.lineHeight,letterSpacing:element.letterSpacing,wordSpacing:element.wordSpacing,paragraphSpacing:element.paragraphSpacing,verticalAlign:element.verticalAlign,
     textTransform:element.textTransform,textDecoration:element.textDecoration,textStrokeColor:element.textStrokeColor,textStrokeWidth:element.textStrokeWidth,textStrokeOpacity:element.textStrokeOpacity,textStrokePosition:element.textStrokePosition,textShadows:element.textShadows,textBoxMode:element.textBoxMode,autoFit:element.autoFit,textAlign:element.textAlign,
   };
@@ -99,7 +106,7 @@ function canonicalArtworkBounds(element:EditorElement){
 }
 
 export function visualBoundsForElement(element:EditorElement,visualPart:RobloxRasterPart="full"){
-  const splitTextVisual=(element.type==="text"||element.type==="button")&&visualPart!=="full",padding=shadowPadding(element,visualPart),art=visualPart==="text"?{minX:0,minY:0,maxX:element.width,maxY:element.height}:canonicalArtworkBounds(element),originX=element.width*element.originX/100,originY=element.height*element.originY/100,skewX=Math.tan(element.skewX*Math.PI/180),skewY=Math.tan(element.skewY*Math.PI/180),a=element.scaleX*Math.cos(element.rotateY*Math.PI/180),b=skewY,c=skewX,d=element.scaleY*Math.cos(element.rotateX*Math.PI/180),angle=(splitTextVisual?0:element.rotation)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle),points=[[art.minX,art.minY],[art.maxX,art.minY],[art.maxX,art.maxY],[art.minX,art.maxY]].map(([x,y])=>{const tx=a*(x-originX)+c*(y-originY),ty=b*(x-originX)+d*(y-originY);return{x:originX+tx*cos-ty*sin,y:originY+tx*sin+ty*cos};}),minX=Math.min(...points.map((point)=>point.x)),maxX=Math.max(...points.map((point)=>point.x)),minY=Math.min(...points.map((point)=>point.y)),maxY=Math.max(...points.map((point)=>point.y));
+  const splitTextVisual=(element.type==="text"||element.type==="button")&&visualPart!=="full",rasterElement=rasterElementForPart(element,visualPart),padding=shadowPadding(element,visualPart),art=visualPart==="text"?{minX:0,minY:0,maxX:element.width,maxY:element.height}:canonicalArtworkBounds(element),originX=element.width*element.originX/100,originY=element.height*element.originY/100,skewX=Math.tan(element.skewX*Math.PI/180),skewY=Math.tan(element.skewY*Math.PI/180),a=rasterElement.scaleX*Math.cos(element.rotateY*Math.PI/180),b=skewY,c=skewX,d=rasterElement.scaleY*Math.cos(element.rotateX*Math.PI/180),angle=(splitTextVisual?0:element.rotation)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle),points=[[art.minX,art.minY],[art.maxX,art.minY],[art.maxX,art.maxY],[art.minX,art.maxY]].map(([x,y])=>{const tx=a*(x-originX)+c*(y-originY),ty=b*(x-originX)+d*(y-originY);return{x:originX+tx*cos-ty*sin,y:originY+tx*sin+ty*cos};}),minX=Math.min(...points.map((point)=>point.x)),maxX=Math.max(...points.map((point)=>point.x)),minY=Math.min(...points.map((point)=>point.y)),maxY=Math.max(...points.map((point)=>point.y));
   return{x:minX-padding,y:minY-padding,width:Math.max(1,maxX-minX+padding*2),height:Math.max(1,maxY-minY+padding*2)};
 }
 
@@ -119,31 +126,31 @@ export function planPixelAccurateAssets(project:EditorProject,options:Pick<Roblo
 }
 
 const fontCss=(element:EditorElement)=>[
-  `color:${element.textColor}`,`font-family:${JSON.stringify(element.fontFamily)}`,`font-size:${px(element.fontSize)}px`,`font-weight:${element.fontWeight}`,`font-style:${element.fontStyle}`,
+  `color:${element.textColor}`,`font-family:${JSON.stringify(element.fontFamily)}`,`font-size:${px(designFontSize(element))}px`,`font-weight:${element.fontWeight}`,`font-style:${element.fontStyle}`,
   `line-height:${px(element.lineHeight)}`,`letter-spacing:${px(element.letterSpacing)}px`,`word-spacing:${px(element.wordSpacing)}px`,`text-align:${element.textAlign}`,
   `text-transform:${element.textTransform}`,`text-decoration:${element.textDecoration}`,`text-shadow:${element.textShadows.join(",")||"none"}`,
   element.textStrokeWidth?`-webkit-text-stroke:${px(element.textStrokeWidth)}px ${element.textStrokeColor}`:"",`paint-order:stroke fill`,`white-space:${element.textBoxMode==="auto-width"?"pre":"pre-wrap"}`,
 ].filter(Boolean).join(";");
 const alignment=(element:EditorElement)=>element.verticalAlign==="top"?"flex-start":element.verticalAlign==="bottom"?"flex-end":"center";
 const advancedTransform=(element:EditorElement)=>`perspective(${px(element.perspective)}px) translateZ(${px(element.translateZ+element.z)}px) rotateX(${px(element.rotateX)}deg) rotateY(${px(element.rotateY)}deg) skew(${px(element.skewX)}deg,${px(element.skewY)}deg) scale(${px(element.scaleX)},${px(element.scaleY)})`;
-const contentStyle=(element:EditorElement,includeSurface:boolean)=>[
+const contentStyle=(element:EditorElement,includeSurface:boolean)=>{const padding=textPadding(element);return[
   `position:absolute`,`left:0`,`top:0`,`width:${px(element.width)}px`,`height:${px(element.height)}px`,`box-sizing:border-box`,`display:flex`,`overflow:${element.clipContent?"hidden":"visible"}`,
-  `align-items:${alignment(element)}`,element.type==="button"?"justify-content:center":"",`padding:${px(element.padding)}px`,fontCss(element),
+  `align-items:${alignment(element)}`,element.type==="button"?"justify-content:center":"",`padding:${px(padding.top)}px ${px(padding.right)}px ${px(padding.bottom)}px ${px(padding.left)}px`,fontCss(element),
   includeSurface?`background:${elementBackground(element)}`:"",includeSurface?`border:${px(element.borderWidth)}px solid ${element.borderColor}`:"",includeSurface?`border-radius:${px(element.corners.tl)}px ${px(element.corners.tr)}px ${px(element.corners.br)}px ${px(element.corners.bl)}px`:"",includeSurface?`box-shadow:${element.shadow}`:"",
   `opacity:${px(element.opacity/100)}`,`transform:${advancedTransform(element)}`,`transform-origin:${px(element.originX)}% ${px(element.originY)}%`,`mix-blend-mode:${element.blendMode}`,
-].filter(Boolean).join(";");
+].filter(Boolean).join(";");};
 
 export function renderElementSvg(element:EditorElement,scale:RobloxRenderScale,visualPart:RobloxRasterPart="full"){
-  const visualBounds=visualBoundsForElement(element,visualPart),renderWidth=Math.max(1,Math.ceil(visualBounds.width*scale)),renderHeight=Math.max(1,Math.ceil(visualBounds.height*scale)),offsetX=-visualBounds.x,offsetY=-visualBounds.y,offset=`transform:translate(${px(offsetX)}px,${px(offsetY)}px)`;
+  const rasterElement=rasterElementForPart(element,visualPart),visualBounds=visualBoundsForElement(element,visualPart),renderWidth=Math.max(1,Math.ceil(visualBounds.width*scale)),renderHeight=Math.max(1,Math.ceil(visualBounds.height*scale)),offsetX=-visualBounds.x,offsetY=-visualBounds.y,offset=`transform:translate(${px(offsetX)}px,${px(offsetY)}px)`;
   let body:string;
   if(visualPart==="text"){
-    body=`<foreignObject x="${px(offsetX)}" y="${px(offsetY)}" width="${px(element.width)}" height="${px(element.height)}"><div xmlns="http://www.w3.org/1999/xhtml" style="${css(contentStyle(element,false))}">${esc(element.text)}</div></foreignObject>`;
+    body=`<foreignObject x="${px(offsetX)}" y="${px(offsetY)}" width="${px(element.width)}" height="${px(element.height)}"><div xmlns="http://www.w3.org/1999/xhtml" style="${css(contentStyle(rasterElement,false))}">${esc(element.text)}</div></foreignObject>`;
   }else if(usesVectorSurface(element)){
     const geometry=geometryPresentation(element),clipId=`shape-${element.id.replace(/[^a-zA-Z0-9_-]/g,"")}`,strokeWidth=geometry.open?openGeometryStrokeWidth(element):element.borderWidth,stroke=geometry.open?(element.fill==="transparent"?element.borderColor:element.fill):element.borderColor;
     const text=visualPart==="full"&&(element.type==="button"||element.type==="text")?`<foreignObject x="${px(offsetX)}" y="${px(offsetY)}" width="${px(element.width)}" height="${px(element.height)}"><div xmlns="http://www.w3.org/1999/xhtml" style="${css(contentStyle(element,false))}">${esc(element.text)}</div></foreignObject>`:"";
     body=`<g style="${offset}"><defs><clipPath id="${clipId}"><path d="${esc(geometry.path)}"${geometry.transform?` transform="${esc(geometry.transform)}"`:""} fill-rule="${geometry.fillRule}" clip-rule="${geometry.fillRule}"/></clipPath></defs>${geometry.open?"":`<foreignObject x="0" y="0" width="${px(element.width)}" height="${px(element.height)}" clip-path="url(#${clipId})"><div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:${css(elementBackground(element))};box-shadow:${css(element.shadow)}"></div></foreignObject>`}<path d="${esc(geometry.path)}"${geometry.transform?` transform="${esc(geometry.transform)}"`:""} fill="none" stroke="${esc(stroke)}" stroke-width="${px(strokeWidth)}" stroke-opacity="${stroke==="transparent"?0:1}" fill-rule="${geometry.fillRule}" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/></g>${text}`;
   }else{
-    body=`<foreignObject x="${px(offsetX)}" y="${px(offsetY)}" width="${px(element.width)}" height="${px(element.height)}"><div xmlns="http://www.w3.org/1999/xhtml" style="${css(contentStyle(element,true))}">${visualPart==="full"&&(element.type==="button"||element.type==="text")?esc(element.text):""}</div></foreignObject>`;
+    body=`<foreignObject x="${px(offsetX)}" y="${px(offsetY)}" width="${px(element.width)}" height="${px(element.height)}"><div xmlns="http://www.w3.org/1999/xhtml" style="${css(contentStyle(rasterElement,true))}">${visualPart==="full"&&(element.type==="button"||element.type==="text")?esc(element.text):""}</div></foreignObject>`;
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${renderWidth}" height="${renderHeight}" viewBox="0 0 ${px(visualBounds.width)} ${px(visualBounds.height)}"><rect width="100%" height="100%" fill="none"/>${body}</svg>`;
 }
@@ -172,7 +179,7 @@ export async function ensurePixelExportFont(element:EditorElement,runtime:PixelE
   const variant=resolveCreatorFontVariant(registered,element.fontWeight,element.fontStyle);
   const result=await runtime.load(registered,variant.weight,variant.style);
   if(result!=="loaded")throw new Error(`FONT_RENDER_BLOCKED: Font failed to load: ${element.fontFamily} ${variant.weight} ${variant.style}`);
-  const sample=element.text||"CreatorMake",descriptor=`${variant.style} ${variant.weight} ${Math.max(1,element.fontSize)}px ${JSON.stringify(element.fontFamily)}`;
+  const sample=element.text||"CreatorMake",descriptor=`${variant.style} ${variant.weight} ${Math.max(1,designFontSize(element))}px ${JSON.stringify(element.fontFamily)}`;
   const faceCount=await runtime.loadDescriptor(descriptor,sample);
   if(faceCount<1||!runtime.hasLoadedFace(element.fontFamily,variant.weight,variant.style))throw new Error(`FONT_RENDER_BLOCKED: Font fallback detected: ${element.fontFamily}`);
   let css:string;try{css=await runtime.rasterStyle(registered,variant.weight,variant.style,sample);}catch(error){throw new Error(`FONT_RENDER_BLOCKED: Font failed to embed: ${element.fontFamily}. ${error instanceof Error?error.message:String(error)}`);}

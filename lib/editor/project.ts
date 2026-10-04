@@ -1,6 +1,7 @@
 import { DEFAULT_CORNER_TYPES, DEFAULT_VECTOR_GEOMETRY, GEOMETRY_OPTIONS, defaultGeometryKindForElementType, geometryKindForElement } from "./geometry.ts";
 import type { EditorAsset, EditorElement, EditorProject, ElementType, GeometryKind, ProjectSummary, RecoverySnapshot } from "./types";
 import { CREATOR_FONTS, FONT_BY_ID } from "../fonts/font-library.ts";
+import { getRobloxFontDefinition, resolveRobloxFontVariant } from "../roblox/fonts.ts";
 
 const PROJECT_PREFIX = "creatormake:project:";
 const INDEX_KEY = "creatormake:projects";
@@ -14,7 +15,8 @@ const SUMMARY_STORE = "summaries";
 const RECOVERY_STORE = "recoveries";
 const SETTINGS_STORE = "settings";
 const ASSET_STORE = "assets";
-export const CREATORMAKE_SCHEMA_VERSION = 7 as const;
+export const CREATORMAKE_SCHEMA_VERSION = 9 as const;
+const EMPTY_COMMISSION_BRIEF={clientLabel:"",gameName:"",targetDevices:["Desktop","Phone","Tablet"],requestedStyle:"",colorPalette:"",fonts:"",deliverables:"Roblox-ready project, PNG previews, project backup",notes:""};
 
 export const createId = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 
@@ -34,9 +36,9 @@ export function createElement(type: ElementType, index = 0): EditorElement {
     cornerTypes: { ...DEFAULT_CORNER_TYPES }, geometry: { ...DEFAULT_VECTOR_GEOMETRY, kind:defaultGeometryKindForElementType(type) }, booleanOperation: null, booleanOperands: [],
     gradientStops: [{ id: createId("stop"), color: "#7457ff", position: 0, opacity: 100 }, { id: createId("stop"), color: "#25c8ff", position: 100, opacity: 100 }], blendMode: "normal" as const,
     gradientPoints:[{id:createId("point"),color:"#7457ff",x:25,y:25,opacity:100,radius:58},{id:createId("point"),color:"#25c8ff",x:75,y:70,opacity:100,radius:62}],fourCornerColors:{tl:"#7457ff",tr:"#25c8ff",bl:"#ff4aa2",br:"#ffcb4d"},
-    shadow: "0 12px 30px rgba(0,0,0,.28)", textColor: "#ffffff", fontId: "inter", fontFamily: "Inter", fontSize: 18, fontWeight: 500, fontStyle: "normal" as const, lineHeight: 1.2, letterSpacing: 0, wordSpacing: 0, paragraphSpacing: 0,
+    shadow: "0 12px 30px rgba(0,0,0,.28)", textColor: "#ffffff", fontId: "inter", fontFamily: "Inter", fontSize: 18, fontSizeDesign: 18, fontWeight: 500, fontStyle: "normal" as const, lineHeight: 1.2, letterSpacing: 0, wordSpacing: 0, paragraphSpacing: 0,
     verticalAlign: "center" as const, textTransform: "none" as const, textDecoration: "none" as const,
-    textStrokeColor: "#000000", textStrokeWidth: 0, textStrokeOpacity: 100, textStrokePosition: "center" as const, textShadows: [], textBoxMode: "fixed" as const, autoFit: false, textAlign: "left" as const, padding: 12,
+    textStrokeColor: "#000000", textStrokeWidth: 0, textStrokeOpacity: 100, textStrokePosition: "center" as const, textShadows: [], textBoxMode: "fixed" as const, autoFit: false, textSizingMode: "fixed" as const, responsiveMinTextSize: 8, responsiveMaxTextSize: 18, textAlign: "left" as const, padding: 12, textPadding: { top: 12, right: 12, bottom: 12, left: 12 },
     z: 0, rotateX: 0, rotateY: 0, perspective: 900, perspectiveOriginX: 50, perspectiveOriginY: 50, translateZ: 0, skewX: 0, skewY: 0, locked: false, hidden: false,
     imageAssetId:null,imageFit:"fit" as const,imageCrop:{x:0,y:0,width:100,height:100},imageOffsetX:0,imageOffsetY:0,imageScale:1,imageScaleX:1,imageScaleY:1,imageRotation:0,imageOpacity:100,imageFlipX:false,imageFlipY:false,imageTileWidth:128,imageTileHeight:128,imageBrightness:100,imageContrast:100,imageSaturation:100,imageHue:0,imageBlur:0,imageTint:"#ffffff",imageTintOpacity:0,imageStateAssetIds:{default:null,hover:null,pressed:null,disabled:null,selected:null},imagePreviewState:"default" as const,sliceCenter:null,sliceScale:1,
     textRobloxExportMode:"AUTO" as const,dynamicText:false,richText:false,textInput:false,
@@ -44,8 +46,8 @@ export function createElement(type: ElementType, index = 0): EditorElement {
   if (type === "frame") return { ...base, name: "Frame", x: 230 + offset, y: 130 + offset, width: 460, height: 320, fill: "#181c2b", text: "" };
   if (type === "container") return { ...base, name: "Container", x: 280 + offset, y: 170 + offset, width: 320, height: 220, fill: "#161a26", borderColor: "#4c5268", text: "" };
   if (type === "scrolling-frame") return { ...base, name: "Scrolling Frame", x: 180 + offset, y: 100 + offset, width: 600, height: 400, fill: "#161a26", borderColor: "#4c5268", text: "", layoutMode: "grid", gridColumns: 4, rowGap: 12, columnGap: 12, layoutPadding: { top: 16, right: 16, bottom: 16, left: 16 }, canvasSizeX: 600, canvasSizeY: 720, roblox: { className: "ScrollingFrame", layout: "grid" } };
-  if (type === "text") return { ...base, name: "Text", x: 330 + offset, y: 220 + offset, width: 240, height: 48, fill: "transparent", borderColor: "transparent", text: "New text", fontSize: 28, fontWeight: 700 };
-  if (type === "button") return { ...base, name: "Button", x: 360 + offset, y: 330 + offset, width: 180, height: 48, fill: "#7457ff", borderColor: "#8d76ff", text: "Button", textAlign: "center", fontSize: 15, fontWeight: 700 };
+  if (type === "text") return { ...base, name: "Text", x: 330 + offset, y: 220 + offset, width: 240, height: 48, fill: "transparent", borderColor: "transparent", text: "New text", fontSize: 28, fontSizeDesign: 28, responsiveMaxTextSize: 28, fontWeight: 700 };
+  if (type === "button") return { ...base, name: "Button", x: 360 + offset, y: 330 + offset, width: 180, height: 48, fill: "#7457ff", borderColor: "#8d76ff", text: "Button", textAlign: "center", fontSize: 15, fontSizeDesign: 15, responsiveMaxTextSize: 15, fontWeight: 700 };
   if (type === "image" || type === "image-button") return { ...base, name: type === "image-button" ? "Image Button" : "Image", x: 350 + offset, y: 190 + offset, width: 220, height: 160, fill: "transparent", borderColor: "transparent", borderWidth: 0, shadow: "none", padding: 0, text: "", clipContent: true, roblox: { className: type === "image-button" ? "ImageButton" : "ImageLabel" } };
   if (type === "ellipse") return { ...base, name: "Ellipse", x: 380 + offset, y: 190 + offset, width: 140, height: 140, fill: "#2d69ff", borderColor: "#63d6ff", text: "", cornerRadius: 999 };
   if (type === "line") return { ...base, name: "Line", x: 340 + offset, y: 270 + offset, width: 220, height: 4, fill: "#63d6ff", borderColor: "transparent", borderWidth: 0, text: "", cornerRadius: 2 };
@@ -57,7 +59,7 @@ export function createElement(type: ElementType, index = 0): EditorElement {
 
 export function createScrollingInventoryElements(index=0):EditorElement[]{
   const scrolling=createElement("scrolling-frame",index);scrolling.name="Inventory Scroll";scrolling.canvasSizeY=600;
-  const cards=Array.from({length:20},(_,cardIndex)=>{const card=createElement("button",index+cardIndex+1);card.id=createId("inventory-card");card.name=`Inventory Card ${cardIndex+1}`;card.parentId=scrolling.id;card.width=133;card.height=100;card.sizingX="fill";card.text=`ITEM ${String(cardIndex+1).padStart(2,"0")}`;card.fontSize=14;card.fill=cardIndex%2?"#2f2557":"#1d3156";card.borderColor=cardIndex%2?"#8c64ff":"#4ddcff";card.gradientType="linear";card.gradientAngle=135;card.gradientStops=[{id:createId("stop"),color:cardIndex%2?"#7148ff":"#1764d8",position:0,opacity:100},{id:createId("stop"),color:cardIndex%2?"#d143b7":"#22c7d9",position:100,opacity:100}];card.shadow="0 8px 18px rgba(0,0,0,.24)";return card;});
+  const cards=Array.from({length:20},(_,cardIndex)=>{const card=createElement("button",index+cardIndex+1);card.id=createId("inventory-card");card.name=`Inventory Card ${cardIndex+1}`;card.parentId=scrolling.id;card.width=133;card.height=100;card.sizingX="fill";card.text=`ITEM ${String(cardIndex+1).padStart(2,"0")}`;card.fontSize=14;card.fontSizeDesign=14;card.responsiveMaxTextSize=14;card.fill=cardIndex%2?"#2f2557":"#1d3156";card.borderColor=cardIndex%2?"#8c64ff":"#4ddcff";card.gradientType="linear";card.gradientAngle=135;card.gradientStops=[{id:createId("stop"),color:cardIndex%2?"#7148ff":"#1764d8",position:0,opacity:100},{id:createId("stop"),color:cardIndex%2?"#d143b7":"#22c7d9",position:100,opacity:100}];card.shadow="0 8px 18px rgba(0,0,0,.24)";return card;});
   return[scrolling,...cards];
 }
 
@@ -74,28 +76,36 @@ export function createVectorElement(kind:GeometryKind,index=0){
   return element;
 }
 
-export function createProject(name = "Untitled UI"): EditorProject {
+export function createProject(name = "Untitled UI",projectKind:EditorProject["projectKind"]="blank"): EditorProject {
   const now = Date.now();
   return {
     schemaVersion: CREATORMAKE_SCHEMA_VERSION,
     id: createId("project"), name, createdAt: now, updatedAt: now,
-    platform: "Roblox", status: "Draft", tags: [], archived: false,
+    platform: "Roblox", status: "Draft", tags: [], archived: false, projectKind, commissionBrief:structuredClone(EMPTY_COMMISSION_BRIEF),
     screen: { id: createId("screen"), name: "Desktop", width: 960, height: 600, background: "#0e1220", x: 2100, y: 1400 },
     elements: [], assets: [], assetFolders: ["Logos","Icons","Characters","Textures","Backgrounds","Client Assets"], selectedIds: [], references: [], activePresetIds: [], favoritePresetIds: [], favoriteFontIds: [], recentFontIds: [], customFrameRecipes: [], researchCache: {}, generationHistory: [], projectFonts: [], fontPolicy: {allowSyntheticWeight:false,allowSyntheticItalic:false},
   };
 }
 
 export function normalizeProject(project: EditorProject): EditorProject {
+  const sourceSchema=Number(project.schemaVersion??0);
   project.schemaVersion = CREATORMAKE_SCHEMA_VERSION;
-  project.platform ??= "Roblox"; project.status ??= "Draft"; project.tags ??= []; project.archived ??= false;
+  project.platform ??= "Roblox"; project.status ??= "Draft"; project.tags ??= []; project.archived ??= false;project.projectKind ??= "blank";project.commissionBrief={...EMPTY_COMMISSION_BRIEF,...(project.commissionBrief??{}),targetDevices:[...(project.commissionBrief?.targetDevices??EMPTY_COMMISSION_BRIEF.targetDevices)]};
   project.screen.x ??= 2100; project.screen.y ??= 1400;
   project.references ??= []; project.activePresetIds ??= ["digital-system"]; project.favoritePresetIds ??= []; project.favoriteFontIds ??= []; project.recentFontIds ??= []; project.customFrameRecipes ??= []; project.researchCache ??= {}; project.generationHistory ??= []; project.fontPolicy ??= {allowSyntheticWeight:false,allowSyntheticItalic:false};
   project.assets ??= []; project.assets=project.assets.map((asset)=>({...asset,favorite:asset.favorite??false})); project.assetFolders ??= ["Logos","Icons","Characters","Textures","Backgrounds","Client Assets"];
   project.elements = project.elements.map((element) => {
     const base = createElement(element.type === ("shape" as ElementType) ? "rectangle" : element.type);
     const byFamily=CREATOR_FONTS.find((font)=>font.family.toLowerCase()===String(element.fontFamily??"").replace(/["']/g,"").toLowerCase());
-    const font=FONT_BY_ID[element.fontId as keyof typeof FONT_BY_ID]??byFamily??FONT_BY_ID.inter;
-    const normalized={ ...base, ...element, imageStateAssetIds:{...base.imageStateAssetIds,...element.imageStateAssetIds}, fontId:font.id, fontFamily:font.family, type: element.type === ("shape" as ElementType) ? "rectangle" : element.type, corners: element.corners ?? { tl: element.cornerRadius ?? 0, tr: element.cornerRadius ?? 0, br: element.cornerRadius ?? 0, bl: element.cornerRadius ?? 0 }, cornerTypes: element.cornerTypes??{...DEFAULT_CORNER_TYPES}, geometry:{...DEFAULT_VECTOR_GEOMETRY,...element.geometry}, booleanOperation:element.booleanOperation??null, booleanOperands:element.booleanOperands??[], gradientStops: element.gradientStops ?? base.gradientStops,gradientPoints:element.gradientPoints??base.gradientPoints,fourCornerColors:element.fourCornerColors??base.fourCornerColors };
+    const robloxFont=getRobloxFontDefinition(String(element.fontFamily??element.fontId??"")),font=robloxFont?{id:robloxFont.id,family:robloxFont.family}:FONT_BY_ID[element.fontId as keyof typeof FONT_BY_ID]??byFamily??FONT_BY_ID.inter,robloxVariant=robloxFont?resolveRobloxFontVariant(robloxFont,Number(element.fontWeight)||robloxFont.defaultWeight,element.fontStyle==="italic"?"italic":"normal"):null;
+    const legacySize=Number.isFinite(element.fontSize)&&element.fontSize>0?element.fontSize:base.fontSize;
+    const storedDesignSize=Number((element as EditorElement).fontSizeDesign);
+    const fontSizeDesign=sourceSchema<CREATORMAKE_SCHEMA_VERSION||!Number.isFinite(storedDesignSize)||storedDesignSize<=0?legacySize:storedDesignSize;
+    const textSizingMode=element.textSizingMode==="responsive"?"responsive" as const:"fixed" as const;
+    const legacyPadding=Math.max(0,Number.isFinite(element.padding)?element.padding:base.padding),rawTextPadding=element.textPadding??{top:legacyPadding,right:legacyPadding,bottom:legacyPadding,left:legacyPadding};
+    const textPadding={top:Math.max(0,Number(rawTextPadding.top)||0),right:Math.max(0,Number(rawTextPadding.right)||0),bottom:Math.max(0,Number(rawTextPadding.bottom)||0),left:Math.max(0,Number(rawTextPadding.left)||0)};
+    const requestedMin=Number(element.responsiveMinTextSize),requestedMax=Number(element.responsiveMaxTextSize),responsiveMinTextSize=Math.max(1,Number.isFinite(requestedMin)?requestedMin:Math.min(8,fontSizeDesign)),responsiveMaxTextSize=Math.max(responsiveMinTextSize,Number.isFinite(requestedMax)?requestedMax:fontSizeDesign);
+    const normalized={ ...base, ...element, imageStateAssetIds:{...base.imageStateAssetIds,...element.imageStateAssetIds}, fontId:font.id, fontFamily:font.family, fontWeight:robloxVariant?.weight??element.fontWeight??base.fontWeight,fontStyle:robloxVariant?.style??element.fontStyle??base.fontStyle,fontSize:fontSizeDesign, fontSizeDesign, textSizingMode, autoFit:textSizingMode==="responsive", responsiveMinTextSize, responsiveMaxTextSize, textPadding, type: element.type === ("shape" as ElementType) ? "rectangle" : element.type, corners: element.corners ?? { tl: element.cornerRadius ?? 0, tr: element.cornerRadius ?? 0, br: element.cornerRadius ?? 0, bl: element.cornerRadius ?? 0 }, cornerTypes: element.cornerTypes??{...DEFAULT_CORNER_TYPES}, geometry:{...DEFAULT_VECTOR_GEOMETRY,...element.geometry}, booleanOperation:element.booleanOperation??null, booleanOperands:element.booleanOperands??[], gradientStops: element.gradientStops ?? base.gradientStops,gradientPoints:element.gradientPoints??base.gradientPoints,fourCornerColors:element.fourCornerColors??base.fourCornerColors };
     normalized.geometry.kind=geometryKindForElement(normalized);
     return normalized;
   });
@@ -148,7 +158,7 @@ function projectThumbnail(project:EditorProject){
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-const projectSummary=(project:EditorProject):ProjectSummary=>({id:project.id,name:project.name,createdAt:project.createdAt,updatedAt:project.updatedAt,platform:project.platform,status:project.status,tags:[...project.tags],archived:project.archived,thumbnail:projectThumbnail(project),width:project.screen.width,height:project.screen.height,frameCount:project.elements.filter((item)=>item.type==="frame"||item.type==="container"||item.type==="scrolling-frame").length});
+const projectSummary=(project:EditorProject):ProjectSummary=>({id:project.id,name:project.name,createdAt:project.createdAt,updatedAt:project.updatedAt,platform:project.platform,status:project.status,tags:[...project.tags],archived:project.archived,projectKind:project.projectKind,thumbnail:projectThumbnail(project),width:project.screen.width,height:project.screen.height,frameCount:project.elements.filter((item)=>item.type==="frame"||item.type==="container"||item.type==="scrolling-frame").length});
 
 async function migrateLegacy(database:IDBDatabase){
   const current=await requestResult(database.transaction(SETTINGS_STORE,"readonly").objectStore(SETTINGS_STORE).get(LEGACY_MIGRATED_KEY)) as SettingRecord|undefined;

@@ -11,8 +11,8 @@ import { DEFAULT_ROBLOX_EXPORT_OPTIONS } from "../lib/roblox/types.ts";
 
 const projectFixture=()=>{
   const frame=createElement("frame");Object.assign(frame,{id:"frame-1",name:"MainFrame",x:125,y:118,width:768,height:572,gradientType:"freeform",shadow:"none"});
-  const title=createElement("text");Object.assign(title,{id:"text-1",name:"Title",parentId:frame.id,x:25,y:78,width:500,height:110,text:"Frame Name",fontFamily:"Inter",fontSize:54,fill:"#33205f",gradientType:"freeform",shadow:"none",textShadows:[],geometry:{...title.geometry,kind:"trapezoid",skew:14}});
-  const button=createElement("button");Object.assign(button,{id:"button-1",name:"Close",parentId:frame.id,x:845,y:88,width:120,height:110,text:"×",fontSize:64,gradientType:"linear",shadow:"none",textShadows:[]});
+  const title=createElement("text");Object.assign(title,{id:"text-1",name:"Title",parentId:frame.id,x:25,y:78,width:500,height:110,text:"Frame Name",fontFamily:"Inter",fontSize:54,fontSizeDesign:54,fill:"#33205f",gradientType:"freeform",shadow:"none",textShadows:[],geometry:{...title.geometry,kind:"trapezoid",skew:14}});
+  const button=createElement("button");Object.assign(button,{id:"button-1",name:"Close",parentId:frame.id,x:845,y:88,width:120,height:110,text:"×",fontSize:64,fontSizeDesign:64,gradientType:"linear",shadow:"none",textShadows:[]});
   const shape=createVectorElement("plaque");Object.assign(shape,{id:"shape-1",name:"Accent",parentId:frame.id,x:180,y:620,width:180,height:54,shadow:"none"});
   return{screen:{width:1920,height:1080},elements:[frame,title,button,shape]};
 };
@@ -138,7 +138,7 @@ test("visual bounds include baked scale, skew, and edge effects without changing
 
 test("one FIT scale preserves the entire composition at common Studio viewports",()=>{
   const main={width:768,height:572},title={width:500,height:110},close={width:120,height:110};
-  for(const [width,height] of [[1920,1080],[1600,900],[1366,768],[1280,720],[2560,1440]]){
+  for(const [width,height] of [[1920,1080],[1600,900],[1366,768],[1280,720],[2560,1440],[3840,2160],[390,844],[844,390],[1024,768],[3440,1440]]){
     const scale=calculateCreatorMakeFitScale(1920,1080,width,height);
     if(width===1920&&height===1080)assert.equal(scale,1);
     assert.ok(Math.abs((title.width*scale)/(main.width*scale)-title.width/main.width)<1e-12);

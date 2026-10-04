@@ -123,7 +123,7 @@ export type RobloxSyncOperation =
   | {type:"rename";sourceId:string;name:string};
 
 export const ROBLOX_RESOLUTIONS:RobloxResolution[]=[
-  {label:"1920 × 1080",width:1920,height:1080},{label:"1366 × 768",width:1366,height:768},{label:"1280 × 720",width:1280,height:720},{label:"2560 × 1440",width:2560,height:1440},{label:"Mobile Portrait",width:390,height:844},{label:"Mobile Landscape",width:844,height:390},{label:"Tablet",width:1024,height:768},
+  {label:"1920 × 1080",width:1920,height:1080},{label:"1366 × 768",width:1366,height:768},{label:"1280 × 720",width:1280,height:720},{label:"2560 × 1440",width:2560,height:1440},{label:"3840 × 2160",width:3840,height:2160},{label:"Mobile Portrait",width:390,height:844},{label:"Mobile Landscape",width:844,height:390},{label:"Tablet",width:1024,height:768},{label:"Ultrawide",width:3440,height:1440},
 ];
 
 export const DEFAULT_ROBLOX_EXPORT_OPTIONS:RobloxExportOptions={screenGuiName:"CreatorMakeGui",sizingMode:"AUTO",resolution:ROBLOX_RESOLUTIONS[0],visualMode:"ADAPTIVE",renderScale:2,resetOnSpawn:false,includeStroke:true,includeCorners:true,includeGradients:true,includeLayouts:true,includeConstraints:true};
