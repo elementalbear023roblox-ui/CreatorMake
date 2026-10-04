@@ -162,6 +162,8 @@ export type EditorElement = {
   textBoxMode: "auto-width" | "auto-height" | "fixed";
   autoFit: boolean;
   textSizingMode: TextSizingMode;
+  followObjectAngle: boolean;
+  textRotation: number;
   responsiveMinTextSize: number;
   responsiveMaxTextSize: number;
   textAlign: "left" | "center" | "right";
@@ -225,7 +227,7 @@ export type Screen = {
 };
 
 export type EditorProject = {
-  schemaVersion: 10;
+  schemaVersion: 11;
   id: string;
   name: string;
   createdAt: number;

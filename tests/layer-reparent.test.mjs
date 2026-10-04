@@ -34,3 +34,11 @@ test("optional keep-local-position mode is explicit and default remains preserve
   const result=reparentLayers(project,{draggedIds:["Card3"],targetId:"TopBar",position:"inside",keepLocalPosition:true});
   assert.equal(result.ok,true);assert.equal(card.x,newParent.x+local.x);assert.equal(card.y,newParent.y+local.y);
 });
+
+test("preserve-world reparenting also preserves effective world rotation",()=>{
+  const project=fixture(),main=project.elements.find((item)=>item.id==="MainFrame"),content=project.elements.find((item)=>item.id==="Content"),scroll=project.elements.find((item)=>item.id==="Scroll"),top=project.elements.find((item)=>item.id==="TopBar"),card=project.elements.find((item)=>item.id==="Card3");
+  main.rotation=3;content.rotation=-7;scroll.rotation=5;top.rotation=10;card.rotation=2;card.followObjectAngle=true;card.textRotation=.75;
+  const beforeWorld=main.rotation+content.rotation+scroll.rotation+card.rotation;
+  const result=reparentLayers(project,{draggedIds:[card.id],targetId:top.id,position:"inside"});
+  assert.equal(result.ok,true);assert.equal(card.parentId,top.id);assert.equal(main.rotation+top.rotation+card.rotation,beforeWorld);assert.equal(card.followObjectAngle,true);assert.equal(card.textRotation,.75);
+});

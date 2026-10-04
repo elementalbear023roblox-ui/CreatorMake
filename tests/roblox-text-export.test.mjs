@@ -73,6 +73,32 @@ test("nested rotated text and buttons keep one shared transform root in Roblox",
   assert.equal(byId.get(`${button.id}::text`).properties.Rotation,0);
 });
 
+test("garage buttons keep native captions on the exact pixel-visual angle",()=>{
+  const specs=[
+    ["car-color","Car Color",{skewY:-3.75}],
+    ["accessories","Accessories",{geometry:{kind:"custom-path",pathData:"M 0 28 L 100 0 L 100 72 L 0 100 Z"}}],
+    ["rim-color","Rim Color",{rotation:-2.25,skewY:-1.5}],
+    ["license-plate","License Plate",{rotation:1.125,skewY:2.375}],
+    ["plate-design","Plate Design",{geometry:{kind:"custom-path",pathData:"M 0 0 L 100 22 L 100 100 L 0 78 Z"}}],
+    ["exit-garage","Exit Garage",{rotation:-1.5,skewY:-2.625,textRotation:.875}],
+  ];
+  const buttons=specs.map(([id,text,patch],index)=>{const button=createElement("button"),baseGeometry={...button.geometry};Object.assign(button,{id,name:id.replaceAll("-","_"),x:80,y:70+index*90,width:460,height:72,text,fontFamily:"Roboto",fontSize:32,fontSizeDesign:32,fill:index===5?"#b3261e":"#16a34a",borderColor:"#ffffff",borderWidth:3,shadow:"none",textShadows:[],textPadding:{top:12,right:18,bottom:12,left:18},followObjectAngle:true,...patch});if(patch.geometry)button.geometry={...baseGeometry,...patch.geometry,nodes:[],closed:true};return button;});
+  const project=projectFor(...buttons),assets=mapped(planPixelAccurateAssets(project,options)),result=createRobloxExport(project,options,assets),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node]));
+  for(const button of buttons){
+    const root=byId.get(button.id),text=byId.get(`${button.id}::text`),diagnostic=result.textRotationDiagnostics.find((row)=>row.sourceId===button.id);
+    assert.equal(root.className,"ImageButton",button.name);assert.equal(text.className,"TextLabel",button.name);assert.equal(text.properties.Active,false);assert.equal(text.properties.Selectable,false);assert.equal(text.properties.TextSize,32);assert.equal(text.properties.TextScaled,false);
+    assert.ok(Math.abs(diagnostic.expectedTextVisualRotation)>.1,`${button.name} must have an intentional angled caption`);assert.ok(Math.abs(diagnostic.finalTextVisualRotation-diagnostic.expectedTextVisualRotation)<.011,`${button.name} caption angle must match its pixel visual`);assert.equal(text.attributes.CreatorMakeVisualRotationSource,diagnostic.visualRotationSource);assert.ok(Math.abs(Number(text.properties.Rotation))>.1,`${button.name} TextLabel.Rotation must contain the uninherited visual angle`);
+    assert.deepEqual(text.properties.AnchorPoint,{kind:"Vector2",x:.5,y:.5});assert.deepEqual(text.properties.Position,{kind:"UDim2",xScale:0,xOffset:230,yScale:0,yOffset:36});
+  }
+  assert.match(result.hierarchy,/car_color \[ImageButton\][\s\S]+Text \[TextLabel\]/);assert.match(result.hierarchy,/exit_garage \[ImageButton\][\s\S]+Text \[TextLabel\]/);
+});
+
+test("Follow Object Angle can be disabled without moving or resizing native text",()=>{
+  const button=createElement("button");Object.assign(button,{id:"manual-caption",name:"ManualCaption",x:100,y:120,width:300,height:80,rotation:-4,skewY:-3,text:"MANUAL",fontFamily:"Roboto",fontSize:30,fontSizeDesign:30,fill:"#16a34a",shadow:"none",textShadows:[],followObjectAngle:false,textRotation:1.25,textPadding:{top:10,right:20,bottom:10,left:20}});
+  const project=projectFor(button),result=createRobloxExport(project,options,mapped(planPixelAccurateAssets(project,options))),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node])),text=byId.get("manual-caption::text"),diagnostic=result.textRotationDiagnostics[0];
+  assert.equal(byId.get(button.id).properties.Rotation,-4);assert.equal(text.properties.Rotation,5.25);assert.equal(diagnostic.finalTextVisualRotation,1.25);assert.equal(diagnostic.expectedTextVisualRotation,1.25);assert.equal(text.properties.TextSize,30);assert.deepEqual(text.properties.Size,{kind:"UDim2",xScale:0,xOffset:260,yScale:0,yOffset:60});
+});
+
 test("legacy PIXEL TEXT preferences are ignored and visible glyphs remain native",()=>{
   const title=createElement("text");Object.assign(title,{id:"pixel-title",name:"PixelTitle",text:"LIMITED",textRobloxExportMode:"PIXEL",fontFamily:"Inter",fill:"#7c3aed",shadow:"none",textShadows:["0 2px 4px #000000"]});
   const assets=planPixelAccurateAssets(projectFor(title),options);

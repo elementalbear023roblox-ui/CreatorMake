@@ -2,6 +2,7 @@ import { elementBackground } from "../editor/render.ts";
 import { geometryPresentation, openGeometryStrokeWidth, usesVectorSurface } from "../editor/geometry.ts";
 import { rasterizeWithCreatorMakeRenderer } from "../editor/canvas-rasterizer.ts";
 import { designFontSize, textPadding, textSizingMode } from "../editor/text-sizing.ts";
+import { visualLinearTransform } from "../editor/visual-transform.ts";
 import { CREATOR_FONTS, creatorFontRasterStyle, hasLoadedCreatorFontFace, loadCreatorFont, resolveCreatorFontVariant } from "../fonts/font-library.ts";
 import type { CreatorFont, FontLoadStatus } from "../fonts/font-library.ts";
 import type { EditorAsset, EditorElement, EditorProject } from "../editor/types.ts";
@@ -106,7 +107,7 @@ function canonicalArtworkBounds(element:EditorElement){
 }
 
 export function visualBoundsForElement(element:EditorElement,visualPart:RobloxRasterPart="full"){
-  const rasterElement=rasterElementForPart(element,visualPart),padding=shadowPadding(element,visualPart),art=visualPart==="text"?{minX:0,minY:0,maxX:element.width,maxY:element.height}:canonicalArtworkBounds(element),originX=element.width*element.originX/100,originY=element.height*element.originY/100,skewX=Math.tan(element.skewX*Math.PI/180),skewY=Math.tan(element.skewY*Math.PI/180),a=rasterElement.scaleX*Math.cos(element.rotateY*Math.PI/180),b=skewY,c=skewX,d=rasterElement.scaleY*Math.cos(element.rotateX*Math.PI/180),points=[[art.minX,art.minY],[art.maxX,art.minY],[art.maxX,art.maxY],[art.minX,art.maxY]].map(([x,y])=>{const tx=a*(x-originX)+c*(y-originY),ty=b*(x-originX)+d*(y-originY);return{x:originX+tx,y:originY+ty};}),minX=Math.min(...points.map((point)=>point.x)),maxX=Math.max(...points.map((point)=>point.x)),minY=Math.min(...points.map((point)=>point.y)),maxY=Math.max(...points.map((point)=>point.y));
+  const rasterElement=rasterElementForPart(element,visualPart),padding=shadowPadding(element,visualPart),art=visualPart==="text"?{minX:0,minY:0,maxX:element.width,maxY:element.height}:canonicalArtworkBounds(element),originX=element.width*element.originX/100,originY=element.height*element.originY/100,{a,b,c,d}=visualLinearTransform(rasterElement),points=[[art.minX,art.minY],[art.maxX,art.minY],[art.maxX,art.maxY],[art.minX,art.maxY]].map(([x,y])=>{const tx=a*(x-originX)+c*(y-originY),ty=b*(x-originX)+d*(y-originY);return{x:originX+tx,y:originY+ty};}),minX=Math.min(...points.map((point)=>point.x)),maxX=Math.max(...points.map((point)=>point.x)),minY=Math.min(...points.map((point)=>point.y)),maxY=Math.max(...points.map((point)=>point.y));
   return{x:minX-padding,y:minY-padding,width:Math.max(1,maxX-minX+padding*2),height:Math.max(1,maxY-minY+padding*2)};
 }
 

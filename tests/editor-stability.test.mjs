@@ -59,7 +59,7 @@ test("legacy projects migrate to the current schema and IndexedDB-compatible sav
   const legacyText=createElement("text");legacyText.fontSize=37;legacyText.fontSizeDesign=37;project.elements=[legacyText];
   const legacy=structuredClone(project);delete legacy.schemaVersion;delete legacy.elements[0].fontSizeDesign;delete legacy.elements[0].textSizingMode;delete legacy.elements[0].responsiveMinTextSize;delete legacy.elements[0].responsiveMaxTextSize;delete legacy.elements[0].textPadding;legacy.elements[0].autoFit=true;
   const normalized=normalizeProject(legacy);
-  assert.equal(normalized.schemaVersion,10);
+  assert.equal(normalized.schemaVersion,11);
   assert.equal(normalized.elements[0].automaticCanvasSize,"None");
   assert.equal(normalized.elements[0].fontId,"inter");
   assert.equal(normalized.elements[0].fontSizeDesign,37);
@@ -72,12 +72,12 @@ test("legacy projects migrate to the current schema and IndexedDB-compatible sav
   assert.equal((await listRecoverySnapshots()).length,1);
   assert.equal((await loadProject(project.id)).elements[0].x,project.elements[0].x);
   const imported=await importProjectData({format:"creatormake-project",formatVersion:1,project:JSON.parse(JSON.stringify(project))});
-  assert.equal(imported.schemaVersion,10);
+  assert.equal(imported.schemaVersion,11);
   assert.notEqual(imported.id,project.id);
   assert.equal(imported.elements[0].x,project.elements[0].x);
   const exported=exportProjectData(imported);
   assert.equal(exported.format,"creatormake-project");
-  assert.equal(exported.schemaVersion,10);
+  assert.equal(exported.schemaVersion,11);
   assert.equal(exported.project.id,imported.id);
   const summary=(await listProjects()).find((item)=>item.id===imported.id);
   assert.equal(summary.platform,"Roblox");
@@ -92,11 +92,15 @@ test("ordinary containers default to unclipped content while scrolling viewports
   assert.equal(createElement("scrolling-frame").clipContent,true);
 });
 
-test("schema 10 preserves an explicit Clip Contents choice and migrates legacy implicit clipping off",()=>{
+test("schema 11 preserves explicit clipping and caption-angle settings",()=>{
   const legacy=createProject("Legacy clipping"),legacyFrame=createElement("frame");legacy.schemaVersion=9;legacyFrame.clipContent=true;legacy.elements=[legacyFrame];
   assert.equal(normalizeProject(structuredClone(legacy)).elements[0].clipContent,false);
   const current=createProject("Explicit clipping"),currentFrame=createElement("frame");currentFrame.clipContent=true;current.elements=[currentFrame];
   assert.equal(normalizeProject(structuredClone(current)).elements[0].clipContent,true);
+  const currentButton=createElement("button");currentButton.followObjectAngle=false;currentButton.textRotation=1.25;current.elements=[currentButton];
+  const normalized=normalizeProject(structuredClone(current));assert.equal(normalized.elements[0].followObjectAngle,false);assert.equal(normalized.elements[0].textRotation,1.25);
+  const schema10=structuredClone(current);schema10.schemaVersion=10;delete schema10.elements[0].followObjectAngle;delete schema10.elements[0].textRotation;
+  const migrated=normalizeProject(schema10);assert.equal(migrated.elements[0].followObjectAngle,true);assert.equal(migrated.elements[0].textRotation,0);
 });
 
 test("Clip Contents computes the same nested crop used by the editor preview",()=>{

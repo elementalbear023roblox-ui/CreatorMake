@@ -1,5 +1,6 @@
 import { createElement } from "./project.ts";
 import { distributedPositions, logicalBounds, logicalRect, normalizeDesignValue } from "./geometry-math.ts";
+import { inheritedObjectRotation } from "./visual-transform.ts";
 import type { Alignment, AlignmentTarget, EditorElement, EditorProject } from "./types";
 
 export const selectedElements = (project: EditorProject) => project.elements.filter((item) => project.selectedIds.includes(item.id));
@@ -75,8 +76,8 @@ export function validateLayerReparent(project:EditorProject,request:LayerReparen
 
 export function reparentLayers(project:EditorProject,request:LayerReparentRequest):LayerReparentResult{
   const validation=validateLayerReparent(project,request);if(!validation.ok)return validation;
-  const byId=new Map(project.elements.map((element)=>[element.id,element])),roots=validation.movedIds.map((id)=>byId.get(id)!).filter(Boolean),target=request.targetId?byId.get(request.targetId)??null:null,newParentId=request.position==="inside"?target?.id??null:target?.parentId??null,newParent=newParentId?byId.get(newParentId)??null:null;
-  roots.forEach((element)=>{if(request.keepLocalPosition){const oldParent=element.parentId?byId.get(element.parentId):null,localX=element.x-(oldParent?.x??0),localY=element.y-(oldParent?.y??0);element.x=(newParent?.x??0)+localX;element.y=(newParent?.y??0)+localY;}element.parentId=newParentId;});
+  const byId=new Map(project.elements.map((element)=>[element.id,element])),roots=validation.movedIds.map((id)=>byId.get(id)!).filter(Boolean),target=request.targetId?byId.get(request.targetId)??null:null,newParentId=request.position==="inside"?target?.id??null:target?.parentId??null,newParent=newParentId?byId.get(newParentId)??null:null,newParentWorldRotation=newParent?inheritedObjectRotation(newParent,project.elements)+newParent.rotation:0;
+  roots.forEach((element)=>{const oldWorldRotation=inheritedObjectRotation(element,project.elements)+element.rotation;if(request.keepLocalPosition){const oldParent=element.parentId?byId.get(element.parentId):null,localX=element.x-(oldParent?.x??0),localY=element.y-(oldParent?.y??0);element.x=(newParent?.x??0)+localX;element.y=(newParent?.y??0)+localY;}else element.rotation=oldWorldRotation-newParentWorldRotation;element.parentId=newParentId;});
   const moved=new Set(roots.map((element)=>element.id)),siblings=project.elements.filter((element)=>element.parentId===newParentId&&!moved.has(element.id)).sort((a,b)=>b.zIndex-a.zIndex||project.elements.indexOf(b)-project.elements.indexOf(a));
   let insertion=0;if(request.position!=="inside"&&target){const targetIndex=siblings.findIndex((element)=>element.id===target.id);insertion=targetIndex<0?siblings.length:targetIndex+(request.position==="after"?1:0);}
   const visualOrder=[...siblings.slice(0,insertion),...roots,...siblings.slice(insertion)],base=Math.max(visualOrder.length,...visualOrder.map((element)=>element.zIndex));visualOrder.forEach((element,index)=>{element.zIndex=base-index;});
