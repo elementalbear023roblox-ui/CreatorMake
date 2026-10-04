@@ -4,7 +4,7 @@ import { getRobloxFontCompatibility } from "./fonts.ts";
 import type { RobloxExportClassification, RobloxRasterPart } from "./types.ts";
 
 export type RobloxElementClassification={classification:RobloxExportClassification;rasterPart?:RobloxRasterPart;intendedRobloxClass:string;interactionEnabled:boolean;nativeText:boolean;reasons:string[]};
-export type RobloxTextExportDecision={mode:"NATIVE"|"PIXEL";className:"TextLabel"|"TextButton"|"TextBox";fontExact:boolean;backgroundFree:boolean;reasons:string[]};
+export type RobloxTextExportDecision={mode:"NATIVE";className:"TextLabel"|"TextBox";fontExact:boolean;backgroundFree:boolean;reasons:string[]};
 
 const close=(a:number,b:number)=>Math.abs(a-b)<.001;
 const hasShadow=(value:string)=>Boolean(value&&value!=="none");
@@ -18,36 +18,32 @@ const backgroundFree=(element:EditorElement)=>transparent(element.fill)&&element
 export const hasVisibleTextBackground=(element:EditorElement)=>!backgroundFree(element);
 
 export function classifyTextExport(element:EditorElement):RobloxTextExportDecision{
-  const className:RobloxTextExportDecision["className"]=element.textInput?"TextBox":element.type==="button"?"TextButton":"TextLabel",font=getRobloxFontCompatibility(element.fontFamily),fontExact=font.level==="native",plainSurface=backgroundFree(element),effects=textEffectsNative(element),reasons:string[]=[];
+  const className:RobloxTextExportDecision["className"]=element.textInput?"TextBox":"TextLabel",font=getRobloxFontCompatibility(element.fontFamily),fontExact=font.level==="native",plainSurface=backgroundFree(element),effects=textEffectsNative(element),reasons:string[]=[];
   if(!fontExact)reasons.push(font.level==="close"?`${element.fontFamily} is only a close Roblox match`:`Custom font: ${element.fontFamily} has no exact Roblox native match`);
-  if(!effects)reasons.push("text spacing, decoration, shadow, stroke, or advanced transform needs a separate Pixel Text fallback");
+  if(!effects)reasons.push("Roblox native text keeps the words editable; unsupported spacing, decoration, shadow, stroke, or transform effects may differ");
   if(!plainSurface)reasons.push("visible background exports separately without text glyphs");
   const pixelOverride=element.textRobloxExportMode==="PIXEL_ACCURATE"||element.textRobloxExportMode==="PIXEL";
-  if(pixelOverride)reasons.push("Pixel text export is selected");
-  const explicitlyNative=element.textRobloxExportMode==="NATIVE_TEXT"||element.textRobloxExportMode==="NATIVE"||element.dynamicText||element.textInput;
-  const native=!pixelOverride&&(explicitlyNative||effects);
-  if(native&&!fontExact)reasons.push("editable Roblox text uses the declared compatibility font and reports the fidelity mismatch");
-  if(native&&!effects)reasons.push("Native Text override keeps runtime editability but unsupported text effects may differ");
-  return{mode:native?"NATIVE":"PIXEL",className,fontExact,backgroundFree:plainSurface,reasons};
+  if(pixelOverride)reasons.push("Legacy pixel-text preference was ignored because CreatorMake never rasterizes visible glyphs");
+  if(!fontExact)reasons.push("editable Roblox text uses the declared compatibility font and reports the fidelity mismatch");
+  return{mode:"NATIVE",className,fontExact,backgroundFree:plainSurface,reasons};
 }
 
-const simpleImage=(element:EditorElement)=>Boolean(element.roblox?.imageAssetId&&/^rbxassetid:\/\/\d+$/.test(element.roblox.imageAssetId))&&element.imageBrightness===100&&element.imageContrast===100&&element.imageSaturation===100&&element.imageHue===0&&element.imageBlur===0&&element.imageTintOpacity===0&&element.imageRotation===0&&element.imageScale===1&&element.imageOffsetX===0&&element.imageOffsetY===0&&element.imageCrop.x===0&&element.imageCrop.y===0&&element.imageCrop.width===100&&element.imageCrop.height===100&&simpleTransform(element);
+const simpleImage=(element:EditorElement)=>Boolean(element.roblox?.imageAssetId&&/^rbxassetid:\/\/\d+$/.test(element.roblox.imageAssetId))&&element.imageBrightness===100&&element.imageContrast===100&&element.imageSaturation===100&&element.imageHue===0&&element.imageBlur===0&&element.imageTintOpacity===0&&element.imageRotation===0&&element.imageScale===1&&element.imageScaleX===1&&element.imageScaleY===1&&element.imageOpacity===100&&!element.imageFlipX&&!element.imageFlipY&&element.imageOffsetX===0&&element.imageOffsetY===0&&element.imageCrop.x===0&&element.imageCrop.y===0&&element.imageCrop.width===100&&element.imageCrop.height===100&&simpleTransform(element);
 
 export function classifyRobloxElement(element:EditorElement):RobloxElementClassification{
   if(element.type==="image"||element.type==="image-button"){
     const native=simpleImage(element),reasons=native?[]:[!/^rbxassetid:\/\/\d+$/.test(element.roblox?.imageAssetId??"")?"image needs a published Roblox asset ID":"image crop or adjustments need exact pixel rendering"];
     return{classification:native?"NATIVE":"RASTERIZED",rasterPart:native?undefined:"full",intendedRobloxClass:element.type==="image-button"?"ImageButton":"ImageLabel",interactionEnabled:element.type==="image-button",nativeText:false,reasons};
   }
-  const reasons:string[]=[],kind=geometryKindForElement(element),isText=element.type==="text"||element.type==="button",textDecision=isText?classifyTextExport(element):undefined,textIsNative=textDecision?.mode==="NATIVE";
+  const reasons:string[]=[],kind=geometryKindForElement(element),isText=element.type==="text"||element.type==="button",textDecision=isText?classifyTextExport(element):undefined;
   const surfaceNative=(kind==="rectangle"||kind==="rounded-rectangle")&&!element.imageAssetId&&!element.booleanOperation&&!element.booleanOperands.length&&simpleCorners(element)&&simpleGradient(element)&&!hasShadow(element.shadow)&&element.blendMode==="normal"&&simpleTransform(element)&&!(element.clipContent&&kind==="rounded-rectangle"&&Math.max(...Object.values(element.corners))>0);
   if(element.imageAssetId)reasons.push("image fill");
   if(kind!=="rectangle"&&kind!=="rounded-rectangle")reasons.push(`custom ${kind} geometry`);if(element.booleanOperation||element.booleanOperands.length)reasons.push("boolean geometry");if(!simpleCorners(element))reasons.push("non-uniform or advanced corners");if(!simpleGradient(element))reasons.push(`${element.gradientType} gradient`);if(hasShadow(element.shadow))reasons.push("surface shadow");if(element.blendMode!=="normal")reasons.push(`${element.blendMode} blend mode`);if(!simpleTransform(element))reasons.push("advanced transform");if(element.clipContent&&kind==="rounded-rectangle"&&Math.max(...Object.values(element.corners))>0)reasons.push("rounded clipping mask");if(textDecision)reasons.push(...textDecision.reasons);
   if(isText){
     const visibleBackground=hasVisibleTextBackground(element);
-    if(element.type==="button")return{classification:"HYBRID",rasterPart:visibleBackground?"background":undefined,intendedRobloxClass:"ImageButton",interactionEnabled:true,nativeText:Boolean(textIsNative),reasons};
-    if(visibleBackground)return{classification:"HYBRID",rasterPart:"background",intendedRobloxClass:"Frame",interactionEnabled:textDecision!.className==="TextBox",nativeText:Boolean(textIsNative),reasons};
-    if(textIsNative)return{classification:"NATIVE",intendedRobloxClass:textDecision!.className,interactionEnabled:textDecision!.className!=="TextLabel",nativeText:true,reasons:textDecision!.fontExact?[]:textDecision!.reasons};
-    return{classification:"RASTERIZED",rasterPart:"text",intendedRobloxClass:"ImageLabel",interactionEnabled:false,nativeText:false,reasons};
+    if(element.type==="button")return{classification:"HYBRID",rasterPart:visibleBackground?"background":undefined,intendedRobloxClass:"ImageButton",interactionEnabled:true,nativeText:true,reasons};
+    if(visibleBackground)return{classification:"HYBRID",rasterPart:"background",intendedRobloxClass:"Frame",interactionEnabled:textDecision!.className==="TextBox",nativeText:true,reasons};
+    return{classification:"NATIVE",intendedRobloxClass:textDecision!.className,interactionEnabled:textDecision!.className!=="TextLabel",nativeText:true,reasons:textDecision!.fontExact?[]:textDecision!.reasons};
   }
   const intendedRobloxClass=element.type==="scrolling-frame"?"ScrollingFrame":element.type==="frame"||element.type==="container"?"Frame":"ImageLabel";
   if(surfaceNative)return{classification:"NATIVE",intendedRobloxClass,interactionEnabled:false,nativeText:false,reasons:[]};

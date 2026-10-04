@@ -166,7 +166,14 @@ export type EditorElement = {
   imageOffsetX: number;
   imageOffsetY: number;
   imageScale: number;
+  imageScaleX: number;
+  imageScaleY: number;
   imageRotation: number;
+  imageOpacity: number;
+  imageFlipX: boolean;
+  imageFlipY: boolean;
+  imageTileWidth: number;
+  imageTileHeight: number;
   imageBrightness: number;
   imageContrast: number;
   imageSaturation: number;
@@ -257,7 +264,7 @@ export type ProjectSummary = Pick<EditorProject, "id" | "name" | "createdAt" | "
 };
 
 export type ResizeCorner = "nw" | "ne" | "sw" | "se";
-export type InspectorMode = "basic" | "advanced" | "expert";
+export type InspectorMode = "basic" | "advanced" | "expert" | "master";
 export type Alignment = "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom";
 export type AlignmentTarget = "selection" | "parent" | "frame" | "canvas" | "key-object";
 export type ViewAction = "fit-selection" | "fit-frame" | "fit-all" | "actual" | "zoom-in" | "zoom-out";

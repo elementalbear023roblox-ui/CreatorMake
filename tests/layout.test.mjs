@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { applyAutoLayout } from "../lib/editor/layout.ts";
 import { createElement } from "../lib/editor/project.ts";
 import { applySharedPerspective, calculateSelectionResize, resizeElementWithConstraints } from "../lib/editor/transforms.ts";
+import { repeatGridSelection } from "../lib/editor/operations.ts";
 
 test("horizontal auto layout responds to hug-content text changes",()=>{
   const row=createElement("frame");Object.assign(row,{id:"row",x:100,y:80,width:520,height:80,layoutMode:"horizontal",gap:12,layoutPadding:{top:16,right:16,bottom:16,left:16},crossAlign:"center"});
@@ -46,4 +47,15 @@ test("shift and alt multi-resize preserve the common ratio from center",()=>{
 test("multi-selection perspective rotates object centers around a common origin",()=>{
   const left=createElement("container"),right=createElement("text");Object.assign(left,{id:"left",x:0,y:0,width:100,height:80});Object.assign(right,{id:"right",x:200,y:0,width:100,height:80});const project={elements:[left,right],selectedIds:[left.id,right.id]};
   assert.equal(applySharedPerspective(project,{rotateY:30,perspective:800}),true);assert.ok(left.translateZ>0);assert.ok(right.translateZ<0);assert.notEqual(left.x,0);assert.notEqual(right.x,200);
+});
+
+test("repeat grid clones complete hierarchies into deterministic rows and columns",()=>{
+  const card=createElement("container");Object.assign(card,{id:"card",name:"Inventory Slot",x:20,y:30,width:80,height:60});
+  const label=createElement("text");Object.assign(label,{id:"label",name:"Price",parentId:card.id,x:30,y:45,width:50,height:20});
+  const project={screen:{width:800,height:600},elements:[card,label],selectedIds:[card.id]};
+  repeatGridSelection(project,{columns:3,rows:2,gapX:12,gapY:16});
+  assert.equal(project.elements.length,12);assert.equal(project.selectedIds.length,6);
+  const roots=project.elements.filter((item)=>item.name.startsWith("Inventory Slot"));
+  assert.deepEqual(roots.map((item)=>[item.x,item.y]),[[20,30],[112,30],[204,30],[20,106],[112,106],[204,106]]);
+  for(const root of roots.slice(1))assert.equal(project.elements.filter((item)=>item.parentId===root.id).length,1);
 });

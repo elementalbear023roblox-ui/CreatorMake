@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./interface-themes.css";
 
 export const metadata: Metadata = {
   title: "CreatorMake — Interface Editor",

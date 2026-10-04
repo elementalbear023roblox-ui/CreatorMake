@@ -43,7 +43,7 @@ export function visualStateForElement(element:EditorElement,visualPart:RobloxRas
     geometry:element.geometry,booleanOperation:element.booleanOperation,booleanOperands:element.booleanOperands,
     gradientType:element.gradientType,gradientAngle:element.gradientAngle,gradientStops:element.gradientStops,gradientPoints:element.gradientPoints,fourCornerColors:element.fourCornerColors,
     blendMode:element.blendMode,shadow:element.shadow,padding:element.padding,clipContent:element.clipContent,advancedTransform,
-    image:{assetId:element.imageAssetId,fit:element.imageFit,crop:element.imageCrop,offsetX:element.imageOffsetX,offsetY:element.imageOffsetY,scale:element.imageScale,rotation:element.imageRotation,brightness:element.imageBrightness,contrast:element.imageContrast,saturation:element.imageSaturation,hue:element.imageHue,blur:element.imageBlur,tint:element.imageTint,tintOpacity:element.imageTintOpacity,sliceCenter:element.sliceCenter},
+    image:{assetId:element.imageAssetId,fit:element.imageFit,crop:element.imageCrop,offsetX:element.imageOffsetX,offsetY:element.imageOffsetY,scale:element.imageScale,scaleX:element.imageScaleX,scaleY:element.imageScaleY,rotation:element.imageRotation,opacity:element.imageOpacity,flipX:element.imageFlipX,flipY:element.imageFlipY,tileWidth:element.imageTileWidth,tileHeight:element.imageTileHeight,brightness:element.imageBrightness,contrast:element.imageContrast,saturation:element.imageSaturation,hue:element.imageHue,blur:element.imageBlur,tint:element.imageTint,tintOpacity:element.imageTintOpacity,sliceCenter:element.sliceCenter},
   };
   if(visualPart==="background")return{...surface,visualPart};
   const text={type:element.type,width:element.width,height:element.height,opacity:element.opacity,padding:element.padding,clipContent:element.clipContent,advancedTransform,visualPart,
@@ -108,7 +108,7 @@ export function planPixelAccurateAssets(project:EditorProject,options:Pick<Roblo
   return project.elements.filter((element)=>!element.hidden).flatMap((element):RobloxRenderAsset[]=>{
     const classification=classifyRobloxElement(element);
     if(options.visualMode==="ADAPTIVE"&&classification.classification==="NATIVE")return[];
-    const textElement=element.type==="text"||element.type==="button",textDecision=textElement?classifyTextExport(element):undefined,parts:RobloxRasterPart[]=textElement?[...(hasVisibleTextBackground(element)?["background" as const]:[]),...(textDecision?.mode==="PIXEL"?["text" as const]:[])]:[options.visualMode==="ADAPTIVE"?(classification.rasterPart??"full"):"full"];
+    const textElement=element.type==="text"||element.type==="button",parts:RobloxRasterPart[]=textElement?(hasVisibleTextBackground(element)?["background"]:[]):[options.visualMode==="ADAPTIVE"?(classification.rasterPart??"full"):"full"];
     const sourceAsset=element.imageAssetId?assetById.get(element.imageAssetId):undefined;
     return parts.map((visualPart):RobloxRenderAsset=>{
       const sourceId=textElement?`${element.id}::${visualPart==="background"?"background":"pixel-text"}`:element.id,visual=visualHash(element,visualPart,sourceAsset?.contentHash),prior=previousBySource.get(sourceId),robloxAssetId=normalizeRobloxAssetId(mappings[mappingKey(sourceId,visual)]??"");

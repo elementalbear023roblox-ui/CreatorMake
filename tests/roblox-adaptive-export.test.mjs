@@ -21,11 +21,10 @@ test("adaptive classification keeps exact-native layers editable and rasterizes 
   assert.equal(classifyRobloxElement(button).classification,"HYBRID");
   assert.equal(classifyRobloxElement(button).rasterPart,"background");
   assert.equal(classifyRobloxElement(nativeText).classification,"NATIVE");
-  assert.equal(classifyRobloxElement(rasterText).classification,"RASTERIZED");
+  assert.equal(classifyRobloxElement(rasterText).classification,"NATIVE");
   const assets=planPixelAccurateAssets(project,options);
-  assert.deepEqual(assets.map((asset)=>asset.sourceId),["panel","button::background","raster-text::pixel-text"]);
+  assert.deepEqual(assets.map((asset)=>asset.sourceId),["panel","button::background"]);
   assert.equal(assets.find((asset)=>asset.sourceId==="button::background").visualPart,"background");
-  assert.equal(assets.find((asset)=>asset.sourceId==="raster-text::pixel-text").visualPart,"text");
   const changed=structuredClone(button);changed.text="START";
   assert.equal(visualHash(button,"background"),visualHash(changed,"background"),"editable button copy must not invalidate its background PNG");
   assert.notEqual(visualHash(button,"full"),visualHash(changed,"full"));
@@ -39,15 +38,15 @@ test("adaptive manifest keeps original local coordinates under one global scale"
   assert.equal(byId.get("button").className,"ImageButton");assert.equal(byId.get("button").properties.Active,true);assert.equal(byId.get("button").properties.AutoButtonColor,false);
   assert.equal(byId.get("button::background").name,"_Background");assert.equal(byId.get("button::text").className,"TextLabel");assert.equal(byId.get("button::text").properties.Text,"PLAY");
   assert.equal(byId.get("native-text").className,"TextLabel");assert.equal(byId.get("native-text").parentSourceId,"panel");
-  assert.equal(byId.get("raster-text").className,"Frame");assert.equal(byId.get("raster-text::pixel-text").className,"ImageLabel");assert.equal(byId.get("raster-text::text"),undefined);
+  assert.equal(byId.get("raster-text").className,"TextLabel");assert.equal(byId.get("raster-text").properties.Text,"LIMITED");assert.equal(byId.get("raster-text::pixel-text"),undefined);
   assert.deepEqual(byId.get("button").properties.Position,{kind:"UDim2",xScale:0,xOffset:60,yScale:0,yOffset:270});
   assert.deepEqual(byId.get("button").properties.Size,{kind:"UDim2",xScale:0,xOffset:220,yScale:0,yOffset:60});
   assert.equal(result.manifest.nodes.flatMap((node)=>node.decorators).filter((decorator)=>decorator.className==="UIScale").length,1);
-  for(const id of ["panel","button","raster-text"]){assert.equal(byId.get(id).decorators.filter((item)=>item.className==="UIAspectRatioConstraint").length,1);}
-  assert.equal(result.manifest.imageManifest.length,3);const record=result.manifest.imageManifest.find((item)=>item.sourceId==="button::background");
+  for(const id of ["panel","button"]){assert.equal(byId.get(id).decorators.filter((item)=>item.className==="UIAspectRatioConstraint").length,1);}
+  assert.equal(result.manifest.imageManifest.length,2);const record=result.manifest.imageManifest.find((item)=>item.sourceId==="button::background");
   assert.equal(record.sourceElementId,"button");assert.equal(record.classification,"HYBRID");assert.equal(record.visualPart,"background");assert.equal(record.parentId,"panel");assert.equal(record.intendedRobloxClass,"ImageButton");assert.equal(record.interactionEnabled,true);assert.match(record.assetFilename,/playbutton-background-v[0-9a-f]+\.png/);
   assert.deepEqual(record.sourceDimensions,{width:220,height:60});assert.ok(record.croppedPixelDimensions.width>0);assert.ok(Math.abs(record.aspectRatio-220/60)<1e-7);
-  assert.match(result.hierarchy,/StarPanel \[Frame\][\s\S]+_Visual \[ImageLabel\][\s\S]+PlayButton \[ImageButton\][\s\S]+_Background \[ImageLabel\][\s\S]+TextLabel \[TextLabel\]/);
+  assert.match(result.hierarchy,/StarPanel \[Frame\][\s\S]+_Visual \[ImageLabel\][\s\S]+PlayButton \[ImageButton\][\s\S]+_Background \[ImageLabel\][\s\S]+Text \[TextLabel\]/);
 });
 
 test("smart text export keeps exact transparent text native and pixelates visible/custom treatments",()=>{

@@ -24,16 +24,16 @@ test("case A: Frame Name exports a glyph-free plaque below editable native text"
   assert.equal(result.manifest.textExportArchitecture,2);
   assert.equal(root.className,"Frame");assert.deepEqual(root.properties.Size,{kind:"UDim2",xScale:0,xOffset:500,yScale:0,yOffset:100});assert.equal(root.properties.Rotation,-6);assert.equal(root.properties.ClipsDescendants,false);
   assert.equal(background.name,"_Background");assert.equal(background.className,"ImageLabel");assert.deepEqual(background.properties.Position,{kind:"UDim2",xScale:0,xOffset:-70,yScale:0,yOffset:-12});assert.deepEqual(background.properties.Size,{kind:"UDim2",xScale:0,xOffset:588,yScale:0,yOffset:120});assert.equal(background.attributes.CreatorMakeRole,"Background");
-  assert.equal(text.name,"TextLabel");assert.equal(text.className,"TextLabel");assert.equal(text.properties.Text,"Frame Name");assert.equal(text.properties.Active,false);assert.equal(text.properties.Selectable,false);assert.deepEqual(text.properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(text.properties.Size,{kind:"UDim2",xScale:0,xOffset:476,yScale:0,yOffset:76});assert.ok(text.properties.ZIndex>background.properties.ZIndex);assert.equal(text.attributes.CreatorMakeFontExact,false);
+  assert.equal(text.name,"Text");assert.equal(text.className,"TextLabel");assert.equal(text.properties.Text,"Frame Name");assert.equal(text.properties.Active,false);assert.equal(text.properties.Selectable,false);assert.deepEqual(text.properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(text.properties.Size,{kind:"UDim2",xScale:0,xOffset:476,yScale:0,yOffset:76});assert.ok(text.properties.ZIndex>background.properties.ZIndex);assert.equal(text.attributes.CreatorMakeFontExact,false);
   assert.ok(result.compatibility.some((issue)=>issue.elementId==="frame-name"&&issue.feature==="Font"&&issue.message.includes("no exact Roblox native match")));
-  assert.match(result.hierarchy,/FrameName \[Frame\][\s\S]+_Background \[ImageLabel\][\s\S]+TextLabel \[TextLabel\]/);
+  assert.match(result.hierarchy,/FrameName \[Frame\][\s\S]+_Background \[ImageLabel\][\s\S]+Text \[TextLabel\]/);
 });
 
 test("case B: transparent Coins text exports as a single TextLabel",()=>{
   const coins=createElement("text");Object.assign(coins,{id:"coins",name:"Coins",text:"Coins: 500",fontFamily:"Roboto",fill:"transparent",gradientType:"none",borderColor:"transparent",borderWidth:0,shadow:"none",textShadows:[]});
   const project=projectFor(coins),planned=planPixelAccurateAssets(project,options),result=createRobloxExport(project,options,planned),owned=result.manifest.nodes.filter((node)=>node.sourceId==="coins"||node.parentSourceId==="coins");
   assert.equal(planned.length,0);assert.equal(owned.length,1);assert.equal(owned[0].sourceId,"coins");assert.equal(owned[0].className,"TextLabel");assert.equal(owned[0].properties.Text,"Coins: 500");
-  const native=createNativeTextLabel(coins,"parent",5);assert.equal(native.name,"TextLabel");assert.equal(native.className,"TextLabel");assert.equal(native.properties.Text,"Coins: 500");
+  const native=createNativeTextLabel(coins,"parent",5);assert.equal(native.name,"Text");assert.equal(native.className,"TextLabel");assert.equal(native.properties.Text,"Coins: 500");
 });
 
 test("case C and D: a button plaque stays clickable and text-only changes sync only TextLabel.Text",()=>{
@@ -45,13 +45,13 @@ test("case C and D: a button plaque stays clickable and text-only changes sync o
   assert.deepEqual(operations,[{type:"update",sourceId:"play-button::text",properties:["Text"]}]);
 });
 
-test("explicit PIXEL TEXT is a separate asset and never combines with its background",()=>{
+test("legacy PIXEL TEXT preferences are ignored and visible glyphs remain native",()=>{
   const title=createElement("text");Object.assign(title,{id:"pixel-title",name:"PixelTitle",text:"LIMITED",textRobloxExportMode:"PIXEL",fontFamily:"Inter",fill:"#7c3aed",shadow:"none",textShadows:["0 2px 4px #000000"]});
   const assets=planPixelAccurateAssets(projectFor(title),options);
-  assert.deepEqual(assets.map((asset)=>[asset.sourceId,asset.visualPart]),[["pixel-title::background","background"],["pixel-title::pixel-text","text"]]);
-  assert.ok(!renderElementSvg(title,2,"background").includes("LIMITED"));assert.ok(renderElementSvg(title,2,"text").includes("LIMITED"));
+  assert.deepEqual(assets.map((asset)=>[asset.sourceId,asset.visualPart]),[["pixel-title::background","background"]]);
+  assert.ok(!renderElementSvg(title,2,"background").includes("LIMITED"));
   const result=createRobloxExport(projectFor(title),options,mapped(assets)),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node]));
-  assert.equal(byId.get("pixel-title").className,"Frame");assert.equal(byId.get("pixel-title::background").attributes.CreatorMakeRole,"Background");assert.equal(byId.get("pixel-title::pixel-text").name,"_PixelText");assert.equal(byId.get("pixel-title::pixel-text").attributes.CreatorMakeRole,"PixelText");assert.equal(byId.get("pixel-title::text"),undefined);
+  assert.equal(byId.get("pixel-title").className,"Frame");assert.equal(byId.get("pixel-title::background").attributes.CreatorMakeRole,"Background");assert.equal(byId.get("pixel-title::pixel-text"),undefined);assert.equal(byId.get("pixel-title::text").className,"TextLabel");assert.equal(byId.get("pixel-title::text").properties.Text,"LIMITED");
 });
 
 test("mixed Frame, native TextLabel, raster ImageLabel, and text background serialize in parent-first order",()=>{

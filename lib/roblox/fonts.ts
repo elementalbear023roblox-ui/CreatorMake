@@ -22,11 +22,25 @@ const nativeFamilies:Record<string,{family:string;enumName:string}>={
   "Special Elite":{family:"rbxasset://fonts/families/SpecialElite.json",enumName:"SpecialElite"},
 };
 
+export const ROBLOX_NATIVE_FONT_REGISTRY=Object.entries(nativeFamilies).map(([family,value])=>({id:family.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,""),displayName:family,creatorFontId:family.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,""),family,robloxFontFace:value.family,enumName:value.enumName,verified:true as const}));
+const nativeFamilyNames=new Set(ROBLOX_NATIVE_FONT_REGISTRY.map((entry)=>entry.family));
+export const DEFAULT_ROBLOX_FONT_FAMILY="Roboto";
+export function isRobloxNativeFontFamily(family:string){return nativeFamilyNames.has(family);}
+
 const closeMatches:Record<string,{enumName:string;matchName:string}>={
   "Inter":{enumName:"Gotham",matchName:"Gotham"},"Open Sans":{enumName:"SourceSans",matchName:"Source Sans"},"Lato":{enumName:"Gotham",matchName:"Gotham"},"Montserrat":{enumName:"Gotham",matchName:"Gotham"},"Poppins":{enumName:"Gotham",matchName:"Gotham"},"Manrope":{enumName:"Gotham",matchName:"Gotham"},"DM Sans":{enumName:"Gotham",matchName:"Gotham"},"Outfit":{enumName:"Gotham",matchName:"Gotham"},"Figtree":{enumName:"Gotham",matchName:"Gotham"},"Source Sans 3":{enumName:"SourceSans",matchName:"Source Sans"},
   "IBM Plex Mono":{enumName:"Code",matchName:"Code"},"Noto Sans Mono":{enumName:"Code",matchName:"Code"},"Source Code Pro":{enumName:"Code",matchName:"Code"},"Space Mono":{enumName:"Code",matchName:"Code"},"JetBrains Mono":{enumName:"Code",matchName:"Code"},"Fira Code":{enumName:"Code",matchName:"Code"},"Inconsolata":{enumName:"Code",matchName:"Code"},"VT323":{enumName:"Code",matchName:"Code"},"Share Tech Mono":{enumName:"Code",matchName:"Code"},"Press Start 2P":{enumName:"Arcade",matchName:"Arcade"},"Pixelify Sans":{enumName:"Arcade",matchName:"Arcade"},"Silkscreen":{enumName:"Arcade",matchName:"Arcade"},
   "Fredoka":{enumName:"Cartoon",matchName:"Cartoon"},"Baloo 2":{enumName:"Cartoon",matchName:"Cartoon"},"Lilita One":{enumName:"Cartoon",matchName:"Cartoon"},"Titan One":{enumName:"Cartoon",matchName:"Cartoon"},"Comic Neue":{enumName:"Cartoon",matchName:"Cartoon"},"Orbitron":{enumName:"SciFi",matchName:"SciFi"},"Oxanium":{enumName:"SciFi",matchName:"SciFi"},"Audiowide":{enumName:"SciFi",matchName:"SciFi"},"Rajdhani":{enumName:"SciFi",matchName:"SciFi"},"Bungee":{enumName:"GothamBlack",matchName:"Gotham Black"},
 };
+
+export function suggestRobloxNativeFamily(family:string){
+  if(isRobloxNativeFontFamily(family))return family;
+  const match=closeMatches[family]?.enumName??"";
+  if(match==="Code"||match==="Arcade")return"Roboto Mono";
+  if(match==="Cartoon")return"Luckiest Guy";
+  if(match==="SciFi"||match==="GothamBlack")return"Oswald";
+  return DEFAULT_ROBLOX_FONT_FAMILY;
+}
 
 export function getRobloxFontCompatibility(family:string):RobloxFontCompatibility{
   const native=nativeFamilies[family]; if(native)return {level:"native",label:"ROBLOX NATIVE",family:native.family,enumName:native.enumName};

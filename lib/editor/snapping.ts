@@ -1,4 +1,5 @@
 import type { EditorElement } from "./types.ts";
+import { logicalBounds, logicalRect, normalizeDesignValue } from "./geometry-math.ts";
 
 export type SnapMode = "free" | "smart" | "grid";
 export type PixelSnapMode = "off" | "whole" | "half";
@@ -22,14 +23,14 @@ export type SnapSettings = {
 
 export const DEFAULT_SNAP_SETTINGS:SnapSettings={thresholdPx:6,releasePx:10,nearbyRadiusPx:720,alignEdges:true,alignCenters:true,alignBaselines:true,equalSpacing:true,parentPadding:true,gridWithSmart:false,maxCandidates:96};
 
-export function rectFromElement(item:Pick<EditorElement,"x"|"y"|"width"|"height">):SnapRect{return{left:item.x,top:item.y,right:item.x+item.width,bottom:item.y+item.height,width:item.width,height:item.height,cx:item.x+item.width/2,cy:item.y+item.height/2};}
-export function moveRect(rect:SnapRect,dx:number,dy:number):SnapRect{return{...rect,left:rect.left+dx,right:rect.right+dx,cx:rect.cx+dx,top:rect.top+dy,bottom:rect.bottom+dy,cy:rect.cy+dy};}
-export function boundsForElements(items:Array<Pick<EditorElement,"x"|"y"|"width"|"height">>):SnapRect|null{if(!items.length)return null;const left=Math.min(...items.map((item)=>item.x)),top=Math.min(...items.map((item)=>item.y)),right=Math.max(...items.map((item)=>item.x+item.width)),bottom=Math.max(...items.map((item)=>item.y+item.height));return{left,top,right,bottom,width:right-left,height:bottom-top,cx:(left+right)/2,cy:(top+bottom)/2};}
+export function rectFromElement(item:Pick<EditorElement,"x"|"y"|"width"|"height">):SnapRect{return logicalRect(item);}
+export function moveRect(rect:SnapRect,dx:number,dy:number):SnapRect{return{...rect,left:normalizeDesignValue(rect.left+dx),right:normalizeDesignValue(rect.right+dx),cx:normalizeDesignValue(rect.cx+dx),top:normalizeDesignValue(rect.top+dy),bottom:normalizeDesignValue(rect.bottom+dy),cy:normalizeDesignValue(rect.cy+dy)};}
+export function boundsForElements(items:Array<Pick<EditorElement,"x"|"y"|"width"|"height">>):SnapRect|null{return logicalBounds(items);}
 
 type Target={id:string;parentId:string|null;type?:string;locked?:boolean;rect:SnapRect};
 type Candidate={axis:SnapAxis;correction:number;position:number;kind:SnapGuide["kind"];priority:number;label?:string;measurement?:SnapMeasurement};
 const overlap=(a1:number,a2:number,b1:number,b2:number)=>Math.min(a2,b2)-Math.max(a1,b1)>=-1;
-const quantize=(value:number,step:number)=>Math.round(value/step)*step;
+const quantize=(value:number,step:number)=>normalizeDesignValue(Math.round(value/step)*step);
 const targetDistance=(a:SnapRect,b:SnapRect)=>Math.max(0,Math.max(a.left-b.right,b.left-a.right),Math.max(a.top-b.bottom,b.top-a.bottom));
 
 function nearbyTargets(elements:EditorElement[],moving:SnapRect,parentId:string|null,radius:number,limit:number):Target[]{
@@ -86,7 +87,7 @@ export function computeMoveSnap(input:{movingBounds:SnapRect;dx:number;dy:number
   }
   if(input.mode==="grid"||(smart&&settings.gridWithSmart)){dx=quantize(input.movingBounds.left+dx,input.gridSize)-input.movingBounds.left;dy=quantize(input.movingBounds.top+dy,input.gridSize)-input.movingBounds.top;}
   const step=pixelStep(input.pixelSnap);if(step){dx=quantize(input.movingBounds.left+dx,step)-input.movingBounds.left;dy=quantize(input.movingBounds.top+dy,step)-input.movingBounds.top;}
-  return{dx,dy,guides,measurements,latch};
+  return{dx:normalizeDesignValue(dx),dy:normalizeDesignValue(dy),guides,measurements,latch};
 }
 
 export function inspectDistances(moving:SnapRect,elements:EditorElement[],movingIds:Set<string>,zoom:number){const nearby=nearbyTargets(elements.filter((item)=>!movingIds.has(item.id)),moving,null,720/Math.max(.05,zoom),24),measurements:SnapMeasurement[]=[];for(const target of nearby){const rect=target.rect;if(rect.right<=moving.left&&overlap(rect.top,rect.bottom,moving.top,moving.bottom)){const value=moving.left-rect.right;measurements.push({axis:"x",from:rect.right,to:moving.left,cross:(Math.max(rect.top,moving.top)+Math.min(rect.bottom,moving.bottom))/2,value,label:`${Math.round(value*100)/100}px`});}if(rect.left>=moving.right&&overlap(rect.top,rect.bottom,moving.top,moving.bottom)){const value=rect.left-moving.right;measurements.push({axis:"x",from:moving.right,to:rect.left,cross:(Math.max(rect.top,moving.top)+Math.min(rect.bottom,moving.bottom))/2,value,label:`${Math.round(value*100)/100}px`});}if(rect.bottom<=moving.top&&overlap(rect.left,rect.right,moving.left,moving.right)){const value=moving.top-rect.bottom;measurements.push({axis:"y",from:rect.bottom,to:moving.top,cross:(Math.max(rect.left,moving.left)+Math.min(rect.right,moving.right))/2,value,label:`${Math.round(value*100)/100}px`});}if(rect.top>=moving.bottom&&overlap(rect.left,rect.right,moving.left,moving.right)){const value=rect.top-moving.bottom;measurements.push({axis:"y",from:moving.bottom,to:rect.top,cross:(Math.max(rect.left,moving.left)+Math.min(rect.right,moving.right))/2,value,label:`${Math.round(value*100)/100}px`});}}return measurements.sort((a,b)=>a.value-b.value).slice(0,4);}

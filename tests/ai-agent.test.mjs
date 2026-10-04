@@ -22,7 +22,7 @@ test("multiple references and current canvas are literal multimodal image inputs
 
 test("CreatorMake tools are strict and mutate only validated editable project state",()=>{
   for(const tool of CREATORMAKE_TOOLS){assert.equal(tool.parameters.additionalProperties,false);assert.ok(Array.isArray(tool.parameters.required));}
-  const project=createProject("Tool test"),beforeText=project.elements.find((item)=>item.type==="text").text,state=createToolState(project);
+  const project=createProject("Tool test"),text=createElement("text");project.elements=[text];const beforeText=text.text,state=createToolState(project);
   const grid=executeCreatorMakeTool(state,"create_grid",{name:"InventoryGrid",parentId:null,x:80,y:90,width:600,height:420,count:12,columns:4,gap:10,childType:"frame",labelPrefix:"Slot",fill:"#222831"});
   assert.equal(grid.ids.length,13);assert.equal(state.project.elements.filter((item)=>item.name.startsWith("Slot")).length,12);
   assert.throws(()=>executeCreatorMakeTool(state,"create_grid",{name:"Bad",unknown:true}),/missing required field|unknown field/);

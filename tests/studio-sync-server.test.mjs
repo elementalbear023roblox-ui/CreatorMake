@@ -21,6 +21,10 @@ test("local Studio Sync serves health and the current Roblox manifest", async (c
 
   const productionHealth=await fetch(`${url}/health`,{headers:{origin:CREATORMAKE_PRODUCTION_ORIGIN}});assert.equal(productionHealth.status,200);assert.equal(productionHealth.headers.get("access-control-allow-origin"),CREATORMAKE_PRODUCTION_ORIGIN);
   const privateNetworkPreflight=await fetch(`${url}/health`,{method:"OPTIONS",headers:{origin:CREATORMAKE_PRODUCTION_ORIGIN,"access-control-request-method":"GET","access-control-request-private-network":"true"}});assert.equal(privateNetworkPreflight.status,204);assert.equal(privateNetworkPreflight.headers.get("access-control-allow-origin"),CREATORMAKE_PRODUCTION_ORIGIN);assert.equal(privateNetworkPreflight.headers.get("access-control-allow-private-network"),"true");
+  const previewOrigin="http://127.0.0.1:4174";
+  const previewHealth=await fetch(`${url}/health`,{headers:{origin:previewOrigin}});assert.equal(previewHealth.status,200);assert.equal(previewHealth.headers.get("access-control-allow-origin"),previewOrigin);
+  const previewPreflight=await fetch(`${url}/health`,{method:"OPTIONS",headers:{origin:previewOrigin,"access-control-request-method":"GET","access-control-request-private-network":"true"}});assert.equal(previewPreflight.status,204);assert.equal(previewPreflight.headers.get("access-control-allow-origin"),previewOrigin);assert.equal(previewPreflight.headers.get("access-control-allow-private-network"),"true");
+  const arbitraryLoopbackHealth=await fetch(`${url}/health`,{headers:{origin:"http://localhost:61234"}});assert.equal(arbitraryLoopbackHealth.status,200);assert.equal(arbitraryLoopbackHealth.headers.get("access-control-allow-origin"),"http://localhost:61234");
   const blockedOrigin=await fetch(`${url}/health`,{headers:{origin:"https://untrusted.example"}});assert.equal(blockedOrigin.status,200);assert.equal(blockedOrigin.headers.get("access-control-allow-origin"),null);
 
   const missingResponse = await fetch(`${url}/project/current/manifest`);
@@ -84,6 +88,12 @@ test("local Studio Sync rejects legacy combined text rasters and accepts split n
   const split={...legacy,textExportArchitecture:2,nodes:[root,{sourceId:"title::background",name:"_Background",className:"ImageLabel",parentSourceId:"title",properties:{Image:""},attributes:{CreatorMakeRole:"Background",CreatorMakeVisualPart:"background"},decorators:[]},{sourceId:"title::text",name:"TextLabel",className:"TextLabel",parentSourceId:"title",properties:{BackgroundTransparency:1,Text:"New text",Active:false,Selectable:false},attributes:{CreatorMakeRole:"EditableText"},decorators:[]}]};
   const accepted=await fetch(`${url}/project/current/manifest`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(split)});assert.equal(accepted.status,200);
   const stored=await(await fetch(`${url}/project/current/manifest`)).json(),text=stored.nodes.find((node)=>node.sourceId==="title::text");assert.equal(stored.textExportArchitecture,2);assert.equal(text.className,"TextLabel");assert.equal(text.properties.Text,"New text");
+});
+
+test("local Studio Sync rejects legacy PixelText glyph assets",async(context)=>{
+  const outputDir=await mkdtemp(join(tmpdir(),"creatormake-pixel-text-")),{server,url}=await startStudioSyncServer({port:0,quiet:true,outputDir});context.after(async()=>{await new Promise((resolve)=>server.close(resolve));await rm(outputDir,{recursive:true,force:true});});
+  const root={sourceId:"title",name:"Title",className:"Frame",parentSourceId:null,properties:{},attributes:{CreatorMakeElementType:"text"},decorators:[]},manifest=asProjectManifest({schema:"creatormake.roblox-manifest",version:2,textExportArchitecture:2,screenGuiName:"PixelTextGui",referenceResolution:{width:960,height:600},sizingMode:"OFFSET",visualMode:"PIXEL_ACCURATE",nodes:[root,{sourceId:"title::pixel-text",name:"_PixelText",className:"ImageLabel",parentSourceId:"title",properties:{Image:""},attributes:{CreatorMakeRole:"PixelText",CreatorMakeVisualPart:"text"},decorators:[]}],assets:[]});
+  const response=await fetch(`${url}/project/current/manifest`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(manifest)});assert.equal(response.status,400);assert.match(await response.text(),/PIXEL_TEXT_REJECTED/);
 });
 
 test("local Studio Sync identifies the exact malformed manifest object and field",async(context)=>{

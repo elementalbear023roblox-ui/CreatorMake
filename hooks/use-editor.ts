@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createElement, createProject, createScrollingInventoryElements, createVectorElement, deleteStoredProject, discardRecoverySnapshot, duplicateProject, importProjectData, listProjects, listRecoverySnapshots, loadActiveProject, loadProject, restoreRecoverySnapshot, saveProject } from "@/lib/editor/project";
-import { alignSelection, convertSelectionToAutoLayout, distributeSelection, groupSelection, stackSelection, ungroupSelection } from "@/lib/editor/operations";
+import { alignSelection, convertSelectionToAutoLayout, distributeSelection, groupSelection, repeatGridSelection, stackSelection, ungroupSelection, type RepeatGridOptions } from "@/lib/editor/operations";
 import { applyAutoLayout } from "@/lib/editor/layout";
 import { applySharedPerspective } from "@/lib/editor/transforms";
 import { createImageElementForAsset, createVectorElementForSvgAsset, importImageFile } from "@/lib/editor/assets";
@@ -20,16 +20,7 @@ const mutableProject=(current:EditorProject,affectedIds?:Iterable<string>)=>{
 const trimHistory=(items:EditorHistoryCommand[])=>{let next=items.slice(-HISTORY_LIMIT),bytes=next.reduce((sum,item)=>sum+item.estimatedBytes,0);while(next.length>1&&bytes>HISTORY_MEMORY_LIMIT){bytes-=next[0].estimatedBytes;next=next.slice(1);}return next;};
 
 export function useEditor() {
-  const [project, setProject] = useState<EditorProject>({
-    schemaVersion: 7, id: "project_initial", name: "Untitled UI", createdAt: 0, updatedAt: 0, platform:"Roblox", status:"Draft", tags:[], archived:false,
-    screen: { id: "screen_initial", name: "Desktop", width: 960, height: 600, background: "#0e1220", x: 2100, y: 1400 },
-    elements: [
-      seedElement("frame_initial", "frame", "Interface panel", { x: 230, y: 130, width: 460, height: 320, fill: "#181c2b" }),
-      seedElement("text_initial", "text", "Title", { x: 330, y: 205, width: 300, height: 48, fill: "transparent", borderColor: "transparent", borderWidth: 0, text: "CREATOR HUD", fontSize: 28, fontWeight: 700 }),
-      seedElement("button_initial", "button", "Primary action", { x: 365, y: 345, width: 180, height: 48, fill: "#7457ff", borderColor: "#8d76ff", text: "ENTER GAME", textAlign: "center", fontSize: 15, fontWeight: 700 }),
-    ],
-    assets: [], assetFolders:["Logos","Icons","Characters","Textures","Backgrounds","Client Assets"], selectedIds: ["button_initial"], references: [], activePresetIds: ["digital-system"], favoritePresetIds: [], favoriteFontIds: [], recentFontIds: ["inter"], customFrameRecipes: [], researchCache: {}, generationHistory: [], projectFonts:[{fontId:"inter",weights:[500,700],styles:["normal"]}], fontPolicy:{allowSyntheticWeight:false,allowSyntheticItalic:false},
-  });
+  const [project, setProject] = useState<EditorProject>(()=>createProject("Untitled UI"));
   const [past, setPast] = useState<EditorHistoryCommand[]>([]);
   const [future, setFuture] = useState<EditorHistoryCommand[]>([]);
   const [status, setStatus] = useState<"saving" | "saved" | "unsaved" | "error">("saved");
@@ -43,6 +34,7 @@ export function useEditor() {
   const transientFrame=useRef<number|null>(null);
   const pendingTransient=useRef<{operations:Array<(draft:EditorProject)=>void>;affectedIds:Set<string>|null}|null>(null);
   const nudgeTimer=useRef<number|null>(null);
+  const duplicateTransform=useRef({x:16,y:16});
   projectRef.current=project;
 
   const refreshLibrary=useCallback(async()=>{const[projectList,recoveryList]=await Promise.all([listProjects(),listRecoverySnapshots()]);setProjects(projectList);setRecoveries(recoveryList);},[]);
@@ -117,9 +109,9 @@ export function useEditor() {
     recordHistory(label,current,next);
   },[flushTransient,recordHistory]);
 
-  const addElement = (type: ElementType) => commit((draft) => {
+  const addElement = (type: ElementType,patch:Partial<EditorElement>={}) => commit((draft) => {
     if(type==="scrolling-frame"){const elements=createScrollingInventoryElements(draft.elements.length);draft.elements.push(...elements);draft.selectedIds=[elements[0].id];return;}
-    const element = createElement(type, draft.elements.length); draft.elements.push(element); draft.selectedIds = [element.id];
+    const element = {...createElement(type, draft.elements.length),...patch}; draft.elements.push(element); draft.selectedIds = [element.id];
   });
   const addGeometry = (kind:GeometryKind) => commit((draft)=>{const element=createVectorElement(kind,draft.elements.length);draft.elements.push(element);draft.selectedIds=[element.id];});
   const select = (id: string | null, additive = false) => setProject((current) => ({ ...current, selectedIds: id ? (additive ? (current.selectedIds.includes(id) ? current.selectedIds.filter((item) => item !== id) : [...current.selectedIds, id]) : [id]) : [] }));
@@ -127,9 +119,11 @@ export function useEditor() {
   const updateSelected = (patch: Partial<EditorElement>) => commit((draft) => { const resolvedPatch=patch.fontFamily?{...patch,fontId:patch.fontFamily.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")}:patch;applySharedPerspective(draft,resolvedPatch);draft.elements = draft.elements.map((el) => draft.selectedIds.includes(el.id) ? { ...el, ...resolvedPatch } : el); },propertyLabel(patch,projectRef.current));
   const deleteSelected = () => commit((draft) => { const ids=descendantIds(draft.elements,draft.selectedIds);draft.elements = draft.elements.filter((el) => !ids.has(el.id)); draft.selectedIds = []; });
   const duplicateSelected = () => commit((draft) => {
-    const sourceIds=descendantIds(draft.elements,draft.selectedIds),sources=draft.elements.filter((el)=>sourceIds.has(el.id)),idMap=new Map(sources.map((el)=>[el.id,`${el.type}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`]));const clones=sources.map((el)=>({...structuredClone(el),id:idMap.get(el.id)!,parentId:el.parentId?(idMap.get(el.parentId)??el.parentId):null,name:draft.selectedIds.includes(el.id)?`${el.name} Copy`:el.name,x:el.x+16,y:el.y+16}));
+    const offset=duplicateTransform.current,sourceIds=descendantIds(draft.elements,draft.selectedIds),sources=draft.elements.filter((el)=>sourceIds.has(el.id)),idMap=new Map(sources.map((el)=>[el.id,`${el.type}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`]));const clones=sources.map((el)=>({...structuredClone(el),id:idMap.get(el.id)!,parentId:el.parentId?(idMap.get(el.parentId)??el.parentId):null,name:draft.selectedIds.includes(el.id)?`${el.name} Copy`:el.name,x:el.x+offset.x,y:el.y+offset.y}));
     draft.elements.push(...clones); draft.selectedIds = draft.selectedIds.map((id)=>idMap.get(id)).filter((id):id is string=>Boolean(id));
-  });
+  },"Repeat Duplicate Transform");
+  const rememberDuplicateTransform=(x:number,y:number)=>{if(Number.isFinite(x)&&Number.isFinite(y)&&(Math.abs(x)>.01||Math.abs(y)>.01))duplicateTransform.current={x,y};};
+  const repeatGrid=(options:RepeatGridOptions)=>commit((draft)=>repeatGridSelection(draft,options),`Repeat Grid ${Math.round(options.columns)}×${Math.round(options.rows)}`);
   const reorder = (id: string, direction: -1 | 1) => commit((draft) => {
     const index = draft.elements.findIndex((el) => el.id === id); const target = index + direction;
     if (index < 0 || target < 0 || target >= draft.elements.length) return;
@@ -167,6 +161,7 @@ export function useEditor() {
   const toggleFavoriteAsset=(assetId:string)=>commit((draft)=>{const asset=draft.assets.find((item)=>item.id===assetId);if(asset)asset.favorite=!asset.favorite;},"Favorite Asset");
   const createAssetFolder=(name:string)=>commit((draft)=>{const folder=name.trim();if(folder&&!draft.assetFolders.some((item)=>item.toLowerCase()===folder.toLowerCase()))draft.assetFolders.push(folder);},"Create Asset Folder");
   const applyAssetToSelection=(assetId:string)=>commit((draft)=>{draft.elements.forEach((item)=>{if(draft.selectedIds.includes(item.id))item.imageAssetId=assetId;});},"Apply Image Asset");
+  const applyAssetToElement=(assetId:string,elementId:string)=>commit((draft)=>{const item=draft.elements.find((element)=>element.id===elementId),asset=draft.assets.find((candidate)=>candidate.id===assetId);if(!item||!asset)return;item.imageAssetId=assetId;item.imageFit=item.imageFit??"fill";draft.selectedIds=[item.id];},"Apply Image Fill");
 
   const createNewProject = async(name: string) => { await forceSave();const next = createProject(name || "Untitled UI"); await saveProject(next,{createRecovery:false});setProject(next); setPast([]); setFuture([]); await refreshLibrary(); };
   const openProject = async(id: string) => { await forceSave();const next = await loadProject(id); if (next) { setProject(next); setPast([]); setFuture([]); } };
@@ -178,11 +173,7 @@ export function useEditor() {
   const discardRecovery=async(id:string)=>{await discardRecoverySnapshot(id);await refreshLibrary();};
   const archiveProject=async(id:string)=>{const target=await loadProject(id);if(!target)return;target.archived=!target.archived;target.updatedAt=Date.now();await saveProject(target,{createRecovery:false});if(id===projectRef.current.id)setProject(target);await refreshLibrary();};
 
-  return { project, setProject, past, future, historyEntries:[...past].reverse(), status, projects, recoveries, commit, beginHistoryTransaction, transient, finishGesture, cancelHistoryTransaction, importImages, placeAsset, placeSvgAsVector, renameAsset, setAssetFolder, toggleFavoriteAsset, createAssetFolder, applyAssetToSelection, addElement, addGeometry, select, setSelection, updateSelected, deleteSelected, duplicateSelected, reorder, align, distribute, stack, autoLayoutSelection, group, ungroup, nudge, addReferences, updateReference, removeReference, togglePreset, toggleFavoritePreset, applyFont, toggleFavoriteFont, saveFrameRecipe, cacheResearch, restoreGeneration, undo, redo, forceSave, createNewProject, openProject, renameProject, duplicateCurrent, removeProject, importProject, recoverProject, discardRecovery, archiveProject };
-}
-
-function seedElement(id: string, type: ElementType, name: string, patch: Partial<EditorElement>): EditorElement {
-  return { ...createElement(type), id, name, ...patch };
+  return { project, setProject, past, future, historyEntries:[...past].reverse(), status, projects, recoveries, commit, beginHistoryTransaction, transient, finishGesture, cancelHistoryTransaction, importImages, placeAsset, placeSvgAsVector, renameAsset, setAssetFolder, toggleFavoriteAsset, createAssetFolder, applyAssetToSelection, applyAssetToElement, addElement, addGeometry, select, setSelection, updateSelected, deleteSelected, duplicateSelected, rememberDuplicateTransform, repeatGrid, reorder, align, distribute, stack, autoLayoutSelection, group, ungroup, nudge, addReferences, updateReference, removeReference, togglePreset, toggleFavoritePreset, applyFont, toggleFavoriteFont, saveFrameRecipe, cacheResearch, restoreGeneration, undo, redo, forceSave, createNewProject, openProject, renameProject, duplicateCurrent, removeProject, importProject, recoverProject, discardRecovery, archiveProject };
 }
 
 function propertyLabel(patch:Partial<EditorElement>,project:EditorProject){const keys=Object.keys(patch),count=project.selectedIds.length,name=count>1?`${count} Objects`:`"${project.elements.find((item)=>item.id===project.selectedIds[0])?.name??"Object"}"`;if(keys.some((key)=>["x","y"].includes(key)))return`Move ${name}`;if(keys.some((key)=>["width","height"].includes(key)))return`Resize ${name}`;if(keys.includes("rotation"))return`Rotate ${name}`;if(keys.includes("fontFamily")||keys.includes("fontId"))return"Change Font";if(keys.some((key)=>key.startsWith("gradient")))return"Change Gradient";if(keys.includes("geometry"))return"Edit Path";if(keys.includes("imageAssetId"))return"Replace Image";return`Change ${keys[0]??"Property"}`;}

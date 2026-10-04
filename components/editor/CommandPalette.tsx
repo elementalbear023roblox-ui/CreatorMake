@@ -1,5 +1,15 @@
 "use client";
+
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
-type Command = { label: string; hint?: string; action: () => void };
-export function CommandPalette({ open, onClose, commands }: { open: boolean; onClose: () => void; commands: Command[] }) { const [query,setQuery] = useState(""); const close=()=>{setQuery("");onClose();}; const results = useMemo(() => commands.filter((item) => item.label.toLowerCase().includes(query.toLowerCase())), [commands,query]); if (!open) return null; return <div className="dialog-overlay command-overlay" onMouseDown={close}><section className="command-palette" role="dialog" aria-modal="true" aria-label="Command palette" onMouseDown={(event) => event.stopPropagation()}><label><Search size={16}/><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search tools and commands…" onKeyDown={(event) => { if (event.key === "Escape") close(); }}/></label><div>{results.map((command) => <button key={command.label} onClick={() => { command.action(); close(); }}><span>{command.label}</span><kbd>{command.hint}</kbd></button>)}{!results.length && <p>No matching commands.</p>}</div></section></div>; }
+import { Command, Search } from "lucide-react";
+
+export type EditorCommand={label:string;hint?:string;category?:"Create"|"Edit"|"Arrange"|"View"|"Roblox"|"Workspace"|"Settings";keywords?:string;action:()=>void};
+
+export function CommandPalette({open,onClose,commands}:{open:boolean;onClose:()=>void;commands:EditorCommand[]}){
+  const [query,setQuery]=useState(""),[active,setActive]=useState(0);
+  const close=()=>{setQuery("");setActive(0);onClose();};
+  const results=useMemo(()=>{const needle=query.trim().toLowerCase();return commands.filter((item)=>`${item.label} ${item.category??""} ${item.keywords??""}`.toLowerCase().includes(needle)).slice(0,30);},[commands,query]);
+  if(!open)return null;
+  const run=(index:number)=>{const command=results[index];if(command){command.action();close();}};
+  return <div className="dialog-overlay command-overlay" onMouseDown={close}><section className="command-palette professional" role="dialog" aria-modal="true" aria-label="Command palette" onMouseDown={(event)=>event.stopPropagation()}><header><Command size={15}/><span>Quick actions</span><kbd>Ctrl K</kbd></header><label><Search size={16}/><input autoFocus value={query} onChange={(event)=>{setQuery(event.target.value);setActive(0);}} placeholder="Search tools, workspaces, and commands…" onKeyDown={(event)=>{if(event.key==="Escape")close();else if(event.key==="ArrowDown"){event.preventDefault();setActive((value)=>Math.min(results.length-1,value+1));}else if(event.key==="ArrowUp"){event.preventDefault();setActive((value)=>Math.max(0,value-1));}else if(event.key==="Enter"){event.preventDefault();run(active);}}}/></label><div>{results.map((command,index)=><button key={command.label} className={active===index?"active":""} onMouseEnter={()=>setActive(index)} onClick={()=>run(index)}><small>{command.category??"Command"}</small><span>{command.label}</span>{command.hint&&<kbd>{command.hint}</kbd>}</button>)}{!results.length&&<p>No matching commands. Try “Roblox”, “theme”, “grid”, or “frame”.</p>}</div><footer><span>↑↓ Navigate</span><span>Enter Run</span><span>Esc Close</span></footer></section></div>;
+}

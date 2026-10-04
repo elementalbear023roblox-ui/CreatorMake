@@ -31,6 +31,22 @@ const DEFAULT_ALLOWED_ORIGINS = [
 const configuredOrigins=(process.env.CREATORMAKE_TRUSTED_ORIGINS??"").split(",").map((value)=>value.trim()).filter(Boolean).map((value)=>{const url=new URL(value);if(!["http:","https:"].includes(url.protocol)||url.pathname!=="/"||url.search||url.hash)throw new Error(`Invalid CREATORMAKE_TRUSTED_ORIGINS entry: ${value}`);return url.origin;});
 const ALLOWED_ORIGINS = new Set([...DEFAULT_ALLOWED_ORIGINS,...configuredOrigins]);
 
+function isLoopbackOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return ["http:", "https:"].includes(url.protocol)
+      && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
+      && url.username === ""
+      && url.password === "";
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedOrigin(origin) {
+  return ALLOWED_ORIGINS.has(origin) || isLoopbackOrigin(origin);
+}
+
 function sendJson(response, statusCode, value, origin) {
   const body = JSON.stringify(value);
   const headers = {
@@ -39,7 +55,7 @@ function sendJson(response, statusCode, value, origin) {
     "Content-Type": "application/json; charset=utf-8",
     Vary: "Origin",
   };
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
+  if (origin && isAllowedOrigin(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
   }
   response.writeHead(statusCode, headers);
@@ -108,15 +124,15 @@ function validateManifest(value) {
   if (textRoots.length > 0 && value.textExportArchitecture !== TEXT_EXPORT_ARCHITECTURE) {
     throw new Error(`TEXT_EXPORT_ARCHITECTURE_OUTDATED: expected ${TEXT_EXPORT_ARCHITECTURE}. Refresh CreatorMake and stage the project again.`);
   }
+  if(value.nodes.some((node)=>node.attributes?.CreatorMakeRole==="PixelText"||node.attributes?.CreatorMakeVisualPart==="text"&&node.className==="ImageLabel"))throw new Error("PIXEL_TEXT_REJECTED: visible glyphs must be a real TextLabel or TextBox.");
   for (const root of textRoots) {
     const children = value.nodes.filter((node) => node.parentSourceId === root.sourceId);
-    const standaloneNative = ["TextLabel", "TextButton", "TextBox"].includes(root.className) && typeof root.properties?.Text === "string";
+    const standaloneNative = ["TextLabel", "TextBox"].includes(root.className) && typeof root.properties?.Text === "string";
     const nativeChild = children.some((node) => ["TextLabel", "TextBox"].includes(node.className) && typeof node.properties?.Text === "string");
-    const pixelChild = children.some((node) => node.className === "ImageLabel" && node.attributes?.CreatorMakeRole === "PixelText" && node.attributes?.CreatorMakeVisualPart === "text");
     const combinedVisual = children.some((node) => node.attributes?.CreatorMakeRole === "Visual" || node.attributes?.CreatorMakeVisualPart === "full");
     const rootIndex=value.nodes.indexOf(root);
     if (combinedVisual) throw manifestFieldError(root,rootIndex,"children","LEGACY_TEXT_RASTER_REJECTED: combined _Visual is not valid for split text");
-    if (!standaloneNative && !nativeChild && !pixelChild) throw manifestFieldError(root,rootIndex,"children","TEXT_INSTANCE_MISSING: expected a real TextLabel/TextBox or separate _PixelText ImageLabel");
+    if (!standaloneNative && !nativeChild) throw manifestFieldError(root,rootIndex,"children","TEXT_INSTANCE_MISSING: expected a real TextLabel or TextBox");
   }
   if ((value.visualMode === "PIXEL_ACCURATE" || value.visualMode === "ADAPTIVE") && !Array.isArray(value.assets)) throw new Error("Manifest validation failed: Object: project | Type: ScreenGui | Field: assets | Reason: rendered visual mode requires an asset array");
   for (const [index, asset] of (value.assets ?? []).entries()) {
@@ -558,7 +574,7 @@ export async function startStudioSyncServer({
     const requestUrl = new URL(request.url ?? "/", requestedUrl);
 
     if (request.method === "OPTIONS") {
-      if (origin && !ALLOWED_ORIGINS.has(origin)) {
+      if (origin && !isAllowedOrigin(origin)) {
         sendJson(response, 403, { error: "Origin is not allowed." });
         return;
       }
@@ -642,7 +658,7 @@ export async function startStudioSyncServer({
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/publish") {
-      if (origin && !ALLOWED_ORIGINS.has(origin)) {
+      if (origin && !isAllowedOrigin(origin)) {
         sendJson(response, 403, { error: "Origin is not allowed." });
         return;
       }
@@ -767,7 +783,7 @@ export async function startStudioSyncServer({
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/sync/request") {
-      if (origin && !ALLOWED_ORIGINS.has(origin)) {
+      if (origin && !isAllowedOrigin(origin)) {
         sendJson(response, 403, { error: "Origin is not allowed." });
         return;
       }
@@ -875,7 +891,7 @@ export async function startStudioSyncServer({
         const allowedRoot = `${resolve(outputDir)}${sep}`;
         if (!filePath.startsWith(allowedRoot)) throw new Error("Invalid asset path.");
         const body = await readFile(filePath);
-        response.writeHead(200, {"Cache-Control":"no-store","Content-Length":body.length,"Content-Type":"image/png",...(origin && ALLOWED_ORIGINS.has(origin) ? {"Access-Control-Allow-Origin":origin} : {})});
+        response.writeHead(200, {"Cache-Control":"no-store","Content-Length":body.length,"Content-Type":"image/png",...(origin && isAllowedOrigin(origin) ? {"Access-Control-Allow-Origin":origin} : {})});
         response.end(body);
       } catch {
         sendJson(response, 404, { error: "Rendered asset not found." }, origin);
@@ -889,7 +905,7 @@ export async function startStudioSyncServer({
     }
 
     if (request.method === "DELETE" && requestUrl.pathname === "/project/current/manifest") {
-      if (origin && !ALLOWED_ORIGINS.has(origin)) { sendJson(response, 403, { error: "Origin is not allowed." }); return; }
+      if (origin && !isAllowedOrigin(origin)) { sendJson(response, 403, { error: "Origin is not allowed." }); return; }
       const unlessProjectId = requestUrl.searchParams.get("unlessProjectId");
       if (!unlessProjectId || currentManifest?.projectId !== unlessProjectId) {
         currentManifest = null;lastSuccessfulManifest = null;syncJob = null;publishingJob = null;lastUpdatedAt = new Date().toISOString();currentManifestRevision += 1;pixelCache.clear();
@@ -916,7 +932,7 @@ export async function startStudioSyncServer({
     }
 
     if (request.method === "POST" && ["/project/current/manifest", "/manifest"].includes(requestUrl.pathname)) {
-      if (origin && !ALLOWED_ORIGINS.has(origin)) {
+      if (origin && !isAllowedOrigin(origin)) {
         sendJson(response, 403, { error: "Origin is not allowed." });
         return;
       }

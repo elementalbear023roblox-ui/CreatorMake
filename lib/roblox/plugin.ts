@@ -156,20 +156,23 @@ local function validateManifest(manifest)
     if elementType=="text" or elementType=="button" then table.insert(textRoots,node) end
   end
   if #textRoots>0 and manifest.textExportArchitecture~=2 then error("TEXT_EXPORT_ARCHITECTURE_OUTDATED: Refresh CreatorMake and stage the project again.") end
+  for _,node in ipairs(manifest.nodes) do
+    local role=type(node.attributes)=="table" and node.attributes.CreatorMakeRole or nil
+    local visualPart=type(node.attributes)=="table" and node.attributes.CreatorMakeVisualPart or nil
+    if role=="PixelText" or (visualPart=="text" and node.className=="ImageLabel") then error("PIXEL_TEXT_REJECTED: visible glyphs must be a real TextLabel or TextBox.") end
+  end
   for _,rootNode in ipairs(textRoots) do
-    local standaloneNative=(rootNode.className=="TextLabel" or rootNode.className=="TextButton" or rootNode.className=="TextBox") and type(rootNode.properties)=="table" and type(rootNode.properties.Text)=="string"
+    local standaloneNative=(rootNode.className=="TextLabel" or rootNode.className=="TextBox") and type(rootNode.properties)=="table" and type(rootNode.properties.Text)=="string"
     local nativeChild=false
-    local pixelChild=false
     for _,candidate in ipairs(manifest.nodes) do
       if candidate.parentSourceId==rootNode.sourceId then
         local role=type(candidate.attributes)=="table" and candidate.attributes.CreatorMakeRole or nil
         local visualPart=type(candidate.attributes)=="table" and candidate.attributes.CreatorMakeVisualPart or nil
         if role=="Visual" or visualPart=="full" then error("LEGACY_TEXT_RASTER_REJECTED: "..tostring(rootNode.name).." still contains a combined _Visual.") end
         if (candidate.className=="TextLabel" or candidate.className=="TextBox") and type(candidate.properties)=="table" and type(candidate.properties.Text)=="string" then nativeChild=true end
-        if candidate.className=="ImageLabel" and role=="PixelText" and visualPart=="text" then pixelChild=true end
       end
     end
-    if not standaloneNative and not nativeChild and not pixelChild then error("TEXT_INSTANCE_MISSING: "..tostring(rootNode.name).." must contain a real TextLabel/TextBox or a separate _PixelText fallback.") end
+    if not standaloneNative and not nativeChild then error("TEXT_INSTANCE_MISSING: "..tostring(rootNode.name).." must contain a real TextLabel or TextBox.") end
   end
   for index,asset in ipairs(manifest.assets or {}) do
     if type(asset.sourceId)~="string" or type(asset.visualHash)~="string" then error("MANIFEST_ASSET_INVALID: assets["..tostring(index).."] requires sourceId and visualHash.") end

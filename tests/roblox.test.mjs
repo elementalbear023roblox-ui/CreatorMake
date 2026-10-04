@@ -36,7 +36,7 @@ test("Roblox export preserves names, hierarchy, decorators, and valid syntax", (
   const shop = makeShop("Create a colorful Roblox simulator shop with six product cards and category tabs.");
   const project = { screen: { width: 960, height: 600 }, elements: shop.elements };
   const result = createRobloxExport(project, { ...DEFAULT_ROBLOX_EXPORT_OPTIONS, visualMode:"NATIVE", screenGuiName: "CreatorMakeShop" });
-  const requiredInstances = ["ScreenGui", "Frame", "TextLabel", "TextButton", "UIStroke", "UICorner", "UIGradient", "UIListLayout", "UIGridLayout"];
+  const requiredInstances = ["ScreenGui", "Frame", "TextLabel", "ImageButton", "UIStroke", "UICorner", "UIGradient", "UIListLayout", "UIGridLayout"];
   for (const className of requiredInstances) assert.match(result.lua, new RegExp(`Instance\\.new\\(\"${className}\"\\)`), className);
   for (const name of ["ShopWindow", "TitleText", "CloseButton", "ProductGrid", "SideTabs"]) assert.ok(result.lua.includes(`.Name = \"${name}\"`), name);
   assert.ok(result.hierarchy.includes("CreatorMakeShop [ScreenGui]"));

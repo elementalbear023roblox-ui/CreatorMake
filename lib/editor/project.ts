@@ -38,7 +38,7 @@ export function createElement(type: ElementType, index = 0): EditorElement {
     verticalAlign: "center" as const, textTransform: "none" as const, textDecoration: "none" as const,
     textStrokeColor: "#000000", textStrokeWidth: 0, textStrokeOpacity: 100, textStrokePosition: "center" as const, textShadows: [], textBoxMode: "fixed" as const, autoFit: false, textAlign: "left" as const, padding: 12,
     z: 0, rotateX: 0, rotateY: 0, perspective: 900, perspectiveOriginX: 50, perspectiveOriginY: 50, translateZ: 0, skewX: 0, skewY: 0, locked: false, hidden: false,
-    imageAssetId:null,imageFit:"fit" as const,imageCrop:{x:0,y:0,width:100,height:100},imageOffsetX:0,imageOffsetY:0,imageScale:1,imageRotation:0,imageBrightness:100,imageContrast:100,imageSaturation:100,imageHue:0,imageBlur:0,imageTint:"#ffffff",imageTintOpacity:0,imageStateAssetIds:{default:null,hover:null,pressed:null,disabled:null,selected:null},imagePreviewState:"default" as const,sliceCenter:null,sliceScale:1,
+    imageAssetId:null,imageFit:"fit" as const,imageCrop:{x:0,y:0,width:100,height:100},imageOffsetX:0,imageOffsetY:0,imageScale:1,imageScaleX:1,imageScaleY:1,imageRotation:0,imageOpacity:100,imageFlipX:false,imageFlipY:false,imageTileWidth:128,imageTileHeight:128,imageBrightness:100,imageContrast:100,imageSaturation:100,imageHue:0,imageBlur:0,imageTint:"#ffffff",imageTintOpacity:0,imageStateAssetIds:{default:null,hover:null,pressed:null,disabled:null,selected:null},imagePreviewState:"default" as const,sliceCenter:null,sliceScale:1,
     textRobloxExportMode:"AUTO" as const,dynamicText:false,richText:false,textInput:false,
   };
   if (type === "frame") return { ...base, name: "Frame", x: 230 + offset, y: 130 + offset, width: 460, height: 320, fill: "#181c2b", text: "" };
@@ -76,18 +76,12 @@ export function createVectorElement(kind:GeometryKind,index=0){
 
 export function createProject(name = "Untitled UI"): EditorProject {
   const now = Date.now();
-  const frame = createElement("frame");
-  frame.name = "Interface panel";
-  const title = createElement("text", 1);
-  title.name = "Title"; title.text = "CREATOR HUD"; title.x = 330; title.y = 205; title.width = 300;
-  const button = createElement("button", 2);
-  button.name = "Primary action"; button.text = "ENTER GAME"; button.x = 365; button.y = 345;
   return {
     schemaVersion: CREATORMAKE_SCHEMA_VERSION,
     id: createId("project"), name, createdAt: now, updatedAt: now,
     platform: "Roblox", status: "Draft", tags: [], archived: false,
     screen: { id: createId("screen"), name: "Desktop", width: 960, height: 600, background: "#0e1220", x: 2100, y: 1400 },
-    elements: [frame, title, button], assets: [], assetFolders: ["Logos","Icons","Characters","Textures","Backgrounds","Client Assets"], selectedIds: [button.id], references: [], activePresetIds: ["digital-system"], favoritePresetIds: [], favoriteFontIds: [], recentFontIds: ["inter"], customFrameRecipes: [], researchCache: {}, generationHistory: [], projectFonts: [{fontId:"inter",weights:[500,700],styles:["normal"]}], fontPolicy: {allowSyntheticWeight:false,allowSyntheticItalic:false},
+    elements: [], assets: [], assetFolders: ["Logos","Icons","Characters","Textures","Backgrounds","Client Assets"], selectedIds: [], references: [], activePresetIds: [], favoritePresetIds: [], favoriteFontIds: [], recentFontIds: [], customFrameRecipes: [], researchCache: {}, generationHistory: [], projectFonts: [], fontPolicy: {allowSyntheticWeight:false,allowSyntheticItalic:false},
   };
 }
 

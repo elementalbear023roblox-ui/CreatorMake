@@ -27,7 +27,7 @@ test("advanced corner modes produce distinct saved paths",()=>{
 });
 
 test("legacy projects gain geometry and corner metadata without losing objects",()=>{
-  const project=createProject("Geometry migration"),legacy=structuredClone(project);
+  const project=createProject("Geometry migration");project.elements=[createElement("frame")];const legacy=structuredClone(project);
   delete legacy.elements[0].geometry;
   delete legacy.elements[0].cornerTypes;
   const normalized=normalizeProject(legacy);

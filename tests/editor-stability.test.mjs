@@ -4,6 +4,15 @@ import { isCreatorMakeAIEnabled } from "../lib/ai/feature.ts";
 import { alignSelection, distributeSelection } from "../lib/editor/operations.ts";
 import { createElement, createProject, createScrollingInventoryElements, exportProjectData, importProjectData, listProjects, listRecoverySnapshots, loadProject, normalizeProject, saveProject } from "../lib/editor/project.ts";
 
+test("a new CreatorMake project is genuinely blank",()=>{
+  const project=createProject("Blank");
+  assert.deepEqual(project.elements,[]);
+  assert.deepEqual(project.assets,[]);
+  assert.deepEqual(project.selectedIds,[]);
+  assert.deepEqual(project.activePresetIds,[]);
+  assert.deepEqual(project.projectFonts,[]);
+});
+
 test("AI generation feature flag is opt-in", () => {
   const previous=process.env.CREATORMAKE_AI_ENABLED;
   try {
@@ -46,6 +55,7 @@ test("scrolling inventory scaffold is semantic and keeps 20 editable buttons",()
 
 test("legacy projects migrate to the current schema and IndexedDB-compatible saves create recovery snapshots", async() => {
   const project=createProject("Recovery");
+  project.elements=[createElement("frame")];
   const legacy=structuredClone(project);delete legacy.schemaVersion;
   const normalized=normalizeProject(legacy);
   assert.equal(normalized.schemaVersion,7);
