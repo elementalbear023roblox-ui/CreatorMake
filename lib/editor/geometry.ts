@@ -3,6 +3,8 @@ import type { CornerKey, CornerType, EditorElement, ElementType, GeometryKind, P
 export const GEOMETRY_OPTIONS: ReadonlyArray<{kind:GeometryKind;label:string}> = [
   {kind:"rectangle",label:"Rectangle"},{kind:"rounded-rectangle",label:"Rounded Rectangle"},{kind:"ellipse",label:"Ellipse"},{kind:"circle",label:"Circle"},{kind:"line",label:"Line"},{kind:"triangle",label:"Triangle"},{kind:"polygon",label:"Polygon"},{kind:"star",label:"Star"},{kind:"diamond",label:"Diamond"},{kind:"trapezoid",label:"Trapezoid"},{kind:"parallelogram",label:"Parallelogram"},{kind:"chevron",label:"Chevron"},{kind:"arrow",label:"Arrow"},{kind:"capsule",label:"Capsule"},{kind:"ring",label:"Ring"},{kind:"arc",label:"Arc"},{kind:"pie",label:"Pie"},{kind:"notched-rectangle",label:"Notched Rectangle"},{kind:"cut-corner-rectangle",label:"Cut-Corner Rectangle"},{kind:"ticket",label:"Ticket"},{kind:"bracket",label:"Bracket"},{kind:"tab",label:"Tab"},{kind:"banner",label:"Banner"},{kind:"plaque",label:"Plaque"},{kind:"ribbon",label:"Ribbon"},{kind:"custom-path",label:"Custom Path"},
 ];
+const DIRECTIONAL_CAPTION_GEOMETRIES=new Set<GeometryKind>(["trapezoid","parallelogram","chevron","arrow","notched-rectangle","cut-corner-rectangle","tab","banner","plaque","ribbon","custom-path"]);
+export const isDirectionalCaptionGeometry=(kind:GeometryKind)=>DIRECTIONAL_CAPTION_GEOMETRIES.has(kind);
 const GEOMETRY_KINDS=new Set<GeometryKind>(GEOMETRY_OPTIONS.map((option)=>option.kind));
 
 export const DEFAULT_VECTOR_GEOMETRY:VectorGeometry={kind:"triangle",sides:6,points:5,innerRadius:46,inset:18,thickness:18,skew:22,arcStart:0,arcEnd:270,pathData:"M 0 100 L 50 0 L 100 100 Z",nodes:[],closed:true};

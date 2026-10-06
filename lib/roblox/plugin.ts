@@ -155,24 +155,26 @@ local function validateManifest(manifest)
     local elementType=type(node.attributes)=="table" and node.attributes.CreatorMakeElementType or nil
     if elementType=="text" or elementType=="button" then table.insert(textRoots,node) end
   end
-  if #textRoots>0 and manifest.textExportArchitecture~=2 then error("TEXT_EXPORT_ARCHITECTURE_OUTDATED: Refresh CreatorMake and stage the project again.") end
+  if #textRoots>0 and manifest.textExportArchitecture~=3 then error("TEXT_EXPORT_ARCHITECTURE_OUTDATED: Refresh CreatorMake and stage the project again.") end
   for _,node in ipairs(manifest.nodes) do
     local role=type(node.attributes)=="table" and node.attributes.CreatorMakeRole or nil
     local visualPart=type(node.attributes)=="table" and node.attributes.CreatorMakeVisualPart or nil
-    if role=="PixelText" or (visualPart=="text" and node.className=="ImageLabel") then error("PIXEL_TEXT_REJECTED: visible glyphs must be a real TextLabel or TextBox.") end
+    if role=="PixelText" or (visualPart=="text" and node.className=="ImageLabel" and role~="TransformedText") then error("LEGACY_PIXEL_TEXT_REJECTED: text images are accepted only for explicit shear/perspective TransformedText nodes.") end
   end
   for _,rootNode in ipairs(textRoots) do
     local standaloneNative=(rootNode.className=="TextLabel" or rootNode.className=="TextBox") and type(rootNode.properties)=="table" and type(rootNode.properties.Text)=="string"
     local nativeChild=false
+    local exactChild=false
     for _,candidate in ipairs(manifest.nodes) do
       if candidate.parentSourceId==rootNode.sourceId then
         local role=type(candidate.attributes)=="table" and candidate.attributes.CreatorMakeRole or nil
         local visualPart=type(candidate.attributes)=="table" and candidate.attributes.CreatorMakeVisualPart or nil
         if role=="Visual" or visualPart=="full" then error("LEGACY_TEXT_RASTER_REJECTED: "..tostring(rootNode.name).." still contains a combined _Visual.") end
         if (candidate.className=="TextLabel" or candidate.className=="TextBox") and type(candidate.properties)=="table" and type(candidate.properties.Text)=="string" then nativeChild=true end
+        if candidate.className=="ImageLabel" and role=="TransformedText" and candidate.attributes.CreatorMakeRequiresExactTextRaster==true and type(candidate.attributes.CreatorMakeEditableText)=="string" then exactChild=true end
       end
     end
-    if not standaloneNative and not nativeChild then error("TEXT_INSTANCE_MISSING: "..tostring(rootNode.name).." must contain a real TextLabel or TextBox.") end
+    if not standaloneNative and not nativeChild and not exactChild then error("TEXT_INSTANCE_MISSING: "..tostring(rootNode.name).." must contain native editable text or an explicit TransformedText ImageLabel.") end
   end
   local manifestNodesById={}
   for _,node in ipairs(manifest.nodes) do manifestNodesById[node.sourceId]=node end
@@ -195,16 +197,27 @@ local function validateManifest(manifest)
         end
         cursor=cursor.parentSourceId and manifestNodesById[cursor.parentSourceId] or nil
       end
-      if mode=="FIXED_DESIGN_SIZE" or mode=="RESPONSIVE_CONSTRAINED" then
+      if mode=="FIXED_DESIGN_SIZE" or mode=="FIT_GEOMETRY" or mode=="RESPONSIVE_CONSTRAINED" then
         if (manifest.visualMode=="PIXEL_ACCURATE" or manifest.visualMode=="ADAPTIVE") and globalScaleCount~=1 then error("TEXT_ROOT_SCALE_INVALID: "..tostring(node.name).." must inherit exactly one CreatorMakeGlobalScale; received "..tostring(globalScaleCount)..".") end
         if objectScaleCount>1 then error("TEXT_OBJECT_SCALE_INVALID: "..tostring(node.name).." inherits duplicate CreatorMakeObjectScale objects.") end
       end
-      if mode=="FIXED_DESIGN_SIZE" then
-        if properties.TextScaled~=false then error("TEXT_SCALE_INVALID: "..tostring(node.name).." fixed text must use TextScaled=false.") end
-        if type(attributes.CreatorMakeTextSize)~="number" or type(properties.TextSize)~="number" or math.abs(attributes.CreatorMakeTextSize-properties.TextSize)>.001 then error("TEXT_SIZE_INVALID: "..tostring(node.name).." must keep the exact CreatorMake design-space TextSize.") end
-        if constraintCount~=0 then error("TEXT_CONSTRAINT_INVALID: "..tostring(node.name).." fixed text must not use UITextSizeConstraint.") end
+      if mode=="FIXED_DESIGN_SIZE" or mode=="FIT_GEOMETRY" then
+        if properties.TextScaled~=false then error("TEXT_SCALE_INVALID: "..tostring(node.name).." design/fit text must use TextScaled=false.") end
+        local expectedSize=mode=="FIT_GEOMETRY" and attributes.CreatorMakeCalculatedFitTextSize or attributes.CreatorMakeTextSize
+        if type(expectedSize)~="number" or type(properties.TextSize)~="number" or math.abs(expectedSize-properties.TextSize)>.001 then error("TEXT_SIZE_INVALID: "..tostring(node.name).." must keep the exact CreatorMake calculated TextSize.") end
+        if constraintCount~=0 then error("TEXT_CONSTRAINT_INVALID: "..tostring(node.name).." design/fit text must not use UITextSizeConstraint.") end
       elseif mode=="RESPONSIVE_CONSTRAINED" then
         if properties.TextScaled~=true or constraintCount~=1 then error("TEXT_CONSTRAINT_INVALID: "..tostring(node.name).." responsive text requires TextScaled=true and one UITextSizeConstraint.") end
+      end
+      local captionOrientation=attributes.CreatorMakeResolvedCaptionOrientation
+      if captionOrientation~=nil and attributes.CreatorMakeCaptionLayoutSpace=="LOCAL_CHILD" then
+        if captionOrientation~="horizontal" and captionOrientation~="follow-shape" and captionOrientation~="custom" then error("CAPTION_ORIENTATION_INVALID: "..tostring(node.name).." has unsupported orientation "..tostring(captionOrientation)..".") end
+        if type(attributes.CreatorMakeCaptionCenterX)~="number" or type(attributes.CreatorMakeCaptionCenterY)~="number" or type(attributes.CreatorMakeCaptionWidth)~="number" or type(attributes.CreatorMakeCaptionHeight)~="number" or type(attributes.CreatorMakeCaptionSafeWidth)~="number" or type(attributes.CreatorMakeCaptionSafeHeight)~="number" or type(attributes.CreatorMakeGeometryCenterlineAngle)~="number" or type(attributes.CreatorMakeCaptionAngle)~="number" then error("CAPTION_LAYOUT_MISSING: "..tostring(node.name).." is missing canonical caption geometry, safe region, or geometry centerline.") end
+        if type(properties.Position)~="table" or properties.Position.kind~="UDim2" or type(properties.Size)~="table" or properties.Size.kind~="UDim2" or type(properties.AnchorPoint)~="table" or properties.AnchorPoint.kind~="Vector2" then error("CAPTION_LAYOUT_INVALID: "..tostring(node.name).." must export Position, Size, and AnchorPoint from the canonical caption layout.") end
+        if math.abs(properties.AnchorPoint.x-.5)>.001 or math.abs(properties.AnchorPoint.y-.5)>.001 then error("CAPTION_ANCHOR_INVALID: "..tostring(node.name).." must use a centered anchor.") end
+        if math.abs(properties.Position.xOffset-attributes.CreatorMakeCaptionCenterX)>1 or math.abs(properties.Position.yOffset-attributes.CreatorMakeCaptionCenterY)>1 then error("CAPTION_CENTER_INVALID: "..tostring(node.name).." does not match the canonical caption center.") end
+        if type(properties.Rotation)~="number" or math.abs(properties.Rotation-attributes.CreatorMakeFinalTextLabelRotationApplied)>.25 then error("CAPTION_ANGLE_INVALID: "..tostring(node.name).." does not match the canonical caption angle.") end
+        if captionOrientation=="follow-shape" and math.abs(attributes.CreatorMakeFinalTextLabelRotationApplied)>.001 and math.abs(properties.Rotation)<=.001 then error("CAPTION_AXIS_LOST: "..tostring(node.name).." requested Follow Geometry but exported a horizontal TextLabel.") end
       end
     end
   end
@@ -387,7 +400,7 @@ local function printTextScaleDiagnostics(manifest, instances)
           local attributes=type(node.attributes)=="table" and node.attributes or {}
           local viewport=workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.zero
           local parentSize=instance.Parent and instance.Parent:IsA("GuiObject") and instance.Parent.AbsoluteSize or Vector2.zero
-          print("TEXT EXPORT DEBUG\\nName: "..instance.Name.."\\nCreatorMake TextSize: "..tostring(attributes.CreatorMakeTextSize).."\\nExported TextSize: "..tostring(instance.TextSize).."\\nEditor zoom: ignored by export\\nReference viewport: "..tostring(manifest.referenceResolution.width).."x"..tostring(manifest.referenceResolution.height).."\\nRoblox viewport: "..tostring(viewport.X).."x"..tostring(viewport.Y).."\\nRoot/Object UIScale chain: "..table.concat(scaleItems,", ").."\\nCombined inherited scale: "..tostring(scaleProduct).."\\nTextScaled: "..tostring(instance.TextScaled).."\\nUITextSizeConstraint count: "..tostring(constraintCount).."\\nCreatorMake text box: "..tostring(attributes.CreatorMakeTextBoundsWidth).."x"..tostring(attributes.CreatorMakeTextBoundsHeight).."\\nRoblox text box: "..tostring(instance.AbsoluteSize.X).."x"..tostring(instance.AbsoluteSize.Y).."\\nCreatorMake parent: "..tostring(attributes.CreatorMakeBackgroundLogicalWidth).."x"..tostring(attributes.CreatorMakeBackgroundLogicalHeight).."\\nRoblox parent: "..tostring(parentSize.X).."x"..tostring(parentSize.Y).."\\nFontFace: "..tostring(instance.FontFace.Family).."\\nFont weight: "..tostring(instance.FontFace.Weight))
+          print("TEXT EXPORT DEBUG\\nName: "..instance.Name.."\\nSizing mode: "..tostring(attributes.CreatorMakeTextScaleMode).."\\nDesign TextSize: "..tostring(attributes.CreatorMakeTextSize).."\\nCalculated fit TextSize: "..tostring(attributes.CreatorMakeCalculatedFitTextSize).."\\nExported Roblox TextSize: "..tostring(instance.TextSize).."\\nSafe region: "..tostring(attributes.CreatorMakeCaptionSafeWidth).."x"..tostring(attributes.CreatorMakeCaptionSafeHeight).."\\nMeasured text: "..tostring(attributes.CreatorMakeMeasuredTextWidth).."x"..tostring(attributes.CreatorMakeMeasuredTextHeight).."\\nSafe width ratio: "..tostring(attributes.CreatorMakeTextWidthRatio).."\\nSafe height ratio: "..tostring(attributes.CreatorMakeTextHeightRatio).."\\nShared caption group: "..tostring(attributes.CreatorMakeSharedCaptionGroup).."\\nMetric source: "..tostring(attributes.CreatorMakeTextMetricSource).." / "..tostring(attributes.CreatorMakeTextMetricFamily).."\\nEditor zoom: ignored by export\\nReference viewport: "..tostring(manifest.referenceResolution.width).."x"..tostring(manifest.referenceResolution.height).."\\nRoblox viewport: "..tostring(viewport.X).."x"..tostring(viewport.Y).."\\nRoot/Object UIScale chain: "..table.concat(scaleItems,", ").."\\nCombined inherited scale: "..tostring(scaleProduct).."\\nTextScaled: "..tostring(instance.TextScaled).."\\nUITextSizeConstraint count: "..tostring(constraintCount).."\\nCreatorMake text box: "..tostring(attributes.CreatorMakeTextBoundsWidth).."x"..tostring(attributes.CreatorMakeTextBoundsHeight).."\\nRoblox text box: "..tostring(instance.AbsoluteSize.X).."x"..tostring(instance.AbsoluteSize.Y).."\\nCreatorMake parent: "..tostring(attributes.CreatorMakeBackgroundLogicalWidth).."x"..tostring(attributes.CreatorMakeBackgroundLogicalHeight).."\\nRoblox parent: "..tostring(parentSize.X).."x"..tostring(parentSize.Y).."\\nFontFace: "..tostring(instance.FontFace.Family).."\\nFont weight: "..tostring(instance.FontFace.Weight))
         end
       end
     end
@@ -493,7 +506,7 @@ local function verifyTextArchitecture(manifest, instances)
       local root=instances[node.sourceId]
       local background=nil
       local nativeText=nil
-      local pixelText=nil
+      local transformedText=nil
       local combinedVisual=false
       if root and (root:IsA("TextLabel") or root:IsA("TextButton") or root:IsA("TextBox")) then nativeText=root end
       for _,candidate in ipairs(manifest.nodes or {}) do
@@ -503,15 +516,37 @@ local function verifyTextArchitecture(manifest, instances)
           local instance=instances[candidate.sourceId]
           if role=="Background" then background=instance end
           if role=="EditableText" or role=="EditableTextBox" or role=="ButtonText" then nativeText=instance end
-          if role=="PixelText" then pixelText=instance end
+          if role=="TransformedText" then transformedText=instance end
           if role=="Visual" or visualPart=="full" then combinedVisual=true end
         end
       end
       local nativeOk=nativeText~=nil and (nativeText:IsA("TextLabel") or nativeText:IsA("TextButton") or nativeText:IsA("TextBox"))
-      local pixelOk=pixelText~=nil and pixelText:IsA("ImageLabel")
-      local itemPassed=root~=nil and not combinedVisual and (nativeOk or pixelOk)
+      local exactOk=transformedText~=nil and transformedText:IsA("ImageLabel") and transformedText:GetAttribute("CreatorMakeRequiresExactTextRaster")==true and type(transformedText:GetAttribute("CreatorMakeEditableText"))=="string"
+      local splitCaption=nativeOk and nativeText~=root
+      local expectedAngle=nativeOk and tonumber(nativeText:GetAttribute(splitCaption and "CreatorMakeFinalTextLabelRotationApplied" or "CreatorMakeStandaloneTextRotationApplied")) or 0
+      local geometryAngle=nativeOk and tonumber(nativeText:GetAttribute("CreatorMakePixelVisualRotation")) or 0
+      local geometryCenterlineAngle=nativeOk and tonumber(nativeText:GetAttribute("CreatorMakeGeometryCenterlineAngle")) or 0
+      local inheritedRotation=nativeOk and tonumber(nativeText:GetAttribute("CreatorMakeRotationInheritedByRobloxParent")) or 0
+      local localRotation=nativeOk and tonumber(nativeText:GetAttribute("CreatorMakeTextLocalRotation")) or 0
+      local safeWidth=nativeOk and tonumber(nativeText:GetAttribute("CreatorMakeCaptionSafeWidth")) or 0
+      local safeHeight=nativeOk and tonumber(nativeText:GetAttribute("CreatorMakeCaptionSafeHeight")) or 0
+      local designTextSize=nativeOk and tonumber(nativeText:GetAttribute("CreatorMakeTextSize")) or 0
+      local calculatedTextSize=nativeOk and tonumber(nativeText:GetAttribute("CreatorMakeCalculatedFitTextSize")) or designTextSize
+      local exportedTextSize=nativeOk and nativeText.TextSize or 0
+      local expectedCenterX=splitCaption and tonumber(nativeText:GetAttribute("CreatorMakeCaptionCenterX")) or 0
+      local expectedCenterY=splitCaption and tonumber(nativeText:GetAttribute("CreatorMakeCaptionCenterY")) or 0
+      local actualAngle=nativeOk and nativeText.Rotation or 0
+      local actualCenterX=splitCaption and (nativeText.Position.X.Offset+(0.5-nativeText.AnchorPoint.X)*nativeText.Size.X.Offset) or 0
+      local actualCenterY=splitCaption and (nativeText.Position.Y.Offset+(0.5-nativeText.AnchorPoint.Y)*nativeText.Size.Y.Offset) or 0
+      local angleDelta=((actualAngle-expectedAngle+180)%360)-180
+      local angleError=math.abs(angleDelta)
+      local centerError=splitCaption and math.sqrt((actualCenterX-expectedCenterX)^2+(actualCenterY-expectedCenterY)^2) or 0
+      local followShape=nativeOk and nativeText:GetAttribute("CreatorMakeResolvedCaptionOrientation")=="follow-shape"
+      local captionOk=not nativeOk or (angleError<=0.25 and centerError<=1 and (not followShape or math.abs(expectedAngle)<=0.001 or math.abs(actualAngle)>0.001))
+      if nativeOk then print(string.format("[CreatorMake Caption] Object=%s Geometry centerline angle=%.4f Pixel geometry angle=%.4f Parent inherited rotation=%.4f Local text rotation=%.4f Final TextLabel.Rotation=%.4f Safe region=%.3fx%.3f Design/Calculated/Exported TextSize=%.3f/%.3f/%.3f Center=(%.3f, %.3f) TextLabel center=(%.3f, %.3f) Angle error=%.4f Center error=%.4f",tostring(node.name),geometryCenterlineAngle,geometryAngle,inheritedRotation,localRotation,actualAngle,safeWidth,safeHeight,designTextSize,calculatedTextSize,exportedTextSize,expectedCenterX,expectedCenterY,actualCenterX,actualCenterY,angleError,centerError)) end
+      local itemPassed=root~=nil and not combinedVisual and (nativeOk or exactOk) and captionOk
       passed=passed and itemPassed
-      table.insert(items,{sourceId=node.sourceId,name=node.name,rootClass=root and root.ClassName or nil,backgroundClass=background and background.ClassName or nil,textClass=nativeText and nativeText.ClassName or nil,textValue=nativeText and nativeText.Text or nil,pixelTextClass=pixelText and pixelText.ClassName or nil,combinedVisual=combinedVisual,glyphsSeparated=not combinedVisual,nativeEditable=nativeOk,passed=itemPassed})
+      table.insert(items,{sourceId=node.sourceId,name=node.name,rootClass=root and root.ClassName or nil,backgroundClass=background and background.ClassName or nil,textClass=nativeText and nativeText.ClassName or transformedText and transformedText.ClassName or nil,textValue=nativeText and nativeText.Text or transformedText and transformedText:GetAttribute("CreatorMakeEditableText") or nil,textRotation=actualAngle,geometryAngle=geometryAngle,geometryCenterlineAngle=geometryCenterlineAngle,parentInheritedRotation=inheritedRotation,localTextRotation=localRotation,safeRegion={width=safeWidth,height=safeHeight},textSize={design=designTextSize,calculated=calculatedTextSize,exported=exportedTextSize},captionCenter={x=expectedCenterX,y=expectedCenterY},textCenter={x=actualCenterX,y=actualCenterY},angleError=angleError,centerError=centerError,transformedTextClass=transformedText and transformedText.ClassName or nil,combinedVisual=combinedVisual,glyphsSeparated=not combinedVisual,nativeEditable=nativeOk,exactAppearance=exactOk,captionTransformValid=captionOk,passed=itemPassed})
     end
   end
   return {version=manifest.textExportArchitecture,passed=passed,count=#items,items=items}

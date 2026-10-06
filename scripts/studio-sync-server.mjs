@@ -22,7 +22,7 @@ const PROTOCOL_VERSION = CREATORMAKE_PROTOCOL_VERSION;
 const REQUIRED_PLUGIN_VERSION = CREATORMAKE_PLUGIN_VERSION;
 const PLUGIN_ONLINE_MS = 8_000;
 const SYNC_LEASE_MS = 120_000;
-const TEXT_EXPORT_ARCHITECTURE = 2;
+const TEXT_EXPORT_ARCHITECTURE = 3;
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://127.0.0.1:5173",
   "http://localhost:5173",
@@ -124,15 +124,16 @@ function validateManifest(value) {
   if (textRoots.length > 0 && value.textExportArchitecture !== TEXT_EXPORT_ARCHITECTURE) {
     throw new Error(`TEXT_EXPORT_ARCHITECTURE_OUTDATED: expected ${TEXT_EXPORT_ARCHITECTURE}. Refresh CreatorMake and stage the project again.`);
   }
-  if(value.nodes.some((node)=>node.attributes?.CreatorMakeRole==="PixelText"||node.attributes?.CreatorMakeVisualPart==="text"&&node.className==="ImageLabel"))throw new Error("PIXEL_TEXT_REJECTED: visible glyphs must be a real TextLabel or TextBox.");
+  if(value.nodes.some((node)=>node.attributes?.CreatorMakeRole==="PixelText"||(node.attributes?.CreatorMakeVisualPart==="text"&&node.className==="ImageLabel"&&node.attributes?.CreatorMakeRole!=="TransformedText")))throw new Error("LEGACY_PIXEL_TEXT_REJECTED: text images are accepted only for explicit shear/perspective TransformedText nodes.");
   for (const root of textRoots) {
     const children = value.nodes.filter((node) => node.parentSourceId === root.sourceId);
     const standaloneNative = ["TextLabel", "TextBox"].includes(root.className) && typeof root.properties?.Text === "string";
     const nativeChild = children.some((node) => ["TextLabel", "TextBox"].includes(node.className) && typeof node.properties?.Text === "string");
+    const exactChild = children.some((node) => node.className === "ImageLabel" && node.attributes?.CreatorMakeRole === "TransformedText" && node.attributes?.CreatorMakeRequiresExactTextRaster === true && typeof node.attributes?.CreatorMakeEditableText === "string");
     const combinedVisual = children.some((node) => node.attributes?.CreatorMakeRole === "Visual" || node.attributes?.CreatorMakeVisualPart === "full");
     const rootIndex=value.nodes.indexOf(root);
     if (combinedVisual) throw manifestFieldError(root,rootIndex,"children","LEGACY_TEXT_RASTER_REJECTED: combined _Visual is not valid for split text");
-    if (!standaloneNative && !nativeChild) throw manifestFieldError(root,rootIndex,"children","TEXT_INSTANCE_MISSING: expected a real TextLabel or TextBox");
+    if (!standaloneNative && !nativeChild && !exactChild) throw manifestFieldError(root,rootIndex,"children","TEXT_INSTANCE_MISSING: expected native editable text or an explicit TransformedText ImageLabel with preserved source text");
   }
   const manifestNodesById=new Map(value.nodes.map((node)=>[node.sourceId,node]));
   for(const [index,node] of value.nodes.entries()){

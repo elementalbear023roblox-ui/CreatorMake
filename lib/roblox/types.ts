@@ -1,6 +1,6 @@
 export type RobloxSizingMode = "AUTO" | "SCALE" | "OFFSET" | "HYBRID";
 export type RobloxVisualMode = "NATIVE" | "ADAPTIVE" | "PIXEL_ACCURATE";
-export type RobloxRenderScale = 1 | 2 | 3 | 4;
+export type RobloxRenderScale = 1 | 2 | 3 | 4 | 6 | 8;
 export type RobloxDeployTarget = "STARTER_GUI" | "PLAYER_GUI_PREVIEW";
 export type RobloxCompatibilityLevel = "native" | "approximation" | "unsupported";
 export type RobloxExportClassification = "NATIVE" | "HYBRID" | "RASTERIZED";
@@ -12,6 +12,8 @@ export type RobloxExportOptions = {
   resolution:RobloxResolution;
   visualMode:RobloxVisualMode;
   renderScale:RobloxRenderScale;
+  imageResampling?:"PERFORMANCE"|"BALANCED"|"BEST_QUALITY";
+  effectsQuality?:"PERFORMANCE"|"HIGH"|"ULTRA";
   resetOnSpawn:boolean;
   includeStroke:boolean;
   includeCorners:boolean;
@@ -20,7 +22,7 @@ export type RobloxExportOptions = {
   includeConstraints:boolean;
 };
 export type RobloxRenderAssetStatus = "needs-render" | "rendering" | "rendered" | "preview-ready" | "needs-publish" | "needs-mapping" | "mapped" | "dirty" | "error";
-export type RobloxRenderAssetRole = "frame-visual" | "text" | "button" | "shape" | "image" | "text-background" | "text-glyphs";
+export type RobloxRenderAssetRole = "frame-visual" | "text" | "button" | "shape" | "image" | "text-background" | "text-glyphs" | "transformed-text-glyphs";
 export type RobloxPixelSample = { label:string;normalizedX:number;normalizedY:number;pixelX:number;pixelY:number;rgba:[number,number,number,number] };
 export type RobloxRenderFidelity = {
   matchPercent:number;
@@ -51,6 +53,11 @@ export type RobloxRenderAsset = {
   renderPixelHeight:number;
   requestedScale:RobloxRenderScale;
   scale:number;
+  internalScale?:number;
+  internalRenderPixelWidth?:number;
+  internalRenderPixelHeight?:number;
+  scaleClamped?:boolean;
+  scaleWarning?:string;
   mimeType:"image/png";
   format:"png";
   layoutBounds:{x:number;y:number;width:number;height:number};
@@ -112,7 +119,7 @@ export type RobloxManifestNode = {
   attributes?:Record<string,string|number|boolean>;
   decorators:Array<{className:string;name:string;properties:Record<string,RobloxPropertyValue>}>;
 };
-export type RobloxManifest = { kind:"project";messageType:"PROJECT_MANIFEST";schema:"creatormake.roblox-manifest";version:1|2;textExportArchitecture?:2;projectId:string;projectName:string;manifestVersion:string;projectObjectIds:string[];exportDiagnostics:{projectObjectCount:number;exportedProjectObjectCount:number;exportNodeCount:number;presetsExported:0;presetDefinitionsIncluded:false};screenGuiName:string;deployTarget?:RobloxDeployTarget;screenGuiSettings?:{enabled:boolean;displayOrder:number;ignoreGuiInset:boolean;resetOnSpawn:boolean;zIndexBehavior:"Global"|"Sibling"};referenceResolution:{width:number;height:number};sizingMode:RobloxSizingMode;visualMode?:RobloxVisualMode;renderScale?:RobloxRenderScale;viewportScaleMode?:"FIT";assets?:RobloxRenderAsset[];imageManifest?:RobloxImageManifestEntry[];nodes:RobloxManifestNode[] };
+export type RobloxManifest = { kind:"project";messageType:"PROJECT_MANIFEST";schema:"creatormake.roblox-manifest";version:1|2;textExportArchitecture?:2|3;projectId:string;projectName:string;manifestVersion:string;projectObjectIds:string[];exportDiagnostics:{projectObjectCount:number;exportedProjectObjectCount:number;exportNodeCount:number;presetsExported:0;presetDefinitionsIncluded:false};screenGuiName:string;deployTarget?:RobloxDeployTarget;screenGuiSettings?:{enabled:boolean;displayOrder:number;ignoreGuiInset:boolean;resetOnSpawn:boolean;zIndexBehavior:"Global"|"Sibling"};referenceResolution:{width:number;height:number};sizingMode:RobloxSizingMode;visualMode?:RobloxVisualMode;renderScale?:RobloxRenderScale;viewportScaleMode?:"FIT";assets?:RobloxRenderAsset[];imageManifest?:RobloxImageManifestEntry[];nodes:RobloxManifestNode[] };
 
 export type RobloxSyncOperation =
   | {type:"create";sourceId:string}
@@ -126,4 +133,4 @@ export const ROBLOX_RESOLUTIONS:RobloxResolution[]=[
   {label:"1920 × 1080",width:1920,height:1080},{label:"1366 × 768",width:1366,height:768},{label:"1280 × 720",width:1280,height:720},{label:"2560 × 1440",width:2560,height:1440},{label:"3840 × 2160",width:3840,height:2160},{label:"Mobile Portrait",width:390,height:844},{label:"Mobile Landscape",width:844,height:390},{label:"Tablet",width:1024,height:768},{label:"Ultrawide",width:3440,height:1440},
 ];
 
-export const DEFAULT_ROBLOX_EXPORT_OPTIONS:RobloxExportOptions={screenGuiName:"CreatorMakeGui",sizingMode:"AUTO",resolution:ROBLOX_RESOLUTIONS[0],visualMode:"ADAPTIVE",renderScale:2,resetOnSpawn:false,includeStroke:true,includeCorners:true,includeGradients:true,includeLayouts:true,includeConstraints:true};
+export const DEFAULT_ROBLOX_EXPORT_OPTIONS:RobloxExportOptions={screenGuiName:"CreatorMakeGui",sizingMode:"AUTO",resolution:ROBLOX_RESOLUTIONS[0],visualMode:"ADAPTIVE",renderScale:2,imageResampling:"BEST_QUALITY",effectsQuality:"HIGH",resetOnSpawn:false,includeStroke:true,includeCorners:true,includeGradients:true,includeLayouts:true,includeConstraints:true};

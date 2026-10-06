@@ -1,6 +1,6 @@
 import { elementBackground } from "../editor/render.ts";
 import { geometryPresentation, openGeometryStrokeWidth, usesVectorSurface } from "../editor/geometry.ts";
-import { rasterizeWithCreatorMakeRenderer } from "../editor/canvas-rasterizer.ts";
+import { MAX_INTERNAL_RENDER_DIMENSION, MAX_INTERNAL_RENDER_PIXELS, rasterizeWithCreatorMakeRenderer } from "../editor/canvas-rasterizer.ts";
 import { designFontSize, textPadding, textSizingMode } from "../editor/text-sizing.ts";
 import { visualLinearTransform } from "../editor/visual-transform.ts";
 import { CREATOR_FONTS, creatorFontRasterStyle, hasLoadedCreatorFontFace, loadCreatorFont, resolveCreatorFontVariant } from "../fonts/font-library.ts";
@@ -12,8 +12,8 @@ import type { RobloxExportOptions, RobloxRasterPart, RobloxRenderAsset, RobloxRe
 export type RobloxAssetMappings = Record<string,string>;
 // Bump whenever canonical geometry interpretation changes so IndexedDB cannot
 // reuse a pre-fidelity rectangular raster for an unchanged custom path.
-const RENDERER_VERSION=14;
-const MAX_EDITABLE_IMAGE_DIMENSION=1024;
+const RENDERER_VERSION=15;
+export const ROBLOX_IMAGE_MAX_DIMENSION=1024;
 const SAMPLE_POINTS=[
   {label:"10%,10%",normalizedX:.1,normalizedY:.1},
   {label:"90%,10%",normalizedX:.9,normalizedY:.1},
@@ -57,13 +57,13 @@ export function visualStateForElement(element:EditorElement,visualPart:RobloxRas
   const text={type:element.type,width:element.width,height:element.height,opacity:element.opacity,padding:textPadding(element),clipContent:element.clipContent,advancedTransform,visualPart,
     text:element.text,textColor:element.textColor,fontFamily:element.fontFamily,fontSizeDesign:designFontSize(element),textSizingMode:textSizingMode(element),fontWeight:element.fontWeight,fontStyle:element.fontStyle,
     lineHeight:element.lineHeight,letterSpacing:element.letterSpacing,wordSpacing:element.wordSpacing,paragraphSpacing:element.paragraphSpacing,verticalAlign:element.verticalAlign,
-    textTransform:element.textTransform,textDecoration:element.textDecoration,textStrokeColor:element.textStrokeColor,textStrokeWidth:element.textStrokeWidth,textStrokeOpacity:element.textStrokeOpacity,textStrokePosition:element.textStrokePosition,textShadows:element.textShadows,textBoxMode:element.textBoxMode,autoFit:element.autoFit,textAlign:element.textAlign,
+    textTransform:element.textTransform,textDecoration:element.textDecoration,textStrokeColor:element.textStrokeColor,textStrokeWidth:element.textStrokeWidth,textStrokeOpacity:element.textStrokeOpacity,textStrokePosition:element.textStrokePosition,textShadows:element.textShadows,textBoxMode:element.textBoxMode,autoFit:element.autoFit,textAlign:element.textAlign,textOrientation:element.textOrientation,textRotation:element.textRotation,captionOffsetX:element.captionOffsetX,captionOffsetY:element.captionOffsetY,captionInsets:element.captionInsets,fitMinTextSize:element.fitMinTextSize,fitMaxTextSize:element.fitMaxTextSize,fitMinHorizontalPadding:element.fitMinHorizontalPadding,fitMinVerticalPadding:element.fitMinVerticalPadding,sharedCaptionSize:element.sharedCaptionSize,sharedCaptionGroup:element.sharedCaptionGroup,textRobloxExportMode:element.textRobloxExportMode,
   };
   return visualPart==="text"?text:{...surface,...text};
 }
 
 export function layoutStateForElement(element:EditorElement){
-  return {parentId:element.parentId,x:element.x,y:element.y,width:element.width,height:element.height,anchorX:element.anchorX,anchorY:element.anchorY,rotation:element.rotation,zIndex:element.zIndex,hidden:element.hidden,locked:element.locked,constraints:element.constraints};
+  return {parentId:element.parentId,x:element.x,y:element.y,width:element.width,height:element.height,anchorX:element.anchorX,anchorY:element.anchorY,rotation:element.rotation,zIndex:element.zIndex,hidden:element.hidden,locked:element.locked,constraints:element.constraints,textOrientation:element.textOrientation,textRotation:element.textRotation,captionOffsetX:element.captionOffsetX,captionOffsetY:element.captionOffsetY,captionInsets:element.captionInsets,textSizingMode:element.textSizingMode,fontSizeDesign:element.fontSizeDesign,fitMinTextSize:element.fitMinTextSize,fitMaxTextSize:element.fitMaxTextSize,fitMinHorizontalPadding:element.fitMinHorizontalPadding,fitMinVerticalPadding:element.fitMinVerticalPadding,sharedCaptionSize:element.sharedCaptionSize,sharedCaptionGroup:element.sharedCaptionGroup};
 }
 
 export const visualHash=(element:EditorElement,visualPart:RobloxRasterPart="full",assetHash="")=>hash({rendererVersion:RENDERER_VERSION,visual:visualStateForElement(element,visualPart),assetHash});
@@ -111,7 +111,17 @@ export function visualBoundsForElement(element:EditorElement,visualPart:RobloxRa
   return{x:minX-padding,y:minY-padding,width:Math.max(1,maxX-minX+padding*2),height:Math.max(1,maxY-minY+padding*2)};
 }
 
-export function planPixelAccurateAssets(project:EditorProject,options:Pick<RobloxExportOptions,"renderScale">&Partial<Pick<RobloxExportOptions,"visualMode">>,mappings:RobloxAssetMappings={},previous:RobloxRenderAsset[]=[]){
+type RenderPlanningOptions=Pick<RobloxExportOptions,"renderScale">&Partial<Pick<RobloxExportOptions,"visualMode"|"imageResampling"|"effectsQuality">>;
+export function maximumSafeInternalScale(bounds:{width:number;height:number},requested:RobloxRenderScale){
+  const scale=Math.min(requested,MAX_INTERNAL_RENDER_DIMENSION/Math.max(1,bounds.width),MAX_INTERNAL_RENDER_DIMENSION/Math.max(1,bounds.height),Math.sqrt(MAX_INTERNAL_RENDER_PIXELS/Math.max(1,bounds.width*bounds.height)));
+  return Math.max(.05,scale);
+}
+function effectsAdjustedRenderScale(options:RenderPlanningOptions):RobloxRenderScale{
+  if(options.effectsQuality==="PERFORMANCE")return Math.min(options.renderScale,2) as RobloxRenderScale;
+  if(options.effectsQuality==="ULTRA")return Math.max(options.renderScale,4) as RobloxRenderScale;
+  return options.renderScale;
+}
+export function planPixelAccurateAssets(project:EditorProject,options:RenderPlanningOptions,mappings:RobloxAssetMappings={},previous:RobloxRenderAsset[]=[]){
   const previousBySource=new Map(previous.map((asset)=>[asset.sourceId,asset])),assetById=new Map((project.assets??[]).map((asset)=>[asset.id,asset]));
   return project.elements.filter((element)=>!element.hidden).flatMap((element):RobloxRenderAsset[]=>{
     const classification=classifyRobloxElement(element);
@@ -119,9 +129,8 @@ export function planPixelAccurateAssets(project:EditorProject,options:Pick<Roblo
     const textElement=element.type==="text"||element.type==="button",parts:RobloxRasterPart[]=textElement?(hasVisibleTextBackground(element)?["background"]:[]):[options.visualMode==="ADAPTIVE"?(classification.rasterPart??"full"):"full"];
     const sourceAsset=element.imageAssetId?assetById.get(element.imageAssetId):undefined;
     return parts.map((visualPart):RobloxRenderAsset=>{
-      const sourceId=textElement?`${element.id}::${visualPart==="background"?"background":"pixel-text"}`:element.id,visual=visualHash(element,visualPart,sourceAsset?.contentHash),prior=previousBySource.get(sourceId),robloxAssetId=normalizeRobloxAssetId(mappings[mappingKey(sourceId,visual)]??"");
-      const layoutBounds={x:0,y:0,width:element.width,height:element.height},visualBounds=visualBoundsForElement(element,visualPart),scale=Math.min(options.renderScale,MAX_EDITABLE_IMAGE_DIMENSION/Math.max(1,visualBounds.width),MAX_EDITABLE_IMAGE_DIMENSION/Math.max(1,visualBounds.height)),renderPixelWidth=Math.max(1,Math.min(MAX_EDITABLE_IMAGE_DIMENSION,Math.ceil(visualBounds.width*scale))),renderPixelHeight=Math.max(1,Math.min(MAX_EDITABLE_IMAGE_DIMENSION,Math.ceil(visualBounds.height*scale))),dirty=Boolean(prior&&prior.visualHash!==visual);
-      return{sourceId,sourceElementId:element.id,elementName:visualPart==="background"?`${element.name} Background`:visualPart==="text"?`${element.name} Text`:element.name,role:visualPart==="background"&&textElement?"text-background":visualPart==="text"?"text-glyphs":roleFor(element),classification:options.visualMode==="ADAPTIVE"?classification.classification:textElement?"HYBRID":"RASTERIZED",visualPart,intendedRobloxClass:classification.intendedRobloxClass,interactionEnabled:classification.interactionEnabled,visualHash:visual,layoutHash:layoutHash(element),width:renderPixelWidth,height:renderPixelHeight,layoutWidth:element.width,layoutHeight:element.height,renderPixelWidth,renderPixelHeight,requestedScale:options.renderScale,scale,mimeType:"image/png",format:"png",layoutBounds,visualBounds,bounds:visualBounds,pixelEncoding:"RGBA8_STRAIGHT_ALPHA",robloxAssetId:robloxAssetId||undefined,status:dirty?"dirty":"needs-render",dirty};
+      const sourceId=textElement?`${element.id}::${visualPart==="background"?"background":"pixel-text"}`:element.id,baseVisual=visualHash(element,visualPart,sourceAsset?.contentHash),layoutBounds={x:0,y:0,width:element.width,height:element.height},visualBounds=visualBoundsForElement(element,visualPart),targetScale=effectsAdjustedRenderScale(options),internalScale=maximumSafeInternalScale(visualBounds,targetScale),scaleClamped=internalScale+0.001<targetScale,scaleWarning=scaleClamped?`Maximum safe internal render scale for this visual is ${Number(internalScale.toFixed(2))}x (requested ${targetScale}x).`:undefined,scale=Math.min(internalScale,ROBLOX_IMAGE_MAX_DIMENSION/Math.max(1,visualBounds.width),ROBLOX_IMAGE_MAX_DIMENSION/Math.max(1,visualBounds.height)),renderPixelWidth=Math.max(1,Math.min(ROBLOX_IMAGE_MAX_DIMENSION,Math.ceil(visualBounds.width*scale))),renderPixelHeight=Math.max(1,Math.min(ROBLOX_IMAGE_MAX_DIMENSION,Math.ceil(visualBounds.height*scale))),internalRenderPixelWidth=Math.max(1,Math.ceil(visualBounds.width*internalScale)),internalRenderPixelHeight=Math.max(1,Math.ceil(visualBounds.height*internalScale)),visual=hash({baseVisual,requestedScale:options.renderScale,effectiveScale:targetScale,internalScale:Number(internalScale.toFixed(4)),imageResampling:options.imageResampling??"BEST_QUALITY",effectsQuality:options.effectsQuality??"HIGH"}),prior=previousBySource.get(sourceId),robloxAssetId=normalizeRobloxAssetId(mappings[mappingKey(sourceId,visual)]??""),dirty=Boolean(prior&&prior.visualHash!==visual);
+      return{sourceId,sourceElementId:element.id,elementName:visualPart==="background"?`${element.name} Background`:visualPart==="text"?`${element.name} Text`:element.name,role:visualPart==="background"&&textElement?"text-background":visualPart==="text"?"text-glyphs":roleFor(element),classification:options.visualMode==="ADAPTIVE"?classification.classification:textElement?"HYBRID":"RASTERIZED",visualPart,intendedRobloxClass:classification.intendedRobloxClass,interactionEnabled:classification.interactionEnabled,visualHash:visual,layoutHash:layoutHash(element),width:renderPixelWidth,height:renderPixelHeight,layoutWidth:element.width,layoutHeight:element.height,renderPixelWidth,renderPixelHeight,requestedScale:options.renderScale,scale,internalScale,internalRenderPixelWidth,internalRenderPixelHeight,scaleClamped,scaleWarning,mimeType:"image/png",format:"png",layoutBounds,visualBounds,bounds:visualBounds,pixelEncoding:"RGBA8_STRAIGHT_ALPHA",robloxAssetId:robloxAssetId||undefined,status:dirty?"dirty":"needs-render",dirty};
     });
   });
 }
@@ -156,7 +165,7 @@ export function renderElementSvg(element:EditorElement,scale:RobloxRenderScale,v
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${renderWidth}" height="${renderHeight}" viewBox="0 0 ${px(visualBounds.width)} ${px(visualBounds.height)}"><rect width="100%" height="100%" fill="none"/>${body}</svg>`;
 }
 
-export async function renderTextBackgroundVisual(element:EditorElement,requestedScale:RobloxRenderScale,asset?:EditorAsset){
+export async function renderTextBackgroundVisual(element:EditorElement,requestedScale:number,asset?:EditorAsset){
   if(element.type!=="text"&&element.type!=="button")throw new Error("TEXT_BACKGROUND_RENDER_INVALID: expected a CreatorMake text or button element.");
   return rasterizeWithCreatorMakeRenderer(element,requestedScale,"background","",asset);
 }
@@ -190,7 +199,17 @@ export async function ensurePixelExportFont(element:EditorElement,runtime:PixelE
 
 const sampleCanvas=(canvas:HTMLCanvasElement)=>{const context=canvas.getContext("2d",{willReadFrequently:true});if(!context)throw new Error("Canvas 2D rendering is unavailable.");const image=context.getImageData(0,0,canvas.width,canvas.height);return SAMPLE_POINTS.map((sample)=>{const pixelX=Math.max(0,Math.min(canvas.width-1,Math.round(sample.normalizedX*(canvas.width-1)))),pixelY=Math.max(0,Math.min(canvas.height-1,Math.round(sample.normalizedY*(canvas.height-1)))),index=(pixelY*canvas.width+pixelX)*4;return{...sample,pixelX,pixelY,rgba:[image.data[index],image.data[index+1],image.data[index+2],image.data[index+3]] as [number,number,number,number]};});};
 
-export async function renderPixelAccurateAssets(project:EditorProject,options:Pick<RobloxExportOptions,"renderScale">&Partial<Pick<RobloxExportOptions,"visualMode">>,mappings:RobloxAssetMappings={},previous:RobloxRenderAsset[]=[],onProgress?:(assets:RobloxRenderAsset[])=>void){
+function resizeCanvas(source:HTMLCanvasElement,width:number,height:number,quality:RobloxExportOptions["imageResampling"]){
+  const target=document.createElement("canvas");target.width=Math.max(1,Math.round(width));target.height=Math.max(1,Math.round(height));const context=target.getContext("2d",{alpha:true,willReadFrequently:true});if(!context)throw new Error("Canvas 2D resampling is unavailable.");context.clearRect(0,0,target.width,target.height);context.imageSmoothingEnabled=quality!=="PERFORMANCE";context.imageSmoothingQuality=quality==="BEST_QUALITY"?"high":quality==="BALANCED"?"medium":"low";context.drawImage(source,0,0,target.width,target.height);return target;
+}
+function downsampleForRoblox(source:HTMLCanvasElement,quality:RobloxExportOptions["imageResampling"]="BEST_QUALITY"){
+  const targetScale=Math.min(1,ROBLOX_IMAGE_MAX_DIMENSION/source.width,ROBLOX_IMAGE_MAX_DIMENSION/source.height);if(targetScale>=1)return source;
+  const targetWidth=Math.max(1,Math.round(source.width*targetScale)),targetHeight=Math.max(1,Math.round(source.height*targetScale));let current=source;
+  if(quality==="BEST_QUALITY")while(current.width>targetWidth*2||current.height>targetHeight*2)current=resizeCanvas(current,Math.max(targetWidth,Math.round(current.width/2)),Math.max(targetHeight,Math.round(current.height/2)),quality);
+  return resizeCanvas(current,targetWidth,targetHeight,quality);
+}
+
+export async function renderPixelAccurateAssets(project:EditorProject,options:RenderPlanningOptions,mappings:RobloxAssetMappings={},previous:RobloxRenderAsset[]=[],onProgress?:(assets:RobloxRenderAsset[])=>void){
   const plans=planPixelAccurateAssets(project,options,mappings,previous),byId=new Map(project.elements.map((element)=>[element.id,element])),assetById=new Map((project.assets??[]).map((asset)=>[asset.id,asset])),previousBySource=new Map(previous.map((asset)=>[asset.sourceId,asset])),results:RobloxRenderAsset[]=[];
   for(let planIndex=0;planIndex<plans.length;planIndex++){
     const plan=plans[planIndex];
@@ -202,9 +221,10 @@ export async function renderPixelAccurateAssets(project:EditorProject,options:Pi
       const font=(plan.visualPart??"full")!=="background"?await ensurePixelExportFont(element):undefined;
       if(font)console.info(`[CreatorMake Export Font] Element: ${element.name} | Requested: ${font.requestedFamily} ${font.requestedWeight} ${font.requestedStyle} | Loaded: ${font.loadedFamily} ${font.loadedWeight} ${font.loadedStyle} | Ready: YES | Embedded: YES`);
       const rendered=plan.visualPart==="background"&&(element.type==="text"||element.type==="button")
-        ?await renderTextBackgroundVisual(element,plan.requestedScale,element.imageAssetId?assetById.get(element.imageAssetId):undefined)
-        :await rasterizeWithCreatorMakeRenderer(element,plan.requestedScale,plan.visualPart??"full",font?.css??"",element.imageAssetId?assetById.get(element.imageAssetId):undefined);
-      const asset:RobloxRenderAsset={...plan,dataUrl:rendered.dataUrl,sourceDataUrl:rendered.sourceDataUrl,differenceDataUrl:rendered.differenceDataUrl,fidelity:rendered.fidelity,width:rendered.width,height:rendered.height,renderPixelWidth:rendered.renderPixelWidth,renderPixelHeight:rendered.renderPixelHeight,scale:rendered.scale,visualBounds:rendered.visualBounds,bounds:rendered.visualBounds,pixelSamples:sampleCanvas(rendered.canvas),renderedAt:Date.now(),robloxAssetId:mapping||undefined,status:mapping?"mapped":"needs-publish",dirty:false};
+        ?await renderTextBackgroundVisual(element,plan.internalScale??plan.requestedScale,element.imageAssetId?assetById.get(element.imageAssetId):undefined)
+        :await rasterizeWithCreatorMakeRenderer(element,plan.internalScale??plan.requestedScale,plan.visualPart??"full",font?.css??"",element.imageAssetId?assetById.get(element.imageAssetId):undefined);
+      const finalCanvas=downsampleForRoblox(rendered.canvas,options.imageResampling),finalScale=Math.min(rendered.scale,finalCanvas.width/Math.max(1,rendered.visualBounds.width),finalCanvas.height/Math.max(1,rendered.visualBounds.height)),actualInternalScale=rendered.scale,actualClamped=actualInternalScale+0.001<plan.requestedScale,scaleWarning=actualClamped?`Maximum safe internal render scale for this visual is ${Number(actualInternalScale.toFixed(2))}x (requested ${plan.requestedScale}x).`:plan.scaleWarning;
+      const asset:RobloxRenderAsset={...plan,dataUrl:finalCanvas.toDataURL("image/png"),sourceDataUrl:rendered.sourceDataUrl,differenceDataUrl:rendered.differenceDataUrl,fidelity:rendered.fidelity,width:finalCanvas.width,height:finalCanvas.height,renderPixelWidth:finalCanvas.width,renderPixelHeight:finalCanvas.height,scale:finalScale,internalScale:actualInternalScale,internalRenderPixelWidth:rendered.canvas.width,internalRenderPixelHeight:rendered.canvas.height,scaleClamped:actualClamped||plan.scaleClamped,scaleWarning,visualBounds:rendered.visualBounds,bounds:rendered.visualBounds,pixelSamples:sampleCanvas(finalCanvas),renderedAt:Date.now(),robloxAssetId:mapping||undefined,status:mapping?"mapped":"needs-publish",dirty:false};
       const fidelity=asset.fidelity;if(!fidelity)throw new Error("EXPORT FIDELITY FAILURE: renderer returned no fidelity report.");
       console.info(`[CreatorMake Export Fidelity] Element: ${element.name} | Geometry: ${geometryPresentation(element).open?"OpenPath":element.geometry.kind} | Match: ${fidelity.matchPercent}% | Bounds Match: ${fidelity.boundsMatch?"PASS":"FAIL"} | Aspect Ratio Match: ${fidelity.aspectRatioMatch?"PASS":"FAIL"} | Transform Match: ${fidelity.transformMatch?"PASS":"FAIL"} | Alpha Edges: ${fidelity.alphaEdgeSafety?"PASS":"FAIL"}`);
       if(!fidelity.passed){results[results.length-1]={...asset,status:"error",error:`EXPORT FIDELITY FAILURE: ${fidelity.matchPercent}% match (minimum ${fidelity.thresholdPercent}%).`,dirty:true};}

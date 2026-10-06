@@ -1,6 +1,6 @@
 import { elementStyle } from "./render.ts";
 import type { EditorAsset, EditorElement } from "./types.ts";
-import type { RobloxRasterPart, RobloxRenderScale } from "../roblox/types.ts";
+import type { RobloxRasterPart } from "../roblox/types.ts";
 
 export type RendererBounds={x:number;y:number;width:number;height:number};
 export type CanvasRendererFidelity={
@@ -30,7 +30,8 @@ export type CanvasRendererRaster={
 type Capture={canvas:HTMLCanvasElement;dataUrl:string;bounds:RendererBounds;scale:number;alphaEdgeSafety:boolean;alphaEdgeContact:string[]};
 const XHTML="http://www.w3.org/1999/xhtml";
 const SVG="http://www.w3.org/2000/svg";
-const MAX_RENDER_DIMENSION=1024;
+export const MAX_INTERNAL_RENDER_DIMENSION=8192;
+export const MAX_INTERNAL_RENDER_PIXELS=16_777_216;
 const FIDELITY_THRESHOLD=98.5;
 export const RASTER_SAFETY_PADDING=3;
 
@@ -92,8 +93,9 @@ function cleanClone(source:HTMLElement,visualPart:RobloxRasterPart){
   clone.style.setProperty("top","0px");
   clone.style.setProperty("outline","none");
   clone.style.setProperty("pointer-events","none");
+  clone.querySelectorAll(".caption-transform-debug,.caption-shape-debug,.caption-geometry-debug").forEach((node)=>node.remove());
   if(visualPart==="background"){
-    clone.querySelectorAll(".vector-text-content").forEach((node)=>node.remove());
+    clone.querySelectorAll(".caption-text-content").forEach((node)=>node.remove());
     const surface=clone.querySelector(":scope > [data-creatormake-surface]");
     if(surface&&!surface.classList.contains("vector-element-surface"))surface.replaceChildren();
   }
@@ -119,14 +121,14 @@ function alphaCrop(canvas:HTMLCanvasElement,bounds:RendererBounds,scale:number):
   return{canvas:cropped,dataUrl:cropped.toDataURL("image/png"),bounds:exact,scale,alphaEdgeSafety:validation.passed,alphaEdgeContact:Object.entries(validation.touchesCropEdge).filter(([,touches])=>touches).map(([edge])=>edge)};
 }
 
-async function captureNode(source:HTMLElement,stage:HTMLElement,requestedScale:RobloxRenderScale,margin:number,fontFaceCss=""):Promise<Capture>{
+async function captureNode(source:HTMLElement,stage:HTMLElement,requestedScale:number,margin:number,fontFaceCss=""):Promise<Capture>{
   const stageRect=stage.getBoundingClientRect(),rectangles=[source,...Array.from(source.querySelectorAll<HTMLElement|SVGElement>("*"))].map((node)=>node.getBoundingClientRect()).filter((rect)=>Number.isFinite(rect.left)&&Number.isFinite(rect.top)&&rect.width>0&&rect.height>0);
   const left=Math.min(...rectangles.map((rect)=>rect.left)),top=Math.min(...rectangles.map((rect)=>rect.top)),right=Math.max(...rectangles.map((rect)=>rect.right)),bottom=Math.max(...rectangles.map((rect)=>rect.bottom));
   const measured={x:left-stageRect.left,y:top-stageRect.top,width:Math.max(1,right-left),height:Math.max(1,bottom-top)};
   let lastEdgeContact:string[]=[];
   for(let attempt=0;attempt<3;attempt++){
     const expandedMargin=margin*(attempt+1)+attempt*RASTER_SAFETY_PADDING,provisional={x:measured.x-expandedMargin,y:measured.y-expandedMargin,width:measured.width+expandedMargin*2,height:measured.height+expandedMargin*2};
-    const scale=Math.max(.05,Math.min(requestedScale,MAX_RENDER_DIMENSION/provisional.width,MAX_RENDER_DIMENSION/provisional.height));
+    const memorySafeScale=Math.sqrt(MAX_INTERNAL_RENDER_PIXELS/Math.max(1,provisional.width*provisional.height)),scale=Math.max(.05,Math.min(requestedScale,MAX_INTERNAL_RENDER_DIMENSION/provisional.width,MAX_INTERNAL_RENDER_DIMENSION/provisional.height,memorySafeScale));
     const pixelWidth=Math.max(1,Math.ceil(provisional.width*scale)),pixelHeight=Math.max(1,Math.ceil(provisional.height*scale));
     const cssWidth=pixelWidth/scale,cssHeight=pixelHeight/scale,clone=cleanClone(source,"full");
     const frame=document.createElementNS(XHTML,"div");
@@ -149,7 +151,7 @@ function findLiveCanvasElement(elementId:string){
 function referenceClone(source:HTMLElement,visualPart:RobloxRasterPart,renderElement:EditorElement){
   const clone=source.cloneNode(false) as HTMLElement,surface=source.querySelector<HTMLElement>(":scope > [data-creatormake-surface]");
   clone.classList.remove("is-selected","is-locked");clone.style.left="0px";clone.style.top="0px";clone.style.outline="none";clone.style.transform=String(elementStyle(renderElement).transform??"none");
-  if(surface){const surfaceClone=surface.cloneNode(true) as HTMLElement;if(visualPart==="background"){surfaceClone.querySelectorAll(".vector-text-content").forEach((node)=>node.remove());if(!surfaceClone.classList.contains("vector-element-surface"))surfaceClone.replaceChildren();}else if(visualPart==="text"){if(surfaceClone.classList.contains("vector-element-surface")){surfaceClone.querySelectorAll(":scope > :not(.vector-text-content)").forEach((node)=>node.remove());}else{surfaceClone.style.background="transparent";surfaceClone.style.border="0";surfaceClone.style.boxShadow="none";surfaceClone.style.clipPath="none";}}clone.appendChild(surfaceClone);}
+  if(surface){const surfaceClone=surface.cloneNode(true) as HTMLElement;surfaceClone.querySelectorAll(".caption-transform-debug,.caption-shape-debug,.caption-geometry-debug").forEach((node)=>node.remove());if(visualPart==="background"){surfaceClone.querySelectorAll(".caption-text-content").forEach((node)=>node.remove());if(!surfaceClone.classList.contains("vector-element-surface"))surfaceClone.replaceChildren();}else if(visualPart==="text"){if(surfaceClone.classList.contains("vector-element-surface")){surfaceClone.querySelectorAll(":scope > :not(.caption-text-content)").forEach((node)=>node.remove());}else{surfaceClone.style.background="transparent";surfaceClone.style.border="0";surfaceClone.style.boxShadow="none";surfaceClone.style.clipPath="none";}}clone.appendChild(surfaceClone);}
   return clone;
 }
 
@@ -166,7 +168,7 @@ function compareCaptures(source:Capture,exported:Capture){
   return{matchPercent,differenceDataUrl:difference.toDataURL("image/png"),boundsMatch,aspectRatioMatch,transformMatch:boundsMatch&&maxDelta<=8};
 }
 
-export async function rasterizeWithCreatorMakeRenderer(element:EditorElement,requestedScale:RobloxRenderScale,visualPart:RobloxRasterPart="full",fontFaceCss="",asset?:EditorAsset):Promise<CanvasRendererRaster>{
+export async function rasterizeWithCreatorMakeRenderer(element:EditorElement,requestedScale:number,visualPart:RobloxRasterPart="full",fontFaceCss="",asset?:EditorAsset):Promise<CanvasRendererRaster>{
   if(typeof document==="undefined")throw new Error("CreatorMake canvas rasterization requires a browser document.");
   const [{createElement},{createRoot},{flushSync},{ElementSurface}]=await Promise.all([import("react"),import("react-dom/client"),import("react-dom"),import("../../components/editor/ElementSurface")]);
   const splitTextVisual=(element.type==="text"||element.type==="button")&&visualPart!=="full",sharedObjectScale=splitTextVisual&&Number.isFinite(element.scaleX)&&element.scaleX>0&&Math.abs(element.scaleX-element.scaleY)<.0001,baseElement={...element,x:0,y:0,rotation:splitTextVisual?0:element.rotation,...(sharedObjectScale?{scaleX:1,scaleY:1}:{})},renderElement=visualPart==="background"?{...baseElement,text:""}:visualPart==="text"?{...baseElement,fill:"transparent",gradientType:"none" as const,borderColor:"transparent",borderWidth:0,shadow:"none"}:baseElement,stage=createStage(renderElement),root=createRoot(stage),margin=renderMargin(renderElement,visualPart);

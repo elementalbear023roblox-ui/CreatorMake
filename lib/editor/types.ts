@@ -3,7 +3,8 @@ export type ElementType = "frame" | "container" | "scrolling-frame" | "text" | "
 export type ImageFitMode = "fit" | "fill" | "stretch" | "original" | "tile";
 export type ImageState = "default" | "hover" | "pressed" | "disabled" | "selected";
 export type TextRobloxExportMode = "AUTO" | "NATIVE_TEXT" | "PIXEL_ACCURATE" | "NATIVE" | "PIXEL";
-export type TextSizingMode = "fixed" | "responsive";
+export type TextSizingMode = "fixed" | "fit-geometry" | "responsive";
+export type TextOrientation = "auto" | "horizontal" | "follow-shape" | "custom";
 export type EditorAsset = {
   id:string;
   name:string;
@@ -163,7 +164,18 @@ export type EditorElement = {
   autoFit: boolean;
   textSizingMode: TextSizingMode;
   followObjectAngle: boolean;
+  textOrientation: TextOrientation;
   textRotation: number;
+  captionOffsetX: number;
+  captionOffsetY: number;
+  captionInsets: EdgeInsets;
+  showCaptionGeometry: boolean;
+  fitMinTextSize: number;
+  fitMaxTextSize: number;
+  fitMinHorizontalPadding: number;
+  fitMinVerticalPadding: number;
+  sharedCaptionSize: boolean;
+  sharedCaptionGroup: string;
   responsiveMinTextSize: number;
   responsiveMaxTextSize: number;
   textAlign: "left" | "center" | "right";
@@ -226,8 +238,36 @@ export type Screen = {
   y: number;
 };
 
+export type ProjectExportOptions = {
+  preset:"FAST_PREVIEW"|"BALANCED"|"ROBLOX_FINAL"|"COMMISSION_FINAL"|"CUSTOM";
+  nativeTextLabelExport:boolean;
+  renderedVisualQuality:"DRAFT"|"STANDARD"|"HIGH"|"ULTRA"|"MAXIMUM_SAFE";
+  pixelAccurateBackgrounds:"ON"|"OFF"|"AUTO";
+  internalRenderScale:"AUTO"|"1"|"2"|"3"|"4"|"6"|"8";
+  imageResampling:"PERFORMANCE"|"BALANCED"|"BEST_QUALITY";
+  backgroundExport:"AUTO"|"PREFER_NATIVE"|"PREFER_PIXEL"|"FORCE_PIXEL";
+  robloxImages:"LOCAL_PREVIEW"|"PUBLISHABLE"|"AUTO";
+  robloxScreenScaling:"FIT"|"FILL"|"RESPONSIVE"|"ORIGINAL"|"STRETCH";
+  referenceResolution:"1920x1080"|"2560x1440"|"1366x768"|"CUSTOM";
+  customReferenceWidth:number;
+  customReferenceHeight:number;
+  imageExportScaling:"PRESERVE"|"FIT"|"FILL"|"STRETCH"|"ORIGINAL";
+  hierarchyExport:"PRESERVE"|"FLATTEN_HELPERS"|"ADVANCED";
+  robloxNaming:"LAYER_NAMES"|"CLEAN_NAMES"|"TECHNICAL_NAMES";
+  multiplayerSafeAssets:"OFF"|"WARN"|"REQUIRE";
+  studioSync:"UPDATE_EXISTING"|"REPLACE_MANAGED"|"ASK";
+  incrementalSync:boolean;
+  compatibilityWarnings:"ALL"|"IMPORTANT"|"OFF";
+  exportDiagnostics:boolean;
+  safeExportCheck:"NEVER"|"WARN"|"REQUIRE";
+  autoUploadChangedVisuals:"OFF"|"ASK"|"ON";
+  renderedVisualBounds:"PRESERVE"|"TRIM"|"SMART";
+  strokeRendering:"NATIVE"|"PIXEL"|"AUTO";
+  effectsQuality:"PERFORMANCE"|"HIGH"|"ULTRA";
+};
+
 export type EditorProject = {
-  schemaVersion: 11;
+  schemaVersion: 14;
   id: string;
   name: string;
   createdAt: number;
@@ -253,6 +293,7 @@ export type EditorProject = {
   generationHistory: GenerationHistoryEntry[];
   projectFonts: Array<{ fontId: string; weights: number[]; styles: Array<"normal" | "italic"> }>;
   fontPolicy: { allowSyntheticWeight: boolean; allowSyntheticItalic: boolean };
+  exportOptions:ProjectExportOptions;
 };
 
 export type EditorHistoryCommand = {

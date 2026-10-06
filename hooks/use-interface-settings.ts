@@ -18,6 +18,10 @@ export type InterfaceSettings = {
   inspectorMode: "basic" | "advanced" | "expert" | "master";
   inspectorCollapsed: string[];
   inspectorPinned: string[];
+  previewQuality: "PERFORMANCE" | "BALANCED" | "HIGH";
+  showGeneratedObjects: boolean;
+  smartGuideDetail: "MINIMAL" | "NORMAL" | "DETAILED";
+  optionFavorites: string[];
 };
 
 export const DEFAULT_INTERFACE_SETTINGS: InterfaceSettings = {
@@ -33,6 +37,10 @@ export const DEFAULT_INTERFACE_SETTINGS: InterfaceSettings = {
   inspectorMode: "advanced",
   inspectorCollapsed: [],
   inspectorPinned: [],
+  previewQuality: "BALANCED",
+  showGeneratedObjects: false,
+  smartGuideDetail: "NORMAL",
+  optionFavorites: ["renderedVisualQuality", "nativeTextLabelExport", "hierarchyExport", "robloxImages", "multiplayerSafeAssets"],
 };
 
 const isAppearance = (value: unknown): value is AppearanceMode => value === "light" || value === "dark" || value === "system";
@@ -51,6 +59,7 @@ const loadSettings = (): InterfaceSettings => {
       customThemes: Array.isArray(stored.customThemes) ? stored.customThemes : [],
       inspectorCollapsed: Array.isArray(stored.inspectorCollapsed) ? stored.inspectorCollapsed : [],
       inspectorPinned: Array.isArray(stored.inspectorPinned) ? stored.inspectorPinned : [],
+      optionFavorites: Array.isArray(stored.optionFavorites) ? stored.optionFavorites : DEFAULT_INTERFACE_SETTINGS.optionFavorites,
     };
   } catch { return DEFAULT_INTERFACE_SETTINGS; }
 };

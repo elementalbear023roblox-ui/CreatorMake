@@ -59,7 +59,7 @@ test("legacy projects migrate to the current schema and IndexedDB-compatible sav
   const legacyText=createElement("text");legacyText.fontSize=37;legacyText.fontSizeDesign=37;project.elements=[legacyText];
   const legacy=structuredClone(project);delete legacy.schemaVersion;delete legacy.elements[0].fontSizeDesign;delete legacy.elements[0].textSizingMode;delete legacy.elements[0].responsiveMinTextSize;delete legacy.elements[0].responsiveMaxTextSize;delete legacy.elements[0].textPadding;legacy.elements[0].autoFit=true;
   const normalized=normalizeProject(legacy);
-  assert.equal(normalized.schemaVersion,11);
+  assert.equal(normalized.schemaVersion,14);
   assert.equal(normalized.elements[0].automaticCanvasSize,"None");
   assert.equal(normalized.elements[0].fontId,"inter");
   assert.equal(normalized.elements[0].fontSizeDesign,37);
@@ -72,12 +72,12 @@ test("legacy projects migrate to the current schema and IndexedDB-compatible sav
   assert.equal((await listRecoverySnapshots()).length,1);
   assert.equal((await loadProject(project.id)).elements[0].x,project.elements[0].x);
   const imported=await importProjectData({format:"creatormake-project",formatVersion:1,project:JSON.parse(JSON.stringify(project))});
-  assert.equal(imported.schemaVersion,11);
+  assert.equal(imported.schemaVersion,14);
   assert.notEqual(imported.id,project.id);
   assert.equal(imported.elements[0].x,project.elements[0].x);
   const exported=exportProjectData(imported);
   assert.equal(exported.format,"creatormake-project");
-  assert.equal(exported.schemaVersion,11);
+  assert.equal(exported.schemaVersion,14);
   assert.equal(exported.project.id,imported.id);
   const summary=(await listProjects()).find((item)=>item.id===imported.id);
   assert.equal(summary.platform,"Roblox");
@@ -92,15 +92,18 @@ test("ordinary containers default to unclipped content while scrolling viewports
   assert.equal(createElement("scrolling-frame").clipContent,true);
 });
 
-test("schema 11 preserves explicit clipping and caption-angle settings",()=>{
+test("schema 13 preserves clipping, caption geometry, and fit/shared sizing",()=>{
   const legacy=createProject("Legacy clipping"),legacyFrame=createElement("frame");legacy.schemaVersion=9;legacyFrame.clipContent=true;legacy.elements=[legacyFrame];
   assert.equal(normalizeProject(structuredClone(legacy)).elements[0].clipContent,false);
   const current=createProject("Explicit clipping"),currentFrame=createElement("frame");currentFrame.clipContent=true;current.elements=[currentFrame];
   assert.equal(normalizeProject(structuredClone(current)).elements[0].clipContent,true);
-  const currentButton=createElement("button");currentButton.followObjectAngle=false;currentButton.textRotation=1.25;current.elements=[currentButton];
-  const normalized=normalizeProject(structuredClone(current));assert.equal(normalized.elements[0].followObjectAngle,false);assert.equal(normalized.elements[0].textRotation,1.25);
+  const currentButton=createElement("button");currentButton.followObjectAngle=false;currentButton.textOrientation="custom";currentButton.textRotation=1.25;currentButton.captionOffsetX=4.5;currentButton.captionOffsetY=-2;currentButton.captionInsets={top:2,right:3,bottom:4,left:5};currentButton.showCaptionGeometry=true;currentButton.textSizingMode="fit-geometry";currentButton.fitMinTextSize=11;currentButton.fitMaxTextSize=41;currentButton.fitMinHorizontalPadding=14;currentButton.fitMinVerticalPadding=9;currentButton.sharedCaptionSize=true;currentButton.sharedCaptionGroup="garage-menu";current.elements=[currentButton];
+  const normalized=normalizeProject(structuredClone(current));assert.equal(normalized.elements[0].followObjectAngle,false);assert.equal(normalized.elements[0].textOrientation,"custom");assert.equal(normalized.elements[0].textRotation,1.25);assert.equal(normalized.elements[0].captionOffsetX,4.5);assert.equal(normalized.elements[0].captionOffsetY,-2);assert.deepEqual(normalized.elements[0].captionInsets,{top:2,right:3,bottom:4,left:5});assert.equal(normalized.elements[0].showCaptionGeometry,true);assert.equal(normalized.elements[0].textSizingMode,"fit-geometry");assert.equal(normalized.elements[0].fitMinTextSize,11);assert.equal(normalized.elements[0].fitMaxTextSize,41);assert.equal(normalized.elements[0].fitMinHorizontalPadding,14);assert.equal(normalized.elements[0].fitMinVerticalPadding,9);assert.equal(normalized.elements[0].sharedCaptionSize,true);assert.equal(normalized.elements[0].sharedCaptionGroup,"garage-menu");
   const schema10=structuredClone(current);schema10.schemaVersion=10;delete schema10.elements[0].followObjectAngle;delete schema10.elements[0].textRotation;
-  const migrated=normalizeProject(schema10);assert.equal(migrated.elements[0].followObjectAngle,true);assert.equal(migrated.elements[0].textRotation,0);
+  const migrated=normalizeProject(schema10);assert.equal(migrated.elements[0].followObjectAngle,true);assert.equal(migrated.elements[0].textOrientation,"auto");assert.equal(migrated.elements[0].textRotation,0);assert.equal(migrated.elements[0].captionOffsetX,0);assert.deepEqual(migrated.elements[0].captionInsets,{top:0,right:0,bottom:0,left:0});
+  const schema11=structuredClone(current);schema11.schemaVersion=11;schema11.elements[0].followObjectAngle=false;delete schema11.elements[0].textOrientation;delete schema11.elements[0].captionOffsetX;delete schema11.elements[0].captionOffsetY;delete schema11.elements[0].captionInsets;delete schema11.elements[0].showCaptionGeometry;
+  const migrated11=normalizeProject(schema11);assert.equal(migrated11.elements[0].textOrientation,"custom");assert.equal(migrated11.elements[0].followObjectAngle,false);assert.equal(migrated11.elements[0].captionOffsetX,0);assert.equal(migrated11.elements[0].showCaptionGeometry,false);
+  const shaped=createProject("Shaped migration"),shapedButton=createElement("button");shaped.schemaVersion=11;shapedButton.geometry={...shapedButton.geometry,kind:"plaque"};delete shapedButton.textOrientation;shaped.elements=[shapedButton];const shapedMigrated=normalizeProject(shaped);assert.equal(shapedMigrated.elements[0].textOrientation,"follow-shape");assert.equal(shapedMigrated.elements[0].followObjectAngle,true);
 });
 
 test("Clip Contents computes the same nested crop used by the editor preview",()=>{

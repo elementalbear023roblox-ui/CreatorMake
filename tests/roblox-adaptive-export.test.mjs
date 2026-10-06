@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "../lib/editor/project.ts";
+import { resolveTextRotation } from "../lib/editor/visual-transform.ts";
 import { classifyRobloxElement } from "../lib/roblox/classification.ts";
 import { createRobloxExport } from "../lib/roblox/exporter.ts";
 import { planPixelAccurateAssets, visualHash } from "../lib/roblox/render-assets.ts";
@@ -40,7 +41,7 @@ test("adaptive manifest keeps original local coordinates under one global scale"
   assert.equal(byId.get("panel").className,"Frame");assert.equal(byId.get("panel").properties.BackgroundTransparency,1);assert.equal(byId.get("panel").attributes.CreatorMakeExportClassification,"HYBRID");
   assert.equal(byId.get("panel::visual").className,"ImageLabel");assert.equal(byId.get("panel::visual").parentSourceId,"panel");assert.equal(byId.get("panel::visual").attributes.CreatorMakeSourceId,"panel");
   assert.equal(byId.get("button").className,"ImageButton");assert.equal(byId.get("button").properties.Active,true);assert.equal(byId.get("button").properties.AutoButtonColor,false);
-  assert.equal(byId.get("button::background").name,"_Background");assert.equal(byId.get("button::text").className,"TextLabel");assert.equal(byId.get("button::text").properties.Text,"PLAY");assert.equal(byId.get("button::text").properties.TextSize,15);assert.equal(byId.get("button::text").properties.TextScaled,false);assert.deepEqual(byId.get("button::text").properties.Position,{kind:"UDim2",xScale:0,xOffset:12,yScale:0,yOffset:12});assert.deepEqual(byId.get("button::text").properties.Size,{kind:"UDim2",xScale:0,xOffset:196,yScale:0,yOffset:36});assert.equal(byId.get("button::text").decorators.length,0);
+  const caption=resolveTextRotation(project.elements.find((element)=>element.id==="button"),project.elements),captionSize={kind:"UDim2",xScale:0,xOffset:Number(caption.captionVisualSize.width.toFixed(4)),yScale:0,yOffset:Number(caption.captionVisualSize.height.toFixed(4))};assert.equal(byId.get("button::background").name,"_Background");assert.equal(byId.get("button::text").className,"TextLabel");assert.equal(byId.get("button::text").properties.Text,"PLAY");assert.equal(byId.get("button::text").properties.TextSize,15);assert.equal(byId.get("button::text").properties.TextScaled,false);assert.deepEqual(byId.get("button::text").properties.AnchorPoint,{kind:"Vector2",x:.5,y:.5});assert.deepEqual(byId.get("button::text").properties.Position,{kind:"UDim2",xScale:0,xOffset:110,yScale:0,yOffset:30});assert.deepEqual(byId.get("button::text").properties.Size,captionSize);assert.equal(byId.get("button::text").attributes.CreatorMakeCaptionUsesShapeSafeRegion,true);assert.equal(byId.get("button::text").decorators.length,0);
   assert.equal(byId.get("native-text").className,"TextLabel");assert.equal(byId.get("native-text").parentSourceId,"panel");
   assert.equal(byId.get("raster-text").className,"TextLabel");assert.equal(byId.get("raster-text").properties.Text,"LIMITED");assert.equal(byId.get("raster-text::pixel-text"),undefined);
   assert.deepEqual(logicalTopLeft(byId.get("button")),{x:60,y:270});

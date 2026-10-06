@@ -12,7 +12,7 @@ test("schema 8 migrates image states and asset favorites without losing source b
   delete element.imageStateAssetIds;delete element.imagePreviewState;delete element.sliceScale;
   project.elements=[element];project.assets=[{id:"asset",name:"Logo",originalName:"logo.png",kind:"image",folder:"",mimeType:"image/png",format:"PNG",width:64,height:64,fileSize:10,contentHash:"abc",dataUrl:"data:image/png;base64,AA==",thumbnailDataUrl:"",createdAt:1,animated:false,warning:null}];
   const normalized=normalizeProject(project);
-  assert.equal(normalized.schemaVersion,11);assert.equal(normalized.assets[0].favorite,false);assert.equal(normalized.assets[0].dataUrl,"data:image/png;base64,AA==");
+  assert.equal(normalized.schemaVersion,14);assert.equal(normalized.assets[0].favorite,false);assert.equal(normalized.assets[0].dataUrl,"data:image/png;base64,AA==");
   assert.deepEqual(normalized.elements[0].imageStateAssetIds,{default:null,hover:null,pressed:null,disabled:null,selected:null});assert.equal(normalized.elements[0].sliceScale,1);
 });
 

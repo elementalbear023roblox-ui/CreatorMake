@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createElement, createProject, normalizeProject } from "../lib/editor/project.ts";
+import { resolveTextRotation } from "../lib/editor/visual-transform.ts";
 import { calculateCreatorMakeFitScale, createRobloxExport, createTextScaleDiagnostics } from "../lib/roblox/exporter.ts";
 import { planPixelAccurateAssets } from "../lib/roblox/render-assets.ts";
 import { DEFAULT_ROBLOX_EXPORT_OPTIONS } from "../lib/roblox/types.ts";
@@ -18,14 +19,15 @@ const fixture=()=>{
 };
 const options={...DEFAULT_ROBLOX_EXPORT_OPTIONS,screenGuiName:"GarageTextScaling",visualMode:"ADAPTIVE",renderScale:2};
 const mapped=(assets)=>assets.map((asset,index)=>({...asset,status:"mapped",robloxAssetId:`rbxassetid://${88000+index}`}));
+const rounded=(value)=>Number(value.toFixed(4));
 
 test("garage fixture exports fixed design-space TextSize and exact local content bounds",()=>{
   const project=fixture(),assets=mapped(planPixelAccurateAssets(project,options)),result=createRobloxExport(project,options,assets),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node]));
   const viewport=byId.get("__creatormake_viewport"),allScales=result.manifest.nodes.flatMap((node)=>node.decorators.map((decorator)=>({node,decorator}))).filter(({decorator})=>decorator.className==="UIScale");
   assert.equal(allScales.length,1);assert.equal(allScales[0].node.sourceId,"__creatormake_viewport");assert.equal(allScales[0].decorator.name,"CreatorMakeGlobalScale");assert.equal(viewport.attributes.CreatorMakeDeviceScaleOwner,"CreatorMakeGlobalScale");
 
-  const select=byId.get("select-color::text");assert.equal(select.properties.TextSize,52);assert.equal(select.properties.TextScaled,false);assert.deepEqual(select.properties.Position,{kind:"UDim2",xScale:0,xOffset:20,yScale:0,yOffset:15});assert.deepEqual(select.properties.Size,{kind:"UDim2",xScale:0,xOffset:460,yScale:0,yOffset:70});assert.equal(select.attributes.CreatorMakeTextBoundsWidth,460);assert.equal(select.attributes.CreatorMakeTextBoundsHeight,70);assert.equal(select.attributes.CreatorMakeBackgroundLogicalWidth,500);assert.equal(select.attributes.CreatorMakeBackgroundLogicalHeight,100);assert.equal(select.decorators.some((item)=>item.className==="UITextSizeConstraint"),false);
-  const play=byId.get("exit-garage::text");assert.equal(play.properties.Text,"Exit Garage");assert.equal(play.properties.TextSize,36);assert.equal(play.properties.TextScaled,false);assert.equal(play.properties.Active,false);assert.equal(play.properties.Selectable,false);assert.deepEqual(play.properties.Size,{kind:"UDim2",xScale:0,xOffset:264,yScale:0,yOffset:56});assert.equal(byId.get("exit-garage").className,"ImageButton");
+  const selectElement=project.elements.find((element)=>element.id==="select-color"),selectLayout=resolveTextRotation(selectElement,project.elements),select=byId.get("select-color::text");assert.equal(select.properties.TextSize,52);assert.equal(select.properties.TextScaled,false);assert.deepEqual(select.properties.AnchorPoint,{kind:"Vector2",x:.5,y:.5});assert.deepEqual(select.properties.Position,{kind:"UDim2",xScale:0,xOffset:rounded(selectLayout.captionVisualCenter.x),yScale:0,yOffset:rounded(selectLayout.captionVisualCenter.y)});assert.deepEqual(select.properties.Size,{kind:"UDim2",xScale:0,xOffset:rounded(selectLayout.captionVisualSize.width),yScale:0,yOffset:rounded(selectLayout.captionVisualSize.height)});assert.equal(select.attributes.CreatorMakeTextBoundsWidth,rounded(selectLayout.captionVisualSize.width));assert.equal(select.attributes.CreatorMakeTextBoundsHeight,70);assert.equal(select.attributes.CreatorMakeCaptionUsesShapeSafeRegion,true);assert.equal(select.attributes.CreatorMakeBackgroundLogicalWidth,500);assert.equal(select.attributes.CreatorMakeBackgroundLogicalHeight,100);assert.equal(select.decorators.some((item)=>item.className==="UITextSizeConstraint"),false);
+  const playElement=project.elements.find((element)=>element.id==="exit-garage"),playLayout=resolveTextRotation(playElement,project.elements),play=byId.get("exit-garage::text");assert.equal(play.properties.Text,"Exit Garage");assert.equal(play.properties.TextSize,36);assert.equal(play.properties.TextScaled,false);assert.equal(play.properties.Active,false);assert.equal(play.properties.Selectable,false);assert.deepEqual(play.properties.Size,{kind:"UDim2",xScale:0,xOffset:rounded(playLayout.captionVisualSize.width),yScale:0,yOffset:rounded(playLayout.captionVisualSize.height)});assert.equal(byId.get("exit-garage").className,"ImageButton");
   for(const [id,size,text] of [["car-name::text",54,"Car Name"],["premium-colors",28,"PREMIUM COLORS"],["regular-colors",28,"REGULAR COLORS"],["garage-input",30,"Search cars"]]){const node=byId.get(id);assert.equal(node.properties.Text,text);assert.equal(node.properties.TextSize,size);assert.equal(node.properties.TextScaled,false);assert.equal(node.attributes.CreatorMakeTextScaleMode,"FIXED_DESIGN_SIZE");assert.equal(node.decorators.some((item)=>item.className==="UITextSizeConstraint"),false);}
   assert.equal(byId.get("garage-input").className,"TextBox");assert.equal(byId.get("garage-input").properties.TextSize,30);
 });
@@ -42,7 +44,7 @@ test("text/background proportions stay invariant across the complete viewport ma
 
 test("canvas zoom and raster resolution never change native TextSize",()=>{
   const base=fixture(),zoomed=structuredClone(base);zoomed.canvasZoom=4;
-  for(const renderScale of [1,2,3,4]){const exportOptions={...options,renderScale},assets=mapped(planPixelAccurateAssets(zoomed,exportOptions)),result=createRobloxExport(zoomed,exportOptions,assets),select=result.manifest.nodes.find((node)=>node.sourceId==="select-color::text");assert.equal(select.properties.TextSize,52);assert.equal(select.attributes.CreatorMakeExportedRobloxTextSize,52);assert.deepEqual(select.properties.Size,{kind:"UDim2",xScale:0,xOffset:460,yScale:0,yOffset:70});}
+  const selectLayout=resolveTextRotation(zoomed.elements.find((element)=>element.id==="select-color"),zoomed.elements);for(const renderScale of [1,2,3,4]){const exportOptions={...options,renderScale},assets=mapped(planPixelAccurateAssets(zoomed,exportOptions)),result=createRobloxExport(zoomed,exportOptions,assets),select=result.manifest.nodes.find((node)=>node.sourceId==="select-color::text");assert.equal(select.properties.TextSize,52);assert.equal(select.attributes.CreatorMakeExportedRobloxTextSize,52);assert.deepEqual(select.properties.Size,{kind:"UDim2",xScale:0,xOffset:rounded(selectLayout.captionVisualSize.width),yScale:0,yOffset:rounded(selectLayout.captionVisualSize.height)});}
 });
 
 test("garage text backgrounds and native labels inherit one shared object scale",()=>{

@@ -12,7 +12,7 @@ const transparent=(value:string)=>{const normalized=value.replaceAll(" ","").toL
 const simpleCorners=(element:EditorElement)=>{const radii=(Object.keys(element.corners)as Array<keyof EditorElement["corners"]>).map((key)=>element.cornerTypes[key]==="square"?0:element.corners[key]);return Object.values(element.cornerTypes).every((type)=>type==="round"||type==="square")&&radii.every((radius)=>close(radius,radii[0]));};
 const simpleTransform=(element:EditorElement)=>close(element.scaleX,1)&&close(element.scaleY,1)&&!element.rotateX&&!element.rotateY&&!element.skewX&&!element.skewY&&!element.translateZ&&!element.z;
 const simpleGradient=(element:EditorElement)=>element.gradientType==="none"||(element.gradientType==="linear"&&element.gradientStops.length>=2&&element.gradientStops.length<=6);
-const textEffectsNative=(element:EditorElement)=>close(element.letterSpacing,0)&&close(element.wordSpacing,0)&&close(element.paragraphSpacing,0)&&element.textTransform==="none"&&element.textDecoration==="none"&&element.textShadows.every((shadow)=>!hasShadow(shadow))&&element.textStrokeWidth<=1&&element.textStrokePosition==="center"&&simpleTransform(element);
+const textEffectsNative=(element:EditorElement)=>close(element.letterSpacing,0)&&close(element.wordSpacing,0)&&close(element.paragraphSpacing,0)&&element.textTransform==="none"&&element.textDecoration==="none"&&element.textShadows.every((shadow)=>!hasShadow(shadow))&&element.textStrokeWidth<=1&&element.textStrokePosition==="center";
 const backgroundFree=(element:EditorElement)=>transparent(element.fill)&&element.gradientType==="none"&&(element.borderWidth<=0||transparent(element.borderColor))&&!hasShadow(element.shadow);
 
 export const hasVisibleTextBackground=(element:EditorElement)=>!backgroundFree(element);
@@ -23,7 +23,7 @@ export function classifyTextExport(element:EditorElement):RobloxTextExportDecisi
   if(!effects)reasons.push("Roblox native text keeps the words editable; unsupported spacing, decoration, shadow, stroke, or transform effects may differ");
   if(!plainSurface)reasons.push("visible background exports separately without text glyphs");
   const pixelOverride=element.textRobloxExportMode==="PIXEL_ACCURATE"||element.textRobloxExportMode==="PIXEL";
-  if(pixelOverride)reasons.push("Legacy pixel-text preference was ignored because CreatorMake never rasterizes visible glyphs");
+  if(pixelOverride)reasons.push("Pixel text is disabled while Native TextLabel Export is enabled; visible glyphs remain editable Roblox text");
   if(!fontExact)reasons.push("editable Roblox text uses the declared compatibility font and reports the fidelity mismatch");
   return{mode:"NATIVE",className,fontExact,backgroundFree:plainSurface,reasons};
 }

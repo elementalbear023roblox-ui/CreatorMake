@@ -1,100 +1,130 @@
-import { geometryKindForElement, geometryPresentation, usesVectorSurface } from "./geometry.ts";
-import type { EditorElement } from "./types";
+import { flattenSvgPath } from "./boolean.ts";
+import { geometryKindForElement, geometryPresentation, isDirectionalCaptionGeometry, usesVectorSurface } from "./geometry.ts";
+import { designFontSize, fitTextToCaption, measureNativeText, textPadding, textSizingMode, type NativeTextMeasurement } from "./text-sizing.ts";
+import type { EditorElement, TextOrientation } from "./types";
 
-type Point={x:number;y:number};
-type Segment={from:Point;to:Point;length:number;angle:number;midY:number};
+export type TransformPoint={x:number;y:number};
+type Point=TransformPoint;
+export type TransformQuad={topLeft:Point;topRight:Point;bottomRight:Point;bottomLeft:Point};
+export type CaptionTransformKind="rectilinear"|"affine"|"projective";
+type Segment={from:Point;to:Point;length:number;angle:number};
 export type VisualLinearTransform={a:number;b:number;c:number;d:number};
 
 const EPSILON=1e-7;
 const radians=(degrees:number)=>degrees*Math.PI/180;
 const degrees=(value:number)=>value*180/Math.PI;
-const finite=(value:number,fallback=0)=>Number.isFinite(value)?value:fallback;
+const finite=(value:number|undefined,fallback=0)=>Number.isFinite(value)?Number(value):fallback;
 const normalizeAngle=(value:number)=>{const normalized=((finite(value)+180)%360+360)%360-180;return Math.abs(normalized)<EPSILON?0:normalized;};
 const normalizeAxisAngle=(value:number)=>{let normalized=normalizeAngle(value);if(normalized>=90)normalized-=180;if(normalized<-90)normalized+=180;return Math.abs(normalized)<EPSILON?0:normalized;};
-const axisDistance=(left:number,right:number)=>Math.abs(normalizeAxisAngle(left-right));
+const samePoint=(left:Point,right:Point)=>Math.abs(left.x-right.x)<.001&&Math.abs(left.y-right.y)<.001;
+const average=(points:Point[]):Point=>({x:points.reduce((sum,point)=>sum+point.x,0)/Math.max(1,points.length),y:points.reduce((sum,point)=>sum+point.y,0)/Math.max(1,points.length)});
 
 function straightSegments(path:string,scaleX=1,scaleY=1):Segment[]{
-  const tokens=path.match(/[a-zA-Z]|[-+]?(?:\d*\.)?\d+(?:e[-+]?\d+)?/gi)??[];
-  const result:Segment[]=[];let index=0,command="",current:Point={x:0,y:0},start:Point={x:0,y:0};
-  const isCommand=(value:string)=>/^[a-zA-Z]$/.test(value),number=()=>Number(tokens[index++]),push=(next:Point)=>{const from={x:current.x*scaleX,y:current.y*scaleY},to={x:next.x*scaleX,y:next.y*scaleY},dx=to.x-from.x,dy=to.y-from.y,length=Math.hypot(dx,dy);if(length>EPSILON)result.push({from,to,length,angle:normalizeAxisAngle(degrees(Math.atan2(dy,dx))),midY:(from.y+to.y)/2});current=next;};
-  while(index<tokens.length){
-    if(isCommand(tokens[index]))command=tokens[index++];
-    if(!command)break;
-    const relative=command===command.toLowerCase(),upper=command.toUpperCase(),point=(x:number,y:number):Point=>({x:relative?current.x+x:x,y:relative?current.y+y:y});
-    if(upper==="Z"){push({...start});command="";continue;}
-    if(!["M","L","H","V"].includes(upper))return[];
-    if(upper==="H"){push({x:relative?current.x+number():number(),y:current.y});continue;}
-    if(upper==="V"){push({x:current.x,y:relative?current.y+number():number()});continue;}
-    if(index+1>=tokens.length||isCommand(tokens[index])||isCommand(tokens[index+1])){command="";continue;}
-    const next=point(number(),number());
-    if(upper==="M"){current=next;start={...next};command=relative?"l":"L";}else push(next);
-  }
-  return result;
+  const tokens=path.match(/[a-zA-Z]|[-+]?(?:\d*\.)?\d+(?:e[-+]?\d+)?/gi)??[],result:Segment[]=[];let index=0,command="",current:Point={x:0,y:0},start:Point={x:0,y:0};
+  const isCommand=(value:string|undefined)=>Boolean(value&&/^[a-zA-Z]$/.test(value)),number=()=>Number(tokens[index++]),push=(next:Point)=>{const from={x:current.x*scaleX,y:current.y*scaleY},to={x:next.x*scaleX,y:next.y*scaleY},dx=to.x-from.x,dy=to.y-from.y,length=Math.hypot(dx,dy);if(length>EPSILON)result.push({from,to,length,angle:normalizeAxisAngle(degrees(Math.atan2(dy,dx)))});current=next;};
+  while(index<tokens.length){if(isCommand(tokens[index]))command=tokens[index++];if(!command)break;const relative=command===command.toLowerCase(),upper=command.toUpperCase(),point=(x:number,y:number):Point=>({x:relative?current.x+x:x,y:relative?current.y+y:y});if(upper==="Z"){push({...start});command="";continue;}if(!["M","L","H","V"].includes(upper))return[];if(upper==="H"){const value=number();push({x:relative?current.x+value:value,y:current.y});continue;}if(upper==="V"){const value=number();push({x:current.x,y:relative?current.y+value:value});continue;}if(index+1>=tokens.length||isCommand(tokens[index])||isCommand(tokens[index+1])){command="";continue;}const next=point(number(),number());if(upper==="M"){current=next;start={...next};command=relative?"l":"L";}else push(next);}return result;
 }
 
-/** Returns a geometry-authored caption baseline only when the canonical vector has a clear primary axis. */
-export function geometryBaselineAngle(element:EditorElement):number{
-  if(!usesVectorSurface(element))return 0;
-  const kind=geometryKindForElement(element),presentation=geometryPresentation(element),scale=String(presentation.transform??"").match(/scale\(([-\d.]+)(?:[ ,]+([-\d.]+))?\)/),scaleX=scale?Number(scale[1]):1,scaleY=scale?Number(scale[2]??scale[1]):1,segments=straightSegments(presentation.path,scaleX,scaleY);
-  if(!segments.length)return 0;
-  if(kind==="line")return normalizeAxisAngle(segments.reduce((longest,item)=>item.length>longest.length?item:longest).angle);
-  const minimumLength=Math.max(8,element.width*.22),candidates=segments.filter((segment)=>segment.length>=minimumLength&&Math.abs(segment.angle)<=45).sort((left,right)=>right.length-left.length);
-  let best:{angle:number;score:number}|undefined;
-  for(let leftIndex=0;leftIndex<candidates.length;leftIndex++)for(let rightIndex=leftIndex+1;rightIndex<candidates.length;rightIndex++){
-    const left=candidates[leftIndex],right=candidates[rightIndex];
-    if(axisDistance(left.angle,right.angle)>2.5||Math.abs(left.midY-right.midY)<Math.max(4,element.height*.18))continue;
-    const rightAngle=left.angle+normalizeAxisAngle(right.angle-left.angle),angle=normalizeAxisAngle((left.angle*left.length+rightAngle*right.length)/(left.length+right.length)),score=left.length+right.length;
-    if(!best||score>best.score)best={angle,score};
-  }
-  if(best)return best.angle;
-  return 0;
+function presentationScale(transform:string|undefined){const match=String(transform??"").match(/scale\(([-\d.]+)(?:[ ,]+([-\d.]+))?\)/);return match?{x:Number(match[1]),y:Number(match[2]??match[1])}:{x:1,y:1};}
+function polygonArea(points:Point[]){return points.reduce((sum,point,index)=>{const next=points[(index+1)%points.length];return sum+point.x*next.y-next.x*point.y;},0)/2;}
+function geometryRings(element:EditorElement){const presentation=geometryPresentation(element);if(presentation.open)return[];const scale=presentationScale(presentation.transform);try{return flattenSvgPath(presentation.path).map((ring)=>{const points=ring.map((point)=>({x:point.x*scale.x,y:point.y*scale.y}));return points.length>1&&samePoint(points[0],points.at(-1)!)?points.slice(0,-1):points;}).filter((ring)=>ring.length>=3).sort((left,right)=>Math.abs(polygonArea(right))-Math.abs(polygonArea(left)));}catch{return[];}}
+function geometrySegments(element:EditorElement){const presentation=geometryPresentation(element),scale=presentationScale(presentation.transform);return straightSegments(presentation.path,scale.x,scale.y);}
+
+const rectangleQuad=(width:number,height:number):TransformQuad=>({topLeft:{x:0,y:0},topRight:{x:width,y:0},bottomRight:{x:width,y:height},bottomLeft:{x:0,y:height}});
+const quadPoints=(quad:TransformQuad)=>[quad.topLeft,quad.topRight,quad.bottomRight,quad.bottomLeft];
+const orderedQuad=(points:Point[]):TransformQuad|undefined=>{
+  if(points.length!==4)return;
+  const sums=points.map((point)=>point.x+point.y),differences=points.map((point)=>point.x-point.y),at=(values:number[],takeMax=false)=>points[values.reduce((best,value,index)=>takeMax?value>values[best]?index:best:value<values[best]?index:best,0)],quad={topLeft:at(sums),topRight:at(differences,true),bottomRight:at(sums,true),bottomLeft:at(differences)};
+  return new Set(quadPoints(quad)).size===4?quad:undefined;
+};
+const quadrilateralKind=(quad:TransformQuad):CaptionTransformKind=>{
+  const affineX=quad.topLeft.x+quad.bottomRight.x-quad.topRight.x-quad.bottomLeft.x,affineY=quad.topLeft.y+quad.bottomRight.y-quad.topRight.y-quad.bottomLeft.y;
+  if(Math.hypot(affineX,affineY)>.01)return"projective";
+  const top={x:quad.topRight.x-quad.topLeft.x,y:quad.topRight.y-quad.topLeft.y},left={x:quad.bottomLeft.x-quad.topLeft.x,y:quad.bottomLeft.y-quad.topLeft.y};
+  return Math.abs(top.y)>.01||Math.abs(left.x)>.01?"affine":"rectilinear";
+};
+export function geometrySurfaceQuad(element:EditorElement):TransformQuad{
+  return orderedQuad(geometryRings(element)[0]??[])??rectangleQuad(element.width,element.height);
 }
+export function geometrySurfaceTransformKind(element:EditorElement){return quadrilateralKind(geometrySurfaceQuad(element));}
+
+type Homography={a:number;b:number;c:number;d:number;e:number;f:number;g:number;h:number};
+const homographyFromUnitSquare=(quad:TransformQuad):Homography=>{
+  const p0=quad.topLeft,p1=quad.topRight,p2=quad.bottomRight,p3=quad.bottomLeft,dx1=p1.x-p2.x,dx2=p3.x-p2.x,dx3=p0.x-p1.x+p2.x-p3.x,dy1=p1.y-p2.y,dy2=p3.y-p2.y,dy3=p0.y-p1.y+p2.y-p3.y,det=dx1*dy2-dx2*dy1;
+  let g=0,h=0;if(Math.abs(dx3)>.000001||Math.abs(dy3)>.000001){if(Math.abs(det)>.000001){g=(dx3*dy2-dx2*dy3)/det;h=(dx1*dy3-dx3*dy1)/det;}}
+  return{a:p1.x-p0.x+g*p1.x,b:p3.x-p0.x+h*p3.x,c:p0.x,d:p1.y-p0.y+g*p1.y,e:p3.y-p0.y+h*p3.y,f:p0.y,g,h};
+};
+const applyHomography=(matrix:Homography,u:number,v:number):Point=>{const w=matrix.g*u+matrix.h*v+1;return{x:(matrix.a*u+matrix.b*v+matrix.c)/w,y:(matrix.d*u+matrix.e*v+matrix.f)/w};};
+const mapElementPointToSurface=(element:EditorElement,point:Point,quad=geometrySurfaceQuad(element))=>applyHomography(homographyFromUnitSquare(quad),point.x/Math.max(1,element.width),point.y/Math.max(1,element.height));
+const rotatePoint=(point:Point,center:Point,angle:number)=>{const theta=radians(angle),cos=Math.cos(theta),sin=Math.sin(theta),x=point.x-center.x,y=point.y-center.y;return{x:center.x+x*cos-y*sin,y:center.y+x*sin+y*cos};};
+const cssMatrixForQuad=(quad:TransformQuad,width:number,height:number)=>{const matrix=homographyFromUnitSquare(quad),a=matrix.a/Math.max(1,width),b=matrix.b/Math.max(1,height),d=matrix.d/Math.max(1,width),e=matrix.e/Math.max(1,height),g=matrix.g/Math.max(1,width),h=matrix.h/Math.max(1,height);return`matrix3d(${a},${d},0,${g},${b},${e},0,${h},0,0,1,0,${matrix.c},${matrix.f},0,1)`;};
+
+export function advancedTextTransformKind(element:EditorElement):CaptionTransformKind{
+  if(Math.abs(finite(element.rotateX))>.001||Math.abs(finite(element.rotateY))>.001)return"projective";
+  if(Math.abs(finite(element.skewX))>.001||Math.abs(finite(element.skewY))>.001)return"affine";
+  if(Math.abs(finite(element.translateZ)+finite(element.z))>.001)return"affine";
+  return"rectilinear";
+}
+export function requiresExactTextTransform(element:EditorElement){
+  const forcedNative=element.textRobloxExportMode==="NATIVE"||element.textRobloxExportMode==="NATIVE_TEXT";
+  if(forcedNative)return false;
+  if(element.textRobloxExportMode==="PIXEL"||element.textRobloxExportMode==="PIXEL_ACCURATE")return true;
+  return advancedTextTransformKind(element)!=="rectilinear"||geometrySurfaceTransformKind(element)!=="rectilinear";
+}
+
+function verticalSpan(points:Point[],x:number){const intersections:number[]=[];for(let index=0;index<points.length;index++){const from=points[index],to=points[(index+1)%points.length];if((from.x<=x&&to.x>x)||(to.x<=x&&from.x>x))intersections.push(from.y+(x-from.x)*(to.y-from.y)/(to.x-from.x));}intersections.sort((left,right)=>left-right);let best:{top:number;bottom:number}|undefined;for(let index=0;index+1<intersections.length;index+=2){const candidate={top:intersections[index],bottom:intersections[index+1]};if(!best||candidate.bottom-candidate.top>best.bottom-best.top)best=candidate;}return best;}
+
+export type GeometryAxisAnalysis={angle:number;reliable:boolean;source:"geometry-centerline"|"line"|"fallback";leftMid?:Point;rightMid?:Point;center?:Point};
+export function geometryCaptionAxis(element:EditorElement):GeometryAxisAnalysis{
+  if(!usesVectorSurface(element))return{angle:0,reliable:false,source:"fallback"};
+  const kind=geometryKindForElement(element),segments=geometrySegments(element);if(kind==="line"&&segments.length){const longest=segments.reduce((best,item)=>item.length>best.length?item:best);return{angle:longest.angle,reliable:true,source:"line",leftMid:longest.from,rightMid:longest.to,center:average([longest.from,longest.to])};}
+  const polygon=geometryRings(element)[0];if(!polygon?.length)return{angle:0,reliable:false,source:"fallback"};
+  let leftMid:Point|undefined,rightMid:Point|undefined;
+  if(polygon.length===4){const sorted=[...polygon].sort((left,right)=>left.x-right.x||left.y-right.y);leftMid=average(sorted.slice(0,2));rightMid=average(sorted.slice(-2));}
+  if(!leftMid||!rightMid){const boundarySegments=polygon.map((from,index)=>{const rawTo=polygon[(index+1)%polygon.length],to=rawTo.x<from.x?from:rawTo,orientedFrom=rawTo.x<from.x?rawTo:from,dx=to.x-orientedFrom.x,dy=to.y-orientedFrom.y;return{from:orientedFrom,to,length:Math.hypot(dx,dy),angle:normalizeAxisAngle(degrees(Math.atan2(dy,dx))),midY:(orientedFrom.y+to.y)/2};}).filter((segment)=>segment.length>=element.width*.24&&Math.abs(segment.angle)<=60).sort((left,right)=>right.length-left.length),primary=boundarySegments[0],partner=primary&&boundarySegments.slice(1).find((candidate)=>Math.abs(candidate.midY-primary.midY)>=element.height*.18&&Math.abs(normalizeAxisAngle(candidate.angle-primary.angle))<=30);if(primary&&partner){leftMid=average([primary.from,partner.from]);rightMid=average([primary.to,partner.to]);}}
+  if(!leftMid||!rightMid){const minX=Math.min(...polygon.map((point)=>point.x)),maxX=Math.max(...polygon.map((point)=>point.x)),span=maxX-minX;for(const inset of [.1,.14,.18,.22,.26]){const left=verticalSpan(polygon,minX+span*inset),right=verticalSpan(polygon,maxX-span*inset);if(left&&right){leftMid={x:minX+span*inset,y:(left.top+left.bottom)/2};rightMid={x:maxX-span*inset,y:(right.top+right.bottom)/2};break;}}}
+  if(!leftMid||!rightMid)return{angle:0,reliable:false,source:"fallback"};const dx=rightMid.x-leftMid.x,dy=rightMid.y-leftMid.y,angle=normalizeAxisAngle(degrees(Math.atan2(dy,dx))),reliable=Math.hypot(dx,dy)>=Math.max(8,element.width*.28)&&Math.abs(angle)<=60;return reliable?{angle,reliable:true,source:"geometry-centerline",leftMid,rightMid,center:average([leftMid,rightMid])}:{angle:0,reliable:false,source:"fallback"};
+}
+
+export function geometryBaselineAngle(element:EditorElement){return geometryCaptionAxis(element).angle;}
 
 /** The same local linear surface transform used by the pixel renderer's visual bounds. */
-export function visualLinearTransform(element:EditorElement):VisualLinearTransform{
-  return{
-    a:finite(element.scaleX,1)*Math.cos(radians(finite(element.rotateY))),
-    b:Math.tan(radians(finite(element.skewY))),
-    c:Math.tan(radians(finite(element.skewX))),
-    d:finite(element.scaleY,1)*Math.cos(radians(finite(element.rotateX))),
-  };
+export function visualLinearTransform(element:EditorElement):VisualLinearTransform{return{a:finite(element.scaleX,1)*Math.cos(radians(finite(element.rotateY))),b:Math.tan(radians(finite(element.skewY))),c:Math.tan(radians(finite(element.skewX))),d:finite(element.scaleY,1)*Math.cos(radians(finite(element.rotateX)))};}
+const transformVector=(transform:VisualLinearTransform,point:Point):Point=>({x:transform.a*point.x+transform.c*point.y,y:transform.b*point.x+transform.d*point.y});
+const transformPoint=(element:EditorElement,point:Point)=>{const transform=visualLinearTransform(element),origin={x:element.width*element.originX/100,y:element.height*element.originY/100},relative=transformVector(transform,{x:point.x-origin.x,y:point.y-origin.y});return{x:origin.x+relative.x,y:origin.y+relative.y};};
+export function transformedBaselineAngle(element:EditorElement,baselineAngle=geometryBaselineAngle(element)){const vector=transformVector(visualLinearTransform(element),{x:Math.cos(radians(baselineAngle)),y:Math.sin(radians(baselineAngle))});return normalizeAngle(degrees(Math.atan2(vector.y,vector.x)));}
+function inverseBaselineAngle(transform:VisualLinearTransform,targetAngle:number){const {a,b,c,d}=transform,determinant=a*d-b*c,x=Math.cos(radians(targetAngle)),y=Math.sin(radians(targetAngle));if(Math.abs(determinant)<EPSILON)return targetAngle;return normalizeAngle(degrees(Math.atan2((-b*x+a*y)/determinant,(d*x-c*y)/determinant)));}
+
+function projectedSpan(points:Array<{u:number;v:number}>,u:number){const intersections:number[]=[];for(let index=0;index<points.length;index++){const from=points[index],to=points[(index+1)%points.length];if((from.u<=u&&to.u>u)||(to.u<=u&&from.u>u))intersections.push(from.v+(u-from.u)*(to.v-from.v)/(to.u-from.u));}intersections.sort((left,right)=>left-right);let best:{top:number;bottom:number}|undefined;for(let index=0;index+1<intersections.length;index+=2){const candidate={top:intersections[index],bottom:intersections[index+1]};if(!best||candidate.bottom-candidate.top>best.bottom-best.top)best=candidate;}return best;}
+const fromAxes=(u:number,v:number,xAxis:Point,yAxis:Point):Point=>({x:xAxis.x*u+yAxis.x*v,y:xAxis.y*u+yAxis.y*v});
+
+type SafeRegion={center:Point;width:number;height:number;angle:number;usesShapeSafeRegion:boolean;axisReliable:boolean;leftBoundary:Point;rightBoundary:Point;topBoundary:Point;bottomBoundary:Point;padding:{left:number;right:number;top:number;bottom:number}};
+function captionSafeRegion(element:EditorElement,axis:GeometryAxisAnalysis,useGeometry:boolean):SafeRegion{
+  const configured=textPadding(element),fit=textSizingMode(element)==="fit-geometry",padding={left:Math.max(configured.left,fit?element.fitMinHorizontalPadding:0)+finite(element.captionInsets?.left),right:Math.max(configured.right,fit?element.fitMinHorizontalPadding:0)+finite(element.captionInsets?.right),top:Math.max(configured.top,fit?element.fitMinVerticalPadding:0)+finite(element.captionInsets?.top),bottom:Math.max(configured.bottom,fit?element.fitMinVerticalPadding:0)+finite(element.captionInsets?.bottom)},polygon=useGeometry?geometryRings(element)[0]:undefined,angle=axis.reliable?axis.angle:0,xAxis={x:Math.cos(radians(angle)),y:Math.sin(radians(angle))},yAxis={x:-xAxis.y,y:xAxis.x};
+  if(polygon?.length&&axis.leftMid&&axis.rightMid){const projected=polygon.map((point)=>({u:point.x*xAxis.x+point.y*xAxis.y,v:point.x*yAxis.x+point.y*yAxis.y})),leftProjection=axis.leftMid.x*xAxis.x+axis.leftMid.y*xAxis.y,rightProjection=axis.rightMid.x*xAxis.x+axis.rightMid.y*xAxis.y,rawStart=Math.min(leftProjection,rightProjection),rawEnd=Math.max(leftProjection,rightProjection),coreInset=polygon.length===4?0:(rawEnd-rawStart)*.12,uStart=rawStart+coreInset,uEnd=rawEnd-coreInset,sampleCount=11,spans=Array.from({length:sampleCount},(_,index)=>projectedSpan(projected,uStart+(uEnd-uStart)*(index+.5)/sampleCount)).filter((span):span is {top:number;bottom:number}=>Boolean(span));if(spans.length){const top=Math.max(...spans.map((span)=>span.top))+padding.top,bottom=Math.min(...spans.map((span)=>span.bottom))-padding.bottom,left=uStart+padding.left,right=uEnd-padding.right;if(right>left&&bottom>top){const centerU=(left+right)/2+finite(element.captionOffsetX),centerV=(top+bottom)/2+finite(element.captionOffsetY),center=fromAxes(centerU,centerV,xAxis,yAxis);return{center,width:right-left,height:bottom-top,angle,usesShapeSafeRegion:true,axisReliable:true,leftBoundary:fromAxes(left,centerV,xAxis,yAxis),rightBoundary:fromAxes(right,centerV,xAxis,yAxis),topBoundary:fromAxes(centerU,top,xAxis,yAxis),bottomBoundary:fromAxes(centerU,bottom,xAxis,yAxis),padding};}}}
+  const width=Math.max(0,element.width-padding.left-padding.right),height=Math.max(0,element.height-padding.top-padding.bottom),center={x:padding.left+width/2+finite(element.captionOffsetX),y:padding.top+height/2+finite(element.captionOffsetY)};return{center,width,height,angle:0,usesShapeSafeRegion:false,axisReliable:false,leftBoundary:{x:padding.left,y:center.y},rightBoundary:{x:element.width-padding.right,y:center.y},topBoundary:{x:center.x,y:padding.top},bottomBoundary:{x:center.x,y:element.height-padding.bottom},padding};
 }
 
-export function transformedBaselineAngle(element:EditorElement,baselineAngle=geometryBaselineAngle(element)){
-  const {a,b,c,d}=visualLinearTransform(element),x=Math.cos(radians(baselineAngle)),y=Math.sin(radians(baselineAngle));
-  return normalizeAngle(degrees(Math.atan2(b*x+d*y,a*x+c*y)));
-}
+export function inheritedObjectRotation(element:EditorElement,elements:EditorElement[]){const byId=new Map(elements.map((item)=>[item.id,item]));let parentId=element.parentId,total=0,guard=0;while(parentId&&guard++<64){const parent=byId.get(parentId);if(!parent||parent.hidden)break;total+=finite(parent.rotation);parentId=parent.parentId;}return total;}
 
-function inverseBaselineAngle(transform:VisualLinearTransform,targetAngle:number){
-  const {a,b,c,d}=transform,determinant=a*d-b*c,x=Math.cos(radians(targetAngle)),y=Math.sin(radians(targetAngle));
-  if(Math.abs(determinant)<EPSILON)return targetAngle;
-  return normalizeAngle(degrees(Math.atan2((-b*x+a*y)/determinant,(d*x-c*y)/determinant)));
-}
-
-export function inheritedObjectRotation(element:EditorElement,elements:EditorElement[]){
-  const byId=new Map(elements.map((item)=>[item.id,item]));let parentId=element.parentId,total=0,guard=0;
-  while(parentId&&guard++<64){const parent=byId.get(parentId);if(!parent||parent.hidden)break;total+=finite(parent.rotation);parentId=parent.parentId;}
-  return total;
-}
-
+export type CaptionGeometry={center:Point;axisX:Point;axisY:Point;angleDegrees:number;leftBoundary:Point;rightBoundary:Point;topBoundary:Point;bottomBoundary:Point;safeWidth:number;safeHeight:number;paddingLeft:number;paddingRight:number;paddingTop:number;paddingBottom:number;visualCenter:Point;visualSize:{width:number;height:number};usesShapeSafeRegion:boolean;axisReliable:boolean;geometryCenterlineAngle:number;surfaceQuad:TransformQuad;textQuad:TransformQuad;textBaseline:{from:Point;to:Point};transformKind:CaptionTransformKind;requiresExactRaster:boolean;cssTransform?:string};
 export type TextRotationResolution={
-  objectLocalRotation:number;
-  parentWorldRotation:number;
-  geometryBaselineAngle:number;
-  pixelVisualRotation:number;
-  textLocalRotation:number;
-  followObjectAngle:boolean;
-  visualRotationSource:"object-transform"|"surface-transform"|"geometry"|"geometry+surface-transform";
-  ownerEffectiveWorldRotation:number;
-  rotationInheritedByRobloxParent:number;
-  textLabelRotation:number;
-  standaloneTextRotation:number;
-  finalTextWorldRotation:number;
-  editorTextLocalRotation:number;
+  requestedOrientation:TextOrientation;resolvedOrientation:Exclude<TextOrientation,"auto">;axisReliable:boolean;usesShapeSafeRegion:boolean;
+  captionGeometry:CaptionGeometry;captionAxis:Point;captionYAxis:Point;captionCenter:Point;captionSize:{width:number;height:number};captionVisualCenter:Point;captionContentBounds:{x:number;y:number;width:number;height:number};captionVisualSize:{width:number;height:number};captionAngle:number;resolvedTextSize:number;textMeasurement:NativeTextMeasurement;textSizingMode:ReturnType<typeof textSizingMode>;sharedCaptionSizeApplied:boolean;sharedCaptionGroup:string;
+  objectLocalRotation:number;parentWorldRotation:number;geometryBaselineAngle:number;pixelVisualRotation:number;textLocalRotation:number;followObjectAngle:boolean;visualRotationSource:"object-transform"|"surface-transform"|"geometry-centerline"|"geometry+surface-transform"|"horizontal"|"custom";ownerEffectiveWorldRotation:number;rotationInheritedByRobloxParent:number;textLabelRotation:number;standaloneTextRotation:number;finalTextWorldRotation:number;editorTextLocalRotation:number;
 };
 
-/** Canonical editor/Roblox text-angle resolver. Roblox properties consume the uninherited delta only. */
-export function resolveTextRotation(element:EditorElement,elements:EditorElement[]):TextRotationResolution{
-  const objectLocalRotation=finite(element.rotation),parentWorldRotation=inheritedObjectRotation(element,elements),geometryAngle=geometryBaselineAngle(element),pixelVisualRotation=transformedBaselineAngle(element,geometryAngle),textLocalRotation=finite(element.textRotation),followObjectAngle=element.followObjectAngle!==false,hasGeometry=Math.abs(geometryAngle)>.0001,hasSurface=Math.abs(pixelVisualRotation-geometryAngle)>.0001,visualRotationSource=hasGeometry?(hasSurface?"geometry+surface-transform":"geometry"):(hasSurface?"surface-transform":"object-transform"),rotationInheritedByRobloxParent=parentWorldRotation+objectLocalRotation,ownerEffectiveWorldRotation=rotationInheritedByRobloxParent+pixelVisualRotation,desiredWorldRotation=followObjectAngle?ownerEffectiveWorldRotation+textLocalRotation:textLocalRotation,textLabelRotation=desiredWorldRotation-rotationInheritedByRobloxParent,standaloneTextRotation=desiredWorldRotation-parentWorldRotation,editorDesiredAfterObject=desiredWorldRotation-objectLocalRotation,editorTextLocalRotation=inverseBaselineAngle(visualLinearTransform(element),editorDesiredAfterObject);
-  return{objectLocalRotation,parentWorldRotation,geometryBaselineAngle:geometryAngle,pixelVisualRotation,textLocalRotation,followObjectAngle,visualRotationSource,ownerEffectiveWorldRotation,rotationInheritedByRobloxParent,textLabelRotation,standaloneTextRotation,finalTextWorldRotation:rotationInheritedByRobloxParent+textLabelRotation,editorTextLocalRotation};
+function orientationFor(element:EditorElement,axis:GeometryAxisAnalysis){const kind=geometryKindForElement(element),surfaceHorizontal=transformedBaselineAngle(element,0),autoFollows=(axis.reliable&&isDirectionalCaptionGeometry(kind))||Math.abs(surfaceHorizontal)>.01,requested:TextOrientation=element.textOrientation??(element.followObjectAngle===false?"custom":"auto"),resolved:Exclude<TextOrientation,"auto">=requested==="auto"?(autoFollows?"follow-shape":"horizontal"):requested==="follow-shape"&&(axis.reliable||Math.abs(surfaceHorizontal)>.01)?"follow-shape":requested==="follow-shape"?"horizontal":requested;return{requested,resolved,surfaceHorizontal};}
+function baseCaption(element:EditorElement){const axis=geometryCaptionAxis(element),orientation=orientationFor(element,axis),useGeometry=orientation.resolved==="follow-shape"&&axis.reliable,safe=captionSafeRegion(element,axis,useGeometry),shapeAngle=orientation.resolved==="follow-shape"?transformedBaselineAngle(element,safe.angle):0,transform=visualLinearTransform(element),visualCenter=transformPoint(element,safe.center),rawXAxis={x:Math.cos(radians(safe.angle)),y:Math.sin(radians(safe.angle))},rawYAxis={x:-rawXAxis.y,y:rawXAxis.x},visualXAxis=transformVector(transform,rawXAxis),visualYAxis=transformVector(transform,rawYAxis),visualSize={width:safe.width*Math.hypot(visualXAxis.x,visualXAxis.y),height:safe.height*Math.hypot(visualYAxis.x,visualYAxis.y)};return{axis,orientation,safe,shapeAngle,transform,visualCenter,visualSize};}
+function sharedGroupKey(element:EditorElement){return element.sharedCaptionGroup.trim()||`parent:${element.parentId??"root"}`;}
+function fittedSize(element:EditorElement){const base=baseCaption(element);return fitTextToCaption(element,base.safe.width,base.safe.height);}
+function resolvedCaptionTextSize(element:EditorElement,elements:EditorElement[],safe:SafeRegion){const mode=textSizingMode(element);if(mode!=="fit-geometry")return{size:designFontSize(element),measurement:measureNativeText(element,designFontSize(element)),shared:false,group:""};const own=fitTextToCaption(element,safe.width,safe.height),group=sharedGroupKey(element);if(!element.sharedCaptionSize)return{size:own.size,measurement:own.measurement,shared:false,group:""};const members=elements.filter((candidate)=>(candidate.type==="text"||candidate.type==="button")&&!candidate.hidden&&textSizingMode(candidate)==="fit-geometry"&&candidate.sharedCaptionSize&&sharedGroupKey(candidate)===group),size=Math.min(own.size,...members.map((candidate)=>fittedSize(candidate).size));return{size,measurement:measureNativeText(element,size),shared:members.length>1,group};}
+
+/** Canonical vector-derived caption source shared by editor preview, manifest export, sync diagnostics, and Studio verification. */
+export function resolveCaptionGeometry(element:EditorElement,elements:EditorElement[]):TextRotationResolution{
+  const base=baseCaption(element),{axis,orientation,safe,shapeAngle,transform,visualCenter,visualSize}=base,textLocalRotation=finite(element.textRotation),captionAngle=normalizeAngle(shapeAngle+textLocalRotation),objectLocalRotation=finite(element.rotation),parentWorldRotation=inheritedObjectRotation(element,elements),rotationInheritedByRobloxParent=parentWorldRotation+objectLocalRotation,ownerEffectiveWorldRotation=rotationInheritedByRobloxParent+shapeAngle,desiredWorldRotation=rotationInheritedByRobloxParent+captionAngle,textLabelRotation=captionAngle,standaloneTextRotation=objectLocalRotation+captionAngle,editorTextLocalRotation=inverseBaselineAngle(transform,captionAngle),hasGeometry=axis.reliable&&Math.abs(axis.angle)>.0001,hasSurface=Math.abs(shapeAngle-axis.angle)>.0001,visualRotationSource=orientation.resolved==="horizontal"?"horizontal":orientation.resolved==="custom"?"custom":hasGeometry?(hasSurface?"geometry+surface-transform":"geometry-centerline"):(Math.abs(shapeAngle)>.0001?"surface-transform":"object-transform"),captionAxis={x:Math.cos(radians(captionAngle)),y:Math.sin(radians(captionAngle))},captionYAxis={x:-captionAxis.y,y:captionAxis.x},sizing=resolvedCaptionTextSize(element,elements,safe),surfaceQuad=geometrySurfaceQuad(element),geometryTransformKind=quadrilateralKind(surfaceQuad),advancedKind=advancedTextTransformKind(element),transformKind:CaptionTransformKind=geometryTransformKind==="projective"||advancedKind==="projective"?"projective":geometryTransformKind==="affine"||advancedKind==="affine"?"affine":"rectilinear",sourceCorners=[{x:safe.center.x-safe.width/2,y:safe.center.y-safe.height/2},{x:safe.center.x+safe.width/2,y:safe.center.y-safe.height/2},{x:safe.center.x+safe.width/2,y:safe.center.y+safe.height/2},{x:safe.center.x-safe.width/2,y:safe.center.y+safe.height/2}].map((point)=>rotatePoint(point,safe.center,geometryTransformKind==="rectilinear"?editorTextLocalRotation:textLocalRotation)),mappedCorners=geometryTransformKind==="rectilinear"?sourceCorners:sourceCorners.map((point)=>mapElementPointToSurface(element,point,surfaceQuad)),textQuad:TransformQuad={topLeft:mappedCorners[0],topRight:mappedCorners[1],bottomRight:mappedCorners[2],bottomLeft:mappedCorners[3]},textLeft=average([textQuad.topLeft,textQuad.bottomLeft]),textRight=average([textQuad.topRight,textQuad.bottomRight]),captionGeometry:CaptionGeometry={center:safe.center,axisX:{x:Math.cos(radians(shapeAngle)),y:Math.sin(radians(shapeAngle))},axisY:{x:-Math.sin(radians(shapeAngle)),y:Math.cos(radians(shapeAngle))},angleDegrees:shapeAngle,leftBoundary:safe.leftBoundary,rightBoundary:safe.rightBoundary,topBoundary:safe.topBoundary,bottomBoundary:safe.bottomBoundary,safeWidth:safe.width,safeHeight:safe.height,paddingLeft:safe.padding.left,paddingRight:safe.padding.right,paddingTop:safe.padding.top,paddingBottom:safe.padding.bottom,visualCenter,visualSize,usesShapeSafeRegion:safe.usesShapeSafeRegion,axisReliable:axis.reliable,geometryCenterlineAngle:axis.angle,surfaceQuad,textQuad,textBaseline:{from:textLeft,to:textRight},transformKind,requiresExactRaster:requiresExactTextTransform(element),...(geometryTransformKind!=="rectilinear"?{cssTransform:cssMatrixForQuad(textQuad,safe.width,safe.height)}:{})};
+  return{requestedOrientation:orientation.requested,resolvedOrientation:orientation.resolved,axisReliable:axis.reliable,usesShapeSafeRegion:safe.usesShapeSafeRegion,captionGeometry,captionAxis,captionYAxis,captionCenter:safe.center,captionSize:{width:safe.width,height:safe.height},captionVisualCenter:visualCenter,captionContentBounds:{x:visualCenter.x-visualSize.width/2,y:visualCenter.y-visualSize.height/2,width:visualSize.width,height:visualSize.height},captionVisualSize:visualSize,captionAngle,resolvedTextSize:sizing.size,textMeasurement:sizing.measurement,textSizingMode:textSizingMode(element),sharedCaptionSizeApplied:sizing.shared,sharedCaptionGroup:sizing.group,objectLocalRotation,parentWorldRotation,geometryBaselineAngle:axis.angle,pixelVisualRotation:shapeAngle,textLocalRotation,followObjectAngle:orientation.resolved==="follow-shape",visualRotationSource,ownerEffectiveWorldRotation,rotationInheritedByRobloxParent,textLabelRotation,standaloneTextRotation,finalTextWorldRotation:desiredWorldRotation,editorTextLocalRotation};
 }
+
+/** Backwards-compatible name retained for consumers while the canonical implementation is geometry-first. */
+export function resolveTextRotation(element:EditorElement,elements:EditorElement[]){return resolveCaptionGeometry(element,elements);}

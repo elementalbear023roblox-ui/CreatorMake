@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "../lib/editor/project.ts";
 import { reparentLayers, validateLayerReparent } from "../lib/editor/operations.ts";
+import { resolveTextRotation } from "../lib/editor/visual-transform.ts";
 import { createRobloxExport } from "../lib/roblox/exporter.ts";
 import { DEFAULT_ROBLOX_EXPORT_OPTIONS } from "../lib/roblox/types.ts";
 
@@ -37,8 +38,10 @@ test("optional keep-local-position mode is explicit and default remains preserve
 
 test("preserve-world reparenting also preserves effective world rotation",()=>{
   const project=fixture(),main=project.elements.find((item)=>item.id==="MainFrame"),content=project.elements.find((item)=>item.id==="Content"),scroll=project.elements.find((item)=>item.id==="Scroll"),top=project.elements.find((item)=>item.id==="TopBar"),card=project.elements.find((item)=>item.id==="Card3");
-  main.rotation=3;content.rotation=-7;scroll.rotation=5;top.rotation=10;card.rotation=2;card.followObjectAngle=true;card.textRotation=.75;
+  main.rotation=3;content.rotation=-7;scroll.rotation=5;top.rotation=10;card.rotation=2;card.followObjectAngle=true;card.textOrientation="follow-shape";card.textRotation=.75;card.captionOffsetX=4;card.captionOffsetY=-2;card.captionInsets={top:1,right:2,bottom:3,left:4};card.textSizingMode="fit-geometry";card.fitMinTextSize=9;card.fitMaxTextSize=37;card.fitMinHorizontalPadding=13;card.fitMinVerticalPadding=7;card.sharedCaptionSize=true;card.sharedCaptionGroup="menu";card.geometry={...card.geometry,kind:"custom-path",pathData:"M 0 12 L 120 0 L 120 36 L 0 48 Z",nodes:[],closed:true};
   const beforeWorld=main.rotation+content.rotation+scroll.rotation+card.rotation;
+  const beforeCaption=resolveTextRotation(card,project.elements);
   const result=reparentLayers(project,{draggedIds:[card.id],targetId:top.id,position:"inside"});
-  assert.equal(result.ok,true);assert.equal(card.parentId,top.id);assert.equal(main.rotation+top.rotation+card.rotation,beforeWorld);assert.equal(card.followObjectAngle,true);assert.equal(card.textRotation,.75);
+  const afterCaption=resolveTextRotation(card,project.elements);
+  assert.equal(result.ok,true);assert.equal(card.parentId,top.id);assert.equal(main.rotation+top.rotation+card.rotation,beforeWorld);assert.equal(card.followObjectAngle,true);assert.equal(card.textOrientation,"follow-shape");assert.equal(card.textRotation,.75);assert.equal(card.captionOffsetX,4);assert.equal(card.captionOffsetY,-2);assert.deepEqual(card.captionInsets,{top:1,right:2,bottom:3,left:4});assert.equal(card.textSizingMode,"fit-geometry");assert.equal(card.fitMinTextSize,9);assert.equal(card.fitMaxTextSize,37);assert.equal(card.fitMinHorizontalPadding,13);assert.equal(card.fitMinVerticalPadding,7);assert.equal(card.sharedCaptionSize,true);assert.equal(card.sharedCaptionGroup,"menu");assert.ok(Math.abs(beforeCaption.finalTextWorldRotation-afterCaption.finalTextWorldRotation)<1e-9);assert.deepEqual(afterCaption.captionCenter,beforeCaption.captionCenter);
 });
