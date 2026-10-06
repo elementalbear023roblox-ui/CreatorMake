@@ -239,7 +239,7 @@ export type Screen = {
 };
 
 export type ProjectExportOptions = {
-  preset:"FAST_PREVIEW"|"BALANCED"|"ROBLOX_FINAL"|"COMMISSION_FINAL"|"CUSTOM";
+  preset:"FAST_PREVIEW"|"BALANCED"|"ROBLOX_FINAL"|"COMMISSION_FINAL"|"MAX_QUALITY"|"CUSTOM";
   nativeTextLabelExport:boolean;
   renderedVisualQuality:"DRAFT"|"STANDARD"|"HIGH"|"ULTRA"|"MAXIMUM_SAFE";
   pixelAccurateBackgrounds:"ON"|"OFF"|"AUTO";

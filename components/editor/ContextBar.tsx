@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, Boxes, Columns3, Grid3X3, Rows3, X } from "lucide-react";
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, Boxes, Columns3, Grid3X3, PanelTop, Rows3, Scan, X } from "lucide-react";
 import type { Alignment, AlignmentTarget, BooleanOperation } from "@/lib/editor/types";
 import type { RepeatGridOptions } from "@/lib/editor/operations";
 
@@ -13,6 +13,8 @@ type Props = {
   onDistribute: (axis: "horizontal" | "vertical", exactSpacing?: number) => void;
   onStack:(axis:"horizontal"|"vertical",gap:number,alignment:"start"|"center"|"end")=>void;
   onAutoLayout:(axis:"horizontal"|"vertical",gap:number,alignment:"start"|"center"|"end")=>void;
+  onWrapInFrame:(padding:number)=>void;
+  onFitToContents:(padding:number)=>void;
   onRepeatGrid:(options:RepeatGridOptions)=>void;
   onGroup: () => void;
   onUngroup: () => void;
@@ -41,6 +43,8 @@ export function ContextBar(props: Props) {
     <button className="context-text-action" disabled={props.count<2} title="Wrap selection in an editable auto-layout container" onClick={()=>props.onAutoLayout(stackAxis,Number.isFinite(exact)?exact!:16,stackAlign)}>Auto layout</button>
     <div className="repeat-grid-control"><button className={`context-text-action ${repeatOpen?"active":""}`} title="Create an editable repeated grid from the selection" onClick={()=>setRepeatOpen((value)=>!value)}><Grid3X3 size={13}/> Repeat grid</button>{repeatOpen&&<div className="repeat-grid-popover" onPointerDown={(event)=>event.stopPropagation()}><header><div><strong>Repeat Grid</strong><small>Clone the complete selected hierarchy.</small></div><button aria-label="Close Repeat Grid" onClick={()=>setRepeatOpen(false)}><X size={13}/></button></header><div>{([['Columns','columns'],['Rows','rows'],['Gap X','gapX'],['Gap Y','gapY']] as const).map(([label,key])=><label key={key}><span>{label}</span><input aria-label={`Repeat grid ${label.toLowerCase()}`} type="number" min={key.startsWith('gap')?-1000:1} max={key.startsWith('gap')?1000:50} value={repeat[key]} onChange={(event)=>setRepeat((current)=>({...current,[key]:Number(event.target.value)}))}/></label>)}</div><footer><span>{Math.max(1,repeat.columns)*Math.max(1,repeat.rows)} total items</span><button onClick={()=>{props.onRepeatGrid(repeat);setRepeatOpen(false);}}>Create grid</button></footer></div>}</div>
     <button aria-label="Group selection" title="Group selection" disabled={props.count < 2} onClick={props.onGroup}><Boxes size={14}/></button>
+    <button className="context-text-action" title="Create an editable frame around the selection without moving it" onClick={()=>props.onWrapInFrame(0)}><PanelTop size={13}/> Wrap in Frame</button>
+    <button className="context-text-action" title="Resize selected frames to their visible child content" onClick={()=>props.onFitToContents(Number.isFinite(exact)?exact!:16)}><Scan size={13}/> Fit Contents</button>
     {props.canUngroup && <button className="context-text-action" onClick={props.onUngroup}>Ungroup</button>}
     {props.count>=2&&<><span className="context-divider"/><div className="boolean-actions" aria-label="Boolean geometry operations">{(["union","subtract","intersect","exclude","divide"] as BooleanOperation[]).map((operation)=><button key={operation} className="context-text-action" aria-label={`Boolean ${operation}`} title={`Boolean ${operation}`} onClick={()=>props.onBoolean(operation)}>{operation}</button>)}</div></>}
   </div>;

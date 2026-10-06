@@ -43,7 +43,13 @@ export const PROJECT_OPTION_PRESETS: Record<Exclude<ProjectExportOptions["preset
   COMMISSION_FINAL: {
     nativeTextLabelExport: true, renderedVisualQuality: "MAXIMUM_SAFE", internalRenderScale: "AUTO", imageResampling: "BEST_QUALITY",
     robloxImages: "PUBLISHABLE", hierarchyExport: "PRESERVE", multiplayerSafeAssets: "REQUIRE",
-    compatibilityWarnings: "ALL", safeExportCheck: "REQUIRE", effectsQuality: "ULTRA",
+    compatibilityWarnings: "ALL", safeExportCheck: "REQUIRE", effectsQuality: "ULTRA", incrementalSync:true,
+  },
+  MAX_QUALITY: {
+    nativeTextLabelExport:true,renderedVisualQuality:"MAXIMUM_SAFE",pixelAccurateBackgrounds:"AUTO",internalRenderScale:"AUTO",
+    imageResampling:"BEST_QUALITY",backgroundExport:"AUTO",robloxImages:"PUBLISHABLE",hierarchyExport:"PRESERVE",
+    multiplayerSafeAssets:"REQUIRE",incrementalSync:true,compatibilityWarnings:"ALL",safeExportCheck:"REQUIRE",
+    renderedVisualBounds:"SMART",strokeRendering:"AUTO",effectsQuality:"ULTRA",
   },
 };
 

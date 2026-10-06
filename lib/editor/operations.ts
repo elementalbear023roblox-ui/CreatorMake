@@ -46,6 +46,13 @@ export function groupSelection(project: EditorProject) {
   const group = createElement("container", project.elements.length); group.name = "Group"; group.x = bounds.left; group.y = bounds.top; group.width = bounds.width; group.height = bounds.height; group.fill = "transparent"; group.borderColor = "#48d7ff"; group.borderWidth = 1; group.shadow = "none";
   project.elements.forEach((item) => { if (project.selectedIds.includes(item.id)) item.parentId = group.id; }); project.elements.push(group); project.selectedIds = [group.id];
 }
+export function wrapSelectionInFrame(project:EditorProject,padding=0){
+  const roots=hierarchyRootIds(project.elements,project.selectedIds),items=roots.map((id)=>project.elements.find((item)=>item.id===id)).filter((item):item is EditorElement=>Boolean(item));if(!items.length)return;
+  const bounds=logicalBounds(items),inset=Math.max(0,normalizeDesignValue(padding)),parentIds=new Set(items.map((item)=>item.parentId)),frame=createElement("frame",project.elements.length);frame.name="Selection Frame";frame.parentId=parentIds.size===1?items[0].parentId:null;frame.x=normalizeDesignValue(bounds.left-inset);frame.y=normalizeDesignValue(bounds.top-inset);frame.width=normalizeDesignValue(bounds.width+inset*2);frame.height=normalizeDesignValue(bounds.height+inset*2);frame.fill="transparent";frame.borderColor="#48d7ff";frame.borderWidth=1;frame.shadow="none";items.forEach((item)=>{item.parentId=frame.id;});project.elements.push(frame);project.selectedIds=[frame.id];
+}
+export function fitFramesToContents(project:EditorProject,padding=16){
+  const inset=Math.max(0,normalizeDesignValue(padding)),selected=new Set(project.selectedIds);for(const frame of project.elements){if(!selected.has(frame.id)||!canContainChildren(frame))continue;const children=project.elements.filter((item)=>item.parentId===frame.id&&!item.hidden);if(!children.length)continue;const bounds=logicalBounds(children);frame.x=normalizeDesignValue(bounds.left-inset);frame.y=normalizeDesignValue(bounds.top-inset);frame.width=normalizeDesignValue(bounds.width+inset*2);frame.height=normalizeDesignValue(bounds.height+inset*2);}
+}
 export function ungroupSelection(project: EditorProject) {
   const groups = new Set(project.selectedIds); const childIds: string[] = []; project.elements.forEach((item) => { if (item.parentId && groups.has(item.parentId)) { item.parentId = null; childIds.push(item.id); } }); project.elements = project.elements.filter((item) => !groups.has(item.id) || item.name !== "Group"); project.selectedIds = childIds;
 }

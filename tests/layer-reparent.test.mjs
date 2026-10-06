@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "../lib/editor/project.ts";
-import { reparentLayers, validateLayerReparent } from "../lib/editor/operations.ts";
+import { fitFramesToContents, reparentLayers, validateLayerReparent, wrapSelectionInFrame } from "../lib/editor/operations.ts";
 import { resolveTextRotation } from "../lib/editor/visual-transform.ts";
 import { createRobloxExport } from "../lib/roblox/exporter.ts";
 import { DEFAULT_ROBLOX_EXPORT_OPTIONS } from "../lib/roblox/types.ts";
@@ -44,4 +44,10 @@ test("preserve-world reparenting also preserves effective world rotation",()=>{
   const result=reparentLayers(project,{draggedIds:[card.id],targetId:top.id,position:"inside"});
   const afterCaption=resolveTextRotation(card,project.elements);
   assert.equal(result.ok,true);assert.equal(card.parentId,top.id);assert.equal(main.rotation+top.rotation+card.rotation,beforeWorld);assert.equal(card.followObjectAngle,true);assert.equal(card.textOrientation,"follow-shape");assert.equal(card.textRotation,.75);assert.equal(card.captionOffsetX,4);assert.equal(card.captionOffsetY,-2);assert.deepEqual(card.captionInsets,{top:1,right:2,bottom:3,left:4});assert.equal(card.textSizingMode,"fit-geometry");assert.equal(card.fitMinTextSize,9);assert.equal(card.fitMaxTextSize,37);assert.equal(card.fitMinHorizontalPadding,13);assert.equal(card.fitMinVerticalPadding,7);assert.equal(card.sharedCaptionSize,true);assert.equal(card.sharedCaptionGroup,"menu");assert.ok(Math.abs(beforeCaption.finalTextWorldRotation-afterCaption.finalTextWorldRotation)<1e-9);assert.deepEqual(afterCaption.captionCenter,beforeCaption.captionCenter);
+});
+
+test("Wrap in Frame preserves world positions and Fit Contents applies explicit padding",()=>{
+  const project=fixture(),one=project.elements.find((item)=>item.id==="Card1"),two=project.elements.find((item)=>item.id==="Card2"),before=[{x:one.x,y:one.y},{x:two.x,y:two.y}];project.selectedIds=[one.id,two.id];
+  wrapSelectionInFrame(project,0);const frame=project.elements.find((item)=>item.id===project.selectedIds[0]);assert.equal(frame.type,"frame");assert.equal(frame.parentId,"Scroll");assert.deepEqual([{x:one.x,y:one.y},{x:two.x,y:two.y}],before);assert.equal(one.parentId,frame.id);assert.equal(two.parentId,frame.id);assert.deepEqual({x:frame.x,y:frame.y,width:frame.width,height:frame.height},{x:160,y:230,width:120,height:112});
+  one.x=176;one.y=246;two.x=306;two.y=310;project.selectedIds=[frame.id];fitFramesToContents(project,16);assert.deepEqual({x:frame.x,y:frame.y,width:frame.width,height:frame.height},{x:160,y:230,width:282,height:144});assert.deepEqual([{x:one.x,y:one.y},{x:two.x,y:two.y}],[{x:176,y:246},{x:306,y:310}]);
 });
