@@ -97,14 +97,23 @@ test("ORIGINAL forces native objects and reports visual limitations instead of r
   assert.equal(node.className,"Frame");assert.equal(result.manifest.nodes.find((item)=>item.sourceId==="original::visual"),undefined);
 });
 
-test("IMAGE renders a simple frame while preserving button text and interaction",()=>{
+test("explicit Button IMAGE flattens caption and surface into one premium clickable ImageButton",()=>{
   const frame=createElement("frame");Object.assign(frame,{id:"image-frame",robloxExportMode:"IMAGE",shadow:"none"});
-  const button=createElement("button");Object.assign(button,{id:"image-button",robloxExportMode:"IMAGE",text:"Car Color",shadow:"none",geometry:{...button.geometry,kind:"trapezoid",skew:10}});
+  const button=createElement("button");Object.assign(button,{id:"image-button",name:"CarColor",robloxExportMode:"IMAGE",text:"Car Color",width:400,height:70,shadow:"none",geometry:{...button.geometry,kind:"trapezoid",skew:10}});
   const project=createProject("Image");project.elements=[frame,button];
-  const plans=planPixelAccurateAssets(project,options);assert.deepEqual(plans.map((asset)=>asset.sourceId),["image-frame","image-button::background"]);
+  const finalOptions={...options,renderScale:8,effectsQuality:"ULTRA",imageResampling:"BEST_QUALITY"},plans=planPixelAccurateAssets(project,finalOptions);assert.deepEqual(plans.map((asset)=>asset.sourceId),["image-frame","image-button"]);
+  const decision=classifyRobloxElement(button);assert.equal(decision.rasterPart,"full");assert.equal(decision.nativeText,false);assert.equal(decision.resolvedLabel,"Flattened Premium ImageButton");
+  const buttonPlan=plans.find((asset)=>asset.sourceId==="image-button");assert.equal(buttonPlan.visualPart,"full");assert.equal(buttonPlan.layoutWidth,400);assert.equal(buttonPlan.layoutHeight,70);assert.ok(buttonPlan.internalRenderPixelWidth>=2400);assert.ok(buttonPlan.internalRenderPixelHeight>=420);
   const mapped=plans.map((asset,index)=>({...asset,status:"mapped",robloxAssetId:`rbxassetid://${7000+index}`})),result=createRobloxExport(project,options,mapped),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node]));
   assert.equal(byId.get("image-frame").className,"Frame");assert.equal(byId.get("image-frame::visual").className,"ImageLabel");
-  assert.equal(byId.get("image-button").className,"ImageButton");assert.equal(byId.get("image-button").properties.Active,true);assert.equal(byId.get("image-button::text").className,"TextLabel");assert.equal(byId.get("image-button::text").properties.Text,"Car Color");
+  const exportedButton=byId.get("image-button");assert.equal(exportedButton.className,"ImageButton");assert.equal(exportedButton.properties.Active,true);assert.equal(exportedButton.properties.Selectable,true);assert.equal(exportedButton.properties.Image,"rbxassetid://7001");assert.deepEqual(exportedButton.properties.Size,{kind:"UDim2",xScale:0,xOffset:400,yScale:0,yOffset:70});assert.equal(exportedButton.attributes.CreatorMakeCaptionBaked,true);assert.equal(exportedButton.attributes.CreatorMakeLogicalHitbox,true);assert.equal(byId.get("image-button::text"),undefined);
+  const changed=structuredClone(button);changed.text="Vehicle Color";assert.notEqual(visualHash(button,"full"),visualHash(changed,"full"),"baked caption changes must invalidate the full visual");
+  const auto=structuredClone(button);auto.robloxExportMode="AUTO";assert.equal(classifyRobloxElement(auto).nativeText,true,"AUTO must keep the existing native-caption architecture");
+});
+
+test("dynamic Button IMAGE reports that runtime caption changes need another export strategy",()=>{
+  const button=createElement("button");Object.assign(button,{robloxExportMode:"IMAGE",dynamicText:true});const decision=classifyRobloxElement(button);
+  assert.equal(decision.nativeText,false);assert.match(decision.reasons.join(" "),/runtime text changes require Auto or Original/i);
 });
 
 test("IMAGE rasterizes standalone text without losing the editable source value",()=>{
