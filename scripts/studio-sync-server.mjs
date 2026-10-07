@@ -345,12 +345,17 @@ function createLayoutDiagnostics(manifest) {
     const height = Number(size.yScale ?? 0) * parentHeight + Number(size.yOffset ?? 0);
     const x = Number(position.xScale ?? 0) * parentWidth + Number(position.xOffset ?? 0) - Number(anchor.x ?? 0) * width;
     const y = Number(position.yScale ?? 0) * parentHeight + Number(position.yOffset ?? 0) - Number(anchor.y ?? 0) * height;
-    const visualNode=(manifest?.nodes??[]).find((candidate)=>candidate.parentSourceId===node.sourceId&&["Visual","BackgroundImage","Background","PixelText"].includes(candidate.attributes?.CreatorMakeRole));
+    const visualNode=(manifest?.nodes??[]).find((candidate)=>candidate.parentSourceId===node.sourceId&&["Visual","BackgroundImage","Background","PixelText","TextImage","TransformedText"].includes(candidate.attributes?.CreatorMakeRole));
     const visualPosition=visualNode?.properties?.Position??{},visualSize=visualNode?.properties?.Size??{};
     const visualX=Number(visualPosition.xScale??0)*width+Number(visualPosition.xOffset??0),visualY=Number(visualPosition.yScale??0)*height+Number(visualPosition.yOffset??0),visualWidth=Number(visualSize.xScale??0)*width+Number(visualSize.xOffset??0),visualHeight=Number(visualSize.yScale??0)*height+Number(visualSize.yOffset??0);
     return {
       name: node.name,
       sourceId: node.sourceId,
+      exportAs: node.attributes?.CreatorMakeExportMode ?? "AUTO",
+      resolvedArchitecture: node.attributes?.CreatorMakeVisualArchitecture ?? "LEGACY_INFERRED",
+      requiresVisualWrapper: node.attributes?.CreatorMakeNeedsVisualWrapper === true,
+      hasInnerVisual: Boolean(visualNode),
+      validation: node.attributes?.CreatorMakeExpectsVisualChild === true && !visualNode ? "FAIL" : "PASS",
       layout: {
         x: node.attributes.CreatorMakeLayoutX,
         y: node.attributes.CreatorMakeLayoutY,

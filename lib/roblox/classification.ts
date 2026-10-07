@@ -5,6 +5,19 @@ import type { RobloxExportClassification, RobloxRasterPart } from "./types.ts";
 
 export type RobloxElementClassification={classification:RobloxExportClassification;rasterPart?:RobloxRasterPart;intendedRobloxClass:string;interactionEnabled:boolean;nativeText:boolean;reasons:string[];requestedMode:RobloxObjectExportMode;resolvedLabel:string;nativeLimitations:string[]};
 export type RobloxTextExportDecision={mode:"NATIVE";className:"TextLabel"|"TextBox";fontExact:boolean;backgroundFree:boolean;reasons:string[]};
+export type RobloxVisualArchitectureMode="NATIVE"|"HYBRID"|"FLATTENED_IMAGE"|"FLATTENED_IMAGE_BUTTON"|"WRAPPER_WITH_VISUAL"|"FUNCTIONAL_WITH_RENDERED_BACKGROUND"|"TEXT_NATIVE"|"SCROLL_NATIVE_WITH_RENDERED_BACKGROUND";
+export type RobloxVisualBounds={x:number;y:number;width:number;height:number};
+export type RobloxVisualArchitecture={
+  mode:RobloxVisualArchitectureMode;
+  logicalBounds:RobloxVisualBounds;
+  visualBounds:RobloxVisualBounds;
+  rasterScale:number;
+  needsVisualWrapper:boolean;
+  expectsVisualChild:boolean;
+  hasNativeText:boolean;
+  textBaked:boolean;
+  interactiveRootType:string;
+};
 
 const close=(a:number,b:number)=>Math.abs(a-b)<.001;
 const hasShadow=(value:string)=>Boolean(value&&value!=="none");
@@ -73,3 +86,16 @@ export function classifyRobloxElement(element:EditorElement,projectDefault:Roblo
 }
 
 export function classifyRobloxElements(elements:EditorElement[],projectDefault:RobloxObjectExportMode="AUTO"){return new Map(elements.map((element)=>[element.id,classifyRobloxElement(element,projectDefault)]));}
+
+const visualFitsLogicalBounds=(logical:RobloxVisualBounds,visual:RobloxVisualBounds)=>close(visual.x,logical.x)&&close(visual.y,logical.y)&&close(visual.width,logical.width)&&close(visual.height,logical.height);
+
+/** Canonical export-structure resolver shared by manifest generation and fidelity validation. */
+export function resolveRobloxVisualArchitecture(element:EditorElement,projectDefault:RobloxObjectExportMode="AUTO",visualBounds:RobloxVisualBounds={x:0,y:0,width:element.width,height:element.height},rasterScale=0):RobloxVisualArchitecture{
+  const classification=classifyRobloxElement(element,projectDefault),logicalBounds={x:0,y:0,width:element.width,height:element.height},overflow=!visualFitsLogicalBounds(logicalBounds,visualBounds),flattenedButton=element.type==="button"&&classification.requestedMode==="IMAGE"&&!classification.nativeText;
+  if(flattenedButton)return{mode:overflow?"WRAPPER_WITH_VISUAL":"FLATTENED_IMAGE_BUTTON",logicalBounds,visualBounds,rasterScale,needsVisualWrapper:overflow,expectsVisualChild:overflow,hasNativeText:false,textBaked:true,interactiveRootType:"ImageButton"};
+  if(classification.classification==="NATIVE")return{mode:element.type==="text"||element.type==="button"?"TEXT_NATIVE":"NATIVE",logicalBounds,visualBounds,rasterScale,needsVisualWrapper:false,expectsVisualChild:false,hasNativeText:classification.nativeText,textBaked:false,interactiveRootType:classification.intendedRobloxClass};
+  if(element.type==="scrolling-frame")return{mode:"SCROLL_NATIVE_WITH_RENDERED_BACKGROUND",logicalBounds,visualBounds,rasterScale,needsVisualWrapper:overflow,expectsVisualChild:true,hasNativeText:false,textBaked:false,interactiveRootType:"ScrollingFrame"};
+  if(classification.nativeText)return{mode:classification.rasterPart?"FUNCTIONAL_WITH_RENDERED_BACKGROUND":"HYBRID",logicalBounds,visualBounds,rasterScale,needsVisualWrapper:overflow,expectsVisualChild:Boolean(classification.rasterPart),hasNativeText:true,textBaked:false,interactiveRootType:classification.intendedRobloxClass};
+  const functional=element.type==="frame"||element.type==="container"||element.type==="image-button";
+  return{mode:functional||overflow?"WRAPPER_WITH_VISUAL":"FLATTENED_IMAGE",logicalBounds,visualBounds,rasterScale,needsVisualWrapper:overflow,expectsVisualChild:functional||overflow,hasNativeText:false,textBaked:element.type==="text"||element.type==="button",interactiveRootType:classification.intendedRobloxClass};
+}
