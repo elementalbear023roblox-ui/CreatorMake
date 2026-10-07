@@ -42,7 +42,7 @@ export function createElement(type: ElementType, index = 0): EditorElement {
     textStrokeColor: "#000000", textStrokeWidth: 0, textStrokeOpacity: 100, textStrokePosition: "center" as const, textShadows: [], textBoxMode: "fixed" as const, autoFit: false, textSizingMode: "fixed" as const, followObjectAngle:true, textOrientation:"auto" as const, textRotation:0, captionOffsetX:0, captionOffsetY:0, captionInsets:{top:0,right:0,bottom:0,left:0}, showCaptionGeometry:false, fitMinTextSize:8, fitMaxTextSize:48, fitMinHorizontalPadding:12, fitMinVerticalPadding:8, sharedCaptionSize:false, sharedCaptionGroup:"", responsiveMinTextSize: 8, responsiveMaxTextSize: 18, textAlign: "left" as const, padding: 12, textPadding: { top: 12, right: 12, bottom: 12, left: 12 },
     z: 0, rotateX: 0, rotateY: 0, perspective: 900, perspectiveOriginX: 50, perspectiveOriginY: 50, translateZ: 0, skewX: 0, skewY: 0, locked: false, hidden: false,
     imageAssetId:null,imageFit:"fit" as const,imageCrop:{x:0,y:0,width:100,height:100},imageOffsetX:0,imageOffsetY:0,imageScale:1,imageScaleX:1,imageScaleY:1,imageRotation:0,imageOpacity:100,imageFlipX:false,imageFlipY:false,imageTileWidth:128,imageTileHeight:128,imageBrightness:100,imageContrast:100,imageSaturation:100,imageHue:0,imageBlur:0,imageTint:"#ffffff",imageTintOpacity:0,imageStateAssetIds:{default:null,hover:null,pressed:null,disabled:null,selected:null},imagePreviewState:"default" as const,sliceCenter:null,sliceScale:1,
-    textRobloxExportMode:"AUTO" as const,dynamicText:false,richText:false,textInput:false,
+    robloxExportMode:null,textRobloxExportMode:"AUTO" as const,dynamicText:false,richText:false,textInput:false,
   };
   if (type === "frame") return { ...base, name: "Frame", x: 230 + offset, y: 130 + offset, width: 460, height: 320, fill: "#181c2b", text: "" };
   if (type === "container") return { ...base, name: "Container", x: 280 + offset, y: 170 + offset, width: 320, height: 220, fill: "#161a26", borderColor: "#4c5268", text: "" };
@@ -84,7 +84,7 @@ export function createProject(name = "Untitled UI",projectKind:EditorProject["pr
     id: createId("project"), name, createdAt: now, updatedAt: now,
     platform: "Roblox", status: "Draft", tags: [], archived: false, projectKind, commissionBrief:structuredClone(EMPTY_COMMISSION_BRIEF),
     screen: { id: createId("screen"), name: "Desktop", width: 960, height: 600, background: "#0e1220", x: 2100, y: 1400 },
-    elements: [], assets: [], assetFolders: ["Logos","Icons","Characters","Textures","Backgrounds","Client Assets"], selectedIds: [], references: [], activePresetIds: [], favoritePresetIds: [], favoriteFontIds: [], recentFontIds: [], customFrameRecipes: [], researchCache: {}, generationHistory: [], projectFonts: [], fontPolicy: {allowSyntheticWeight:false,allowSyntheticItalic:false}, exportOptions: structuredClone(DEFAULT_PROJECT_EXPORT_OPTIONS),
+    elements: [], assets: [], assetFolders: ["Logos","Icons","Characters","Textures","Backgrounds","Client Assets"], selectedIds: [], references: [], activePresetIds: [], favoritePresetIds: [], favoriteFontIds: [], recentFontIds: [], customFrameRecipes: [], researchCache: {}, generationHistory: [], projectFonts: [], fontPolicy: {allowSyntheticWeight:false,allowSyntheticItalic:false}, exportOptions: {...structuredClone(DEFAULT_PROJECT_EXPORT_OPTIONS),...(projectKind==="commission"?{robloxImages:"PUBLISHABLE" as const}: {})},
   };
 }
 

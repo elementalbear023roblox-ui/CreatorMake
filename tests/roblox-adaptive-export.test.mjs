@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createElement } from "../lib/editor/project.ts";
+import { createElement, createProject } from "../lib/editor/project.ts";
 import { resolveTextRotation } from "../lib/editor/visual-transform.ts";
 import { classifyRobloxElement } from "../lib/roblox/classification.ts";
 import { createRobloxExport } from "../lib/roblox/exporter.ts";
@@ -76,4 +76,57 @@ test("image objects require a real Roblox asset ID before adaptive native export
   assert.equal(classifyRobloxElement(image).intendedRobloxClass,"ImageLabel");
   const button=createElement("image-button");button.roblox.imageAssetId="rbxassetid://987654";
   assert.equal(classifyRobloxElement(button).intendedRobloxClass,"ImageButton");
+});
+
+test("AUTO keeps simple frames native and renders complex frames through the premium pipeline",()=>{
+  const simple=createElement("frame");Object.assign(simple,{id:"simple",shadow:"none"});
+  const complex=createElement("frame");Object.assign(complex,{id:"complex",shadow:"0 8px 24px rgba(0,0,0,.45)"});
+  const project=createProject("Policy");project.elements=[simple,complex];
+  assert.equal(classifyRobloxElement(simple).classification,"NATIVE");
+  assert.equal(classifyRobloxElement(complex).classification,"HYBRID");
+  assert.deepEqual(planPixelAccurateAssets(project,options).map((asset)=>asset.sourceId),["complex"]);
+});
+
+test("ORIGINAL forces native objects and reports visual limitations instead of rendering PNGs",()=>{
+  const frame=createElement("frame");Object.assign(frame,{id:"original",robloxExportMode:"ORIGINAL",shadow:"0 8px 24px rgba(0,0,0,.45)",geometry:{...frame.geometry,kind:"trapezoid",skew:10}});
+  const project=createProject("Original");project.elements=[frame];
+  const decision=classifyRobloxElement(frame);
+  assert.equal(decision.classification,"NATIVE");assert.equal(decision.requestedMode,"ORIGINAL");assert.ok(decision.nativeLimitations.length>0);
+  assert.equal(planPixelAccurateAssets(project,options).length,0);
+  const result=createRobloxExport(project,options,[]),node=result.manifest.nodes.find((item)=>item.sourceId==="original");
+  assert.equal(node.className,"Frame");assert.equal(result.manifest.nodes.find((item)=>item.sourceId==="original::visual"),undefined);
+});
+
+test("IMAGE renders a simple frame while preserving button text and interaction",()=>{
+  const frame=createElement("frame");Object.assign(frame,{id:"image-frame",robloxExportMode:"IMAGE",shadow:"none"});
+  const button=createElement("button");Object.assign(button,{id:"image-button",robloxExportMode:"IMAGE",text:"Car Color",shadow:"none",geometry:{...button.geometry,kind:"trapezoid",skew:10}});
+  const project=createProject("Image");project.elements=[frame,button];
+  const plans=planPixelAccurateAssets(project,options);assert.deepEqual(plans.map((asset)=>asset.sourceId),["image-frame","image-button::background"]);
+  const mapped=plans.map((asset,index)=>({...asset,status:"mapped",robloxAssetId:`rbxassetid://${7000+index}`})),result=createRobloxExport(project,options,mapped),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node]));
+  assert.equal(byId.get("image-frame").className,"Frame");assert.equal(byId.get("image-frame::visual").className,"ImageLabel");
+  assert.equal(byId.get("image-button").className,"ImageButton");assert.equal(byId.get("image-button").properties.Active,true);assert.equal(byId.get("image-button::text").className,"TextLabel");assert.equal(byId.get("image-button::text").properties.Text,"Car Color");
+});
+
+test("IMAGE rasterizes standalone text without losing the editable source value",()=>{
+  const label=createElement("text");Object.assign(label,{id:"image-text",robloxExportMode:"IMAGE",text:"EXIT GARAGE",fill:"transparent",borderColor:"transparent",shadow:"none"});
+  const project=createProject("Text Image");project.elements=[label];
+  const [asset]=planPixelAccurateAssets(project,options);assert.equal(asset.sourceId,"image-text::pixel-text");assert.equal(asset.sourceElementId,"image-text");assert.equal(asset.visualPart,"full");
+  const result=createRobloxExport(project,options,[{...asset,status:"mapped",robloxAssetId:"rbxassetid://8000"}]),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node]));
+  assert.equal(byId.get("image-text::visual").className,"ImageLabel");assert.equal(byId.get("image-text::text"),undefined);assert.equal(project.elements[0].text,"EXIT GARAGE");
+});
+
+test("project defaults apply until an object explicitly overrides them",()=>{
+  const inherited=createElement("frame");Object.assign(inherited,{id:"inherited",shadow:"none"});
+  const overridden=createElement("frame");Object.assign(overridden,{id:"overridden",robloxExportMode:"ORIGINAL",shadow:"none"});
+  const project=createProject("Defaults");project.exportOptions.defaultRobloxExportMode="IMAGE";project.elements=[inherited,overridden];
+  assert.equal(classifyRobloxElement(inherited,project.exportOptions.defaultRobloxExportMode).requestedMode,"IMAGE");
+  assert.equal(classifyRobloxElement(overridden,project.exportOptions.defaultRobloxExportMode).requestedMode,"ORIGINAL");
+  assert.deepEqual(planPixelAccurateAssets(project,options).map((asset)=>asset.sourceId),["inherited"]);
+});
+
+test("IMAGE preserves a native scrolling container around its premium visual",()=>{
+  const scroll=createElement("scrolling-frame");Object.assign(scroll,{id:"scroll",robloxExportMode:"IMAGE",shadow:"none"});
+  const project=createProject("Scroll");project.elements=[scroll];
+  const [asset]=planPixelAccurateAssets(project,options),result=createRobloxExport(project,options,[{...asset,status:"mapped",robloxAssetId:"rbxassetid://9000"}]),byId=new Map(result.manifest.nodes.map((node)=>[node.sourceId,node]));
+  assert.equal(byId.get("scroll").className,"Frame");assert.equal(byId.get("scroll::scroll-area").className,"ScrollingFrame");assert.equal(byId.get("scroll::scroll-area").properties.Active,true);assert.ok(byId.get("scroll::visual"));
 });

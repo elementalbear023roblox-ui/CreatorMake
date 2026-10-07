@@ -3,6 +3,7 @@ export type ElementType = "frame" | "container" | "scrolling-frame" | "text" | "
 export type ImageFitMode = "fit" | "fill" | "stretch" | "original" | "tile";
 export type ImageState = "default" | "hover" | "pressed" | "disabled" | "selected";
 export type TextRobloxExportMode = "AUTO" | "NATIVE_TEXT" | "PIXEL_ACCURATE" | "NATIVE" | "PIXEL";
+export type RobloxObjectExportMode = "AUTO" | "ORIGINAL" | "IMAGE";
 export type TextSizingMode = "fixed" | "fit-geometry" | "responsive";
 export type TextOrientation = "auto" | "horizontal" | "follow-shape" | "custom";
 export type EditorAsset = {
@@ -217,6 +218,7 @@ export type EditorElement = {
   imagePreviewState: ImageState;
   sliceCenter: { left:number;top:number;right:number;bottom:number } | null;
   sliceScale: number;
+  robloxExportMode: RobloxObjectExportMode | null;
   textRobloxExportMode: TextRobloxExportMode;
   dynamicText: boolean;
   richText: boolean;
@@ -239,6 +241,8 @@ export type Screen = {
 };
 
 export type ProjectExportOptions = {
+  defaultRobloxExportMode:RobloxObjectExportMode;
+  exportQuality:"PREVIEW"|"FINAL";
   preset:"FAST_PREVIEW"|"BALANCED"|"ROBLOX_FINAL"|"COMMISSION_FINAL"|"MAX_QUALITY"|"CUSTOM";
   nativeTextLabelExport:boolean;
   renderedVisualQuality:"DRAFT"|"STANDARD"|"HIGH"|"ULTRA"|"MAXIMUM_SAFE";

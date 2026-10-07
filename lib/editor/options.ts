@@ -2,9 +2,11 @@ import type { ProjectExportOptions } from "./types";
 import type { RobloxRenderScale, RobloxVisualMode } from "../roblox/types";
 
 export const DEFAULT_PROJECT_EXPORT_OPTIONS: ProjectExportOptions = {
+  defaultRobloxExportMode: "AUTO",
+  exportQuality: "FINAL",
   preset: "BALANCED",
   nativeTextLabelExport: true,
-  renderedVisualQuality: "HIGH",
+  renderedVisualQuality: "MAXIMUM_SAFE",
   pixelAccurateBackgrounds: "AUTO",
   internalRenderScale: "AUTO",
   imageResampling: "BEST_QUALITY",
@@ -26,26 +28,30 @@ export const DEFAULT_PROJECT_EXPORT_OPTIONS: ProjectExportOptions = {
   autoUploadChangedVisuals: "ASK",
   renderedVisualBounds: "SMART",
   strokeRendering: "AUTO",
-  effectsQuality: "HIGH",
+  effectsQuality: "ULTRA",
 };
 
 export const PROJECT_OPTION_PRESETS: Record<Exclude<ProjectExportOptions["preset"], "CUSTOM">, Partial<ProjectExportOptions>> = {
   FAST_PREVIEW: {
+    exportQuality: "PREVIEW",
     renderedVisualQuality: "DRAFT", internalRenderScale: "AUTO", imageResampling: "PERFORMANCE",
     robloxImages: "LOCAL_PREVIEW", incrementalSync: true, effectsQuality: "PERFORMANCE", safeExportCheck: "WARN",
   },
   BALANCED: { ...DEFAULT_PROJECT_EXPORT_OPTIONS, preset: undefined },
   ROBLOX_FINAL: {
+    exportQuality: "FINAL",
     nativeTextLabelExport: true, renderedVisualQuality: "ULTRA", internalRenderScale: "AUTO", imageResampling: "BEST_QUALITY",
     robloxImages: "PUBLISHABLE", pixelAccurateBackgrounds: "AUTO", backgroundExport: "AUTO",
     multiplayerSafeAssets: "REQUIRE", safeExportCheck: "REQUIRE", effectsQuality: "ULTRA",
   },
   COMMISSION_FINAL: {
+    exportQuality: "FINAL",
     nativeTextLabelExport: true, renderedVisualQuality: "MAXIMUM_SAFE", internalRenderScale: "AUTO", imageResampling: "BEST_QUALITY",
     robloxImages: "PUBLISHABLE", hierarchyExport: "PRESERVE", multiplayerSafeAssets: "REQUIRE",
     compatibilityWarnings: "ALL", safeExportCheck: "REQUIRE", effectsQuality: "ULTRA", incrementalSync:true,
   },
   MAX_QUALITY: {
+    exportQuality:"FINAL",
     nativeTextLabelExport:true,renderedVisualQuality:"MAXIMUM_SAFE",pixelAccurateBackgrounds:"AUTO",internalRenderScale:"AUTO",
     imageResampling:"BEST_QUALITY",backgroundExport:"AUTO",robloxImages:"PUBLISHABLE",hierarchyExport:"PRESERVE",
     multiplayerSafeAssets:"REQUIRE",incrementalSync:true,compatibilityWarnings:"ALL",safeExportCheck:"REQUIRE",
@@ -66,7 +72,10 @@ const QUALITY_SCALE: Record<ProjectExportOptions["renderedVisualQuality"], Roblo
 };
 
 export function resolveProjectRenderScale(options: ProjectExportOptions): RobloxRenderScale {
-  return options.internalRenderScale === "AUTO" ? QUALITY_SCALE[options.renderedVisualQuality] : Number(options.internalRenderScale) as RobloxRenderScale;
+  if (options.internalRenderScale !== "AUTO") return Number(options.internalRenderScale) as RobloxRenderScale;
+  if (options.exportQuality === "PREVIEW") return 2;
+  if (options.exportQuality === "FINAL") return 8;
+  return QUALITY_SCALE[options.renderedVisualQuality];
 }
 
 export function resolveProjectVisualMode(options: ProjectExportOptions): RobloxVisualMode {

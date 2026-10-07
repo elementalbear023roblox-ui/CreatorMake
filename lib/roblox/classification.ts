@@ -1,9 +1,9 @@
 import { geometryKindForElement } from "../editor/geometry.ts";
-import type { EditorElement } from "../editor/types.ts";
+import type { EditorElement, RobloxObjectExportMode } from "../editor/types.ts";
 import { getRobloxFontCompatibility } from "./fonts.ts";
 import type { RobloxExportClassification, RobloxRasterPart } from "./types.ts";
 
-export type RobloxElementClassification={classification:RobloxExportClassification;rasterPart?:RobloxRasterPart;intendedRobloxClass:string;interactionEnabled:boolean;nativeText:boolean;reasons:string[]};
+export type RobloxElementClassification={classification:RobloxExportClassification;rasterPart?:RobloxRasterPart;intendedRobloxClass:string;interactionEnabled:boolean;nativeText:boolean;reasons:string[];requestedMode:RobloxObjectExportMode;resolvedLabel:string;nativeLimitations:string[]};
 export type RobloxTextExportDecision={mode:"NATIVE";className:"TextLabel"|"TextBox";fontExact:boolean;backgroundFree:boolean;reasons:string[]};
 
 const close=(a:number,b:number)=>Math.abs(a-b)<.001;
@@ -16,6 +16,7 @@ const textEffectsNative=(element:EditorElement)=>close(element.letterSpacing,0)&
 const backgroundFree=(element:EditorElement)=>transparent(element.fill)&&element.gradientType==="none"&&(element.borderWidth<=0||transparent(element.borderColor))&&!hasShadow(element.shadow);
 
 export const hasVisibleTextBackground=(element:EditorElement)=>!backgroundFree(element);
+export const resolveRobloxExportMode=(element:EditorElement,projectDefault:RobloxObjectExportMode="AUTO")=>element.robloxExportMode??projectDefault;
 
 export function classifyTextExport(element:EditorElement):RobloxTextExportDecision{
   const className:RobloxTextExportDecision["className"]=element.textInput?"TextBox":"TextLabel",font=getRobloxFontCompatibility(element.fontFamily),fontExact=font.level==="native",plainSurface=backgroundFree(element),effects=textEffectsNative(element),reasons:string[]=[];
@@ -23,14 +24,15 @@ export function classifyTextExport(element:EditorElement):RobloxTextExportDecisi
   if(!effects)reasons.push("Roblox native text keeps the words editable; unsupported spacing, decoration, shadow, stroke, or transform effects may differ");
   if(!plainSurface)reasons.push("visible background exports separately without text glyphs");
   const pixelOverride=element.textRobloxExportMode==="PIXEL_ACCURATE"||element.textRobloxExportMode==="PIXEL";
-  if(pixelOverride)reasons.push("Pixel text is disabled while Native TextLabel Export is enabled; visible glyphs remain editable Roblox text");
+  if(pixelOverride)reasons.push("Legacy pixel-text preference is ignored unless this object explicitly uses Export As: Image");
   if(!fontExact)reasons.push("editable Roblox text uses the declared compatibility font and reports the fidelity mismatch");
   return{mode:"NATIVE",className,fontExact,backgroundFree:plainSurface,reasons};
 }
 
 const simpleImage=(element:EditorElement)=>Boolean(element.roblox?.imageAssetId&&/^rbxassetid:\/\/\d+$/.test(element.roblox.imageAssetId))&&element.imageBrightness===100&&element.imageContrast===100&&element.imageSaturation===100&&element.imageHue===0&&element.imageBlur===0&&element.imageTintOpacity===0&&element.imageRotation===0&&element.imageScale===1&&element.imageScaleX===1&&element.imageScaleY===1&&element.imageOpacity===100&&!element.imageFlipX&&!element.imageFlipY&&element.imageOffsetX===0&&element.imageOffsetY===0&&element.imageCrop.x===0&&element.imageCrop.y===0&&element.imageCrop.width===100&&element.imageCrop.height===100&&simpleTransform(element);
+type AutomaticClassification=Omit<RobloxElementClassification,"requestedMode"|"resolvedLabel"|"nativeLimitations">;
 
-export function classifyRobloxElement(element:EditorElement):RobloxElementClassification{
+function automaticClassification(element:EditorElement):AutomaticClassification{
   if(element.type==="image"||element.type==="image-button"){
     const native=simpleImage(element),reasons=native?[]:[!/^rbxassetid:\/\/\d+$/.test(element.roblox?.imageAssetId??"")?"image needs a published Roblox asset ID":"image crop or adjustments need exact pixel rendering"];
     return{classification:native?"NATIVE":"RASTERIZED",rasterPart:native?undefined:"full",intendedRobloxClass:element.type==="image-button"?"ImageButton":"ImageLabel",interactionEnabled:element.type==="image-button",nativeText:false,reasons};
@@ -51,4 +53,23 @@ export function classifyRobloxElement(element:EditorElement):RobloxElementClassi
   return{classification:"RASTERIZED",rasterPart:"full",intendedRobloxClass,interactionEnabled:false,nativeText:false,reasons};
 }
 
-export function classifyRobloxElements(elements:EditorElement[]){return new Map(elements.map((element)=>[element.id,classifyRobloxElement(element)]));}
+const nativeClass=(element:EditorElement,automatic:AutomaticClassification)=>element.type==="button"?"ImageButton":element.type==="text"?(element.textInput?"TextBox":"TextLabel"):automatic.intendedRobloxClass;
+
+export function classifyRobloxElement(element:EditorElement,projectDefault:RobloxObjectExportMode="AUTO"):RobloxElementClassification{
+  const requestedMode=resolveRobloxExportMode(element,projectDefault),automatic=automaticClassification(element);
+  if(requestedMode==="ORIGINAL"){
+    const intendedRobloxClass=nativeClass(element,automatic),nativeLimitations=automatic.classification==="NATIVE"?[]:[...new Set(automatic.reasons.length?automatic.reasons:["this visual has no exact native Roblox representation"])];
+    return{classification:"NATIVE",intendedRobloxClass,interactionEnabled:automatic.interactionEnabled,nativeText:element.type==="text"||element.type==="button",reasons:nativeLimitations,requestedMode,resolvedLabel:`Native ${intendedRobloxClass}`,nativeLimitations};
+  }
+  if(requestedMode==="IMAGE"){
+    if(element.type==="button")return{classification:"HYBRID",rasterPart:"background",intendedRobloxClass:"ImageButton",interactionEnabled:true,nativeText:true,reasons:["Image override renders the button appearance while preserving its native caption and click target"],requestedMode,resolvedLabel:"Premium Image + Native Functionality",nativeLimitations:[]};
+    if(element.type==="text"&&element.textInput)return{classification:"HYBRID",rasterPart:"background",intendedRobloxClass:"TextBox",interactionEnabled:true,nativeText:true,reasons:["Editable input remains a native TextBox; its owned background is rendered when visible"],requestedMode,resolvedLabel:"Premium Image + Native TextBox",nativeLimitations:[]};
+    if(element.type==="text")return{classification:"RASTERIZED",rasterPart:"full",intendedRobloxClass:"ImageLabel",interactionEnabled:false,nativeText:false,reasons:["Explicit Image override renders this standalone text exactly"],requestedMode,resolvedLabel:"Premium Text Image",nativeLimitations:[]};
+    const functional=element.type==="scrolling-frame"||element.type==="frame"||element.type==="container";
+    return{classification:functional?"HYBRID":"RASTERIZED",rasterPart:"full",intendedRobloxClass:element.type==="image-button"?"ImageButton":element.type==="scrolling-frame"?"ScrollingFrame":functional?"Frame":"ImageLabel",interactionEnabled:element.type==="image-button",nativeText:false,reasons:["Explicit Image override uses CreatorMake's canonical premium renderer"],requestedMode,resolvedLabel:element.type==="scrolling-frame"?"Premium Image + Native Scrolling":"Premium Image",nativeLimitations:[]};
+  }
+  const resolvedLabel=automatic.classification==="NATIVE"?`Native ${automatic.intendedRobloxClass}`:automatic.classification==="HYBRID"?(automatic.rasterPart?(automatic.nativeText||automatic.interactionEnabled?"Premium Image + Native Functionality":"Premium Image + Native Container"):`Native ${automatic.intendedRobloxClass} + Native Text`):"Premium Image";
+  return{...automatic,requestedMode,resolvedLabel,nativeLimitations:[]};
+}
+
+export function classifyRobloxElements(elements:EditorElement[],projectDefault:RobloxObjectExportMode="AUTO"){return new Map(elements.map((element)=>[element.id,classifyRobloxElement(element,projectDefault)]));}
