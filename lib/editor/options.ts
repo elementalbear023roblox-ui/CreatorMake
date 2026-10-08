@@ -72,9 +72,9 @@ const QUALITY_SCALE: Record<ProjectExportOptions["renderedVisualQuality"], Roblo
 };
 
 export function resolveProjectRenderScale(options: ProjectExportOptions): RobloxRenderScale {
-  if (options.internalRenderScale !== "AUTO") return Number(options.internalRenderScale) as RobloxRenderScale;
   if (options.exportQuality === "PREVIEW") return 2;
   if (options.exportQuality === "FINAL") return 8;
+  if (options.internalRenderScale !== "AUTO") return Number(options.internalRenderScale) as RobloxRenderScale;
   return QUALITY_SCALE[options.renderedVisualQuality];
 }
 

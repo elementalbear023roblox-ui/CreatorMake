@@ -1,5 +1,6 @@
 import { elementStyle } from "./render.ts";
 import type { EditorAsset, EditorElement } from "./types.ts";
+import { CREATORMAKE_MASTER_CAPABILITIES } from "../roblox/image-capabilities.ts";
 import type { RobloxRasterPart } from "../roblox/types.ts";
 
 export type RendererBounds={x:number;y:number;width:number;height:number};
@@ -30,8 +31,8 @@ export type CanvasRendererRaster={
 type Capture={canvas:HTMLCanvasElement;dataUrl:string;bounds:RendererBounds;scale:number;alphaEdgeSafety:boolean;alphaEdgeContact:string[]};
 const XHTML="http://www.w3.org/1999/xhtml";
 const SVG="http://www.w3.org/2000/svg";
-export const MAX_INTERNAL_RENDER_DIMENSION=8192;
-export const MAX_INTERNAL_RENDER_PIXELS=16_777_216;
+export const MAX_INTERNAL_RENDER_DIMENSION=CREATORMAKE_MASTER_CAPABILITIES.absoluteMaxDimension;
+export const MAX_INTERNAL_RENDER_PIXELS=CREATORMAKE_MASTER_CAPABILITIES.absoluteMaxPixels;
 const FIDELITY_THRESHOLD=98.5;
 export const RASTER_SAFETY_PADDING=3;
 
@@ -44,6 +45,7 @@ export type AlphaBoundsValidation={
 };
 
 const waitForPaint=()=>new Promise<void>((resolve)=>requestAnimationFrame(()=>resolve()));
+const throwIfAborted=(signal?:AbortSignal)=>{if(signal?.aborted)throw new DOMException("Final image rendering was cancelled.","AbortError");};
 const finite=(value:number,fallback=0)=>Number.isFinite(value)?value:fallback;
 const effectExtent=(value:string)=>{
   if(!value||value==="none")return 0;
@@ -111,22 +113,29 @@ export function calculateAlphaCropBounds(width:number,height:number,data:Uint8Cl
   return{crop:{x:cropX,y:cropY,width:cropWidth,height:cropHeight},visible:{x:minX,y:minY,width:maxX-minX+1,height:maxY-minY+1},touchesSourceEdge,touchesCropEdge,passed:!Object.values(touchesCropEdge).some(Boolean)};
 }
 
-function alphaCrop(canvas:HTMLCanvasElement,bounds:RendererBounds,scale:number):Capture{
+const pngDataUrl=async(canvas:HTMLCanvasElement,signal?:AbortSignal)=>new Promise<string>((resolve,reject)=>{
+  if(signal?.aborted){reject(new DOMException("Final image rendering was cancelled.","AbortError"));return;}
+  canvas.toBlob((blob)=>{if(!blob){reject(new Error("CreatorMake could not encode the lossless PNG master."));return;}const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(reader.error??new Error("CreatorMake could not read the lossless PNG master."));reader.readAsDataURL(blob);},"image/png");
+});
+
+async function alphaCrop(canvas:HTMLCanvasElement,bounds:RendererBounds,scale:number,signal?:AbortSignal):Promise<Capture>{
   const context=canvas.getContext("2d",{willReadFrequently:true});
   if(!context)throw new Error("Canvas 2D pixel inspection is unavailable.");
   const pixels=context.getImageData(0,0,canvas.width,canvas.height),validation=calculateAlphaCropBounds(canvas.width,canvas.height,pixels.data,scale),{x:minX,y:minY,width,height}=validation.crop,cropped=document.createElement("canvas");cropped.width=width;cropped.height=height;
   const croppedContext=cropped.getContext("2d",{willReadFrequently:true});if(!croppedContext)throw new Error("Canvas 2D rendering is unavailable.");
   croppedContext.putImageData(context.getImageData(minX,minY,width,height),0,0);
   const exact={x:bounds.x+minX/scale,y:bounds.y+minY/scale,width:width/scale,height:height/scale};
-  return{canvas:cropped,dataUrl:cropped.toDataURL("image/png"),bounds:exact,scale,alphaEdgeSafety:validation.passed,alphaEdgeContact:Object.entries(validation.touchesCropEdge).filter(([,touches])=>touches).map(([edge])=>edge)};
+  return{canvas:cropped,dataUrl:await pngDataUrl(cropped,signal),bounds:exact,scale,alphaEdgeSafety:validation.passed,alphaEdgeContact:Object.entries(validation.touchesCropEdge).filter(([,touches])=>touches).map(([edge])=>edge)};
 }
 
-async function captureNode(source:HTMLElement,stage:HTMLElement,requestedScale:number,margin:number,fontFaceCss=""):Promise<Capture>{
+async function captureNode(source:HTMLElement,stage:HTMLElement,requestedScale:number,margin:number,fontFaceCss="",signal?:AbortSignal):Promise<Capture>{
+  throwIfAborted(signal);
   const stageRect=stage.getBoundingClientRect(),rectangles=[source,...Array.from(source.querySelectorAll<HTMLElement|SVGElement>("*"))].map((node)=>node.getBoundingClientRect()).filter((rect)=>Number.isFinite(rect.left)&&Number.isFinite(rect.top)&&rect.width>0&&rect.height>0);
   const left=Math.min(...rectangles.map((rect)=>rect.left)),top=Math.min(...rectangles.map((rect)=>rect.top)),right=Math.max(...rectangles.map((rect)=>rect.right)),bottom=Math.max(...rectangles.map((rect)=>rect.bottom));
   const measured={x:left-stageRect.left,y:top-stageRect.top,width:Math.max(1,right-left),height:Math.max(1,bottom-top)};
   let lastEdgeContact:string[]=[];
   for(let attempt=0;attempt<3;attempt++){
+    throwIfAborted(signal);
     const expandedMargin=margin*(attempt+1)+attempt*RASTER_SAFETY_PADDING,provisional={x:measured.x-expandedMargin,y:measured.y-expandedMargin,width:measured.width+expandedMargin*2,height:measured.height+expandedMargin*2};
     const memorySafeScale=Math.sqrt(MAX_INTERNAL_RENDER_PIXELS/Math.max(1,provisional.width*provisional.height)),scale=Math.max(.05,Math.min(requestedScale,MAX_INTERNAL_RENDER_DIMENSION/provisional.width,MAX_INTERNAL_RENDER_DIMENSION/provisional.height,memorySafeScale));
     const pixelWidth=Math.max(1,Math.ceil(provisional.width*scale)),pixelHeight=Math.max(1,Math.ceil(provisional.height*scale));
@@ -135,11 +144,12 @@ async function captureNode(source:HTMLElement,stage:HTMLElement,requestedScale:n
     frame.setAttribute("style",`position:relative;width:${cssWidth}px;height:${cssHeight}px;overflow:visible;background:transparent;isolation:isolate`);
     const placement=document.createElementNS(XHTML,"div");placement.setAttribute("style",`position:absolute;left:${-provisional.x}px;top:${-provisional.y}px;width:0;height:0;overflow:visible;background:transparent`);placement.appendChild(clone);frame.appendChild(placement);
     const serialized=new XMLSerializer().serializeToString(frame),embeddedStyle=fontFaceCss?`<defs><style type="text/css"><![CDATA[${fontFaceCss.replaceAll("]]>","]]]]><![CDATA[>")}]]></style></defs>`:"",svg=`<svg xmlns="${SVG}" width="${pixelWidth}" height="${pixelHeight}" viewBox="0 0 ${cssWidth} ${cssHeight}">${embeddedStyle}<foreignObject x="0" y="0" width="${cssWidth}" height="${cssHeight}">${serialized}</foreignObject></svg>`;
-    const image=await new Promise<HTMLImageElement>((resolve,reject)=>{const target=new Image();target.decoding="async";target.onload=()=>resolve(target);target.onerror=()=>reject(new Error("The browser could not rasterize the CreatorMake canvas surface."));target.src=`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;});
+    const image=await new Promise<HTMLImageElement>((resolve,reject)=>{const target=new Image(),cleanup=()=>signal?.removeEventListener("abort",onAbort),onAbort=()=>{cleanup();target.src="";reject(new DOMException("Final image rendering was cancelled.","AbortError"));};target.decoding="async";target.onload=()=>{cleanup();resolve(target);};target.onerror=()=>{cleanup();reject(new Error("The browser could not rasterize the CreatorMake canvas surface."));};signal?.addEventListener("abort",onAbort,{once:true});target.src=`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;});
+    throwIfAborted(signal);
     const canvas=document.createElement("canvas");canvas.width=pixelWidth;canvas.height=pixelHeight;
     const context=canvas.getContext("2d",{willReadFrequently:true});if(!context)throw new Error("Canvas 2D rendering is unavailable.");
     context.clearRect(0,0,pixelWidth,pixelHeight);context.drawImage(image,0,0,pixelWidth,pixelHeight);
-    const cropped=alphaCrop(canvas,provisional,scale);if(cropped.alphaEdgeSafety)return cropped;lastEdgeContact=cropped.alphaEdgeContact;
+    const cropped=await alphaCrop(canvas,provisional,scale,signal);if(cropped.alphaEdgeSafety)return cropped;lastEdgeContact=cropped.alphaEdgeContact;
   }
   throw new Error(`VISUAL_BOUNDS_TOO_SMALL: visible pixels still touch raster edge(s) ${lastEdgeContact.join(", ")||"unknown"} after automatic bounds expansion.`);
 }
@@ -168,18 +178,29 @@ function compareCaptures(source:Capture,exported:Capture){
   return{matchPercent,differenceDataUrl:difference.toDataURL("image/png"),boundsMatch,aspectRatioMatch,transformMatch:boundsMatch&&maxDelta<=8};
 }
 
-export async function rasterizeWithCreatorMakeRenderer(element:EditorElement,requestedScale:number,visualPart:RobloxRasterPart="full",fontFaceCss="",asset?:EditorAsset):Promise<CanvasRendererRaster>{
+export async function rasterizeWithCreatorMakeRenderer(element:EditorElement,requestedScale:number,visualPart:RobloxRasterPart="full",fontFaceCss="",asset?:EditorAsset,signal?:AbortSignal):Promise<CanvasRendererRaster>{
   if(typeof document==="undefined")throw new Error("CreatorMake canvas rasterization requires a browser document.");
+  throwIfAborted(signal);
   const [{createElement},{createRoot},{flushSync},{ElementSurface}]=await Promise.all([import("react"),import("react-dom/client"),import("react-dom"),import("../../components/editor/ElementSurface")]);
   const splitTextVisual=(element.type==="text"||element.type==="button")&&visualPart!=="full",sharedObjectScale=splitTextVisual&&Number.isFinite(element.scaleX)&&element.scaleX>0&&Math.abs(element.scaleX-element.scaleY)<.0001,baseElement={...element,x:0,y:0,rotation:splitTextVisual?0:element.rotation,...(sharedObjectScale?{scaleX:1,scaleY:1}:{})},renderElement=visualPart==="background"?{...baseElement,text:""}:visualPart==="text"?{...baseElement,fill:"transparent",gradientType:"none" as const,borderColor:"transparent",borderWidth:0,shadow:"none"}:baseElement,stage=createStage(renderElement),root=createRoot(stage),margin=renderMargin(renderElement,visualPart);
   try{
     flushSync(()=>root.render(createElement("div",{"data-element-id":element.id,"data-creatormake-export-element":"true",className:`canvas-element type-${element.type}`,style:elementStyle(renderElement)},createElement(ElementSurface,{element:renderElement,asset}))));
-    await document.fonts.ready;await waitForPaint();
+    await document.fonts.ready;await waitForPaint();throwIfAborted(signal);
     const exportNode=stage.querySelector<HTMLElement>("[data-creatormake-export-element]");if(!exportNode)throw new Error("CreatorMake could not mount the isolated canvas renderer.");
-    const exported=await captureNode(exportNode,stage,requestedScale,margin,fontFaceCss),live=findLiveCanvasElement(element.id);
-    let source=exported,sourceKind:CanvasRendererFidelity["source"]="isolated-canvas-renderer";
-    if(live){const sourceStage=createStage(renderElement);try{const clone=referenceClone(live,visualPart,renderElement);sourceStage.appendChild(clone);await waitForPaint();source=await captureNode(clone,sourceStage,requestedScale,margin,fontFaceCss);sourceKind="live-canvas";}finally{sourceStage.remove();}}
-    const comparison=compareCaptures(source,exported),alphaEdgeSafety=exported.alphaEdgeSafety===true,fidelity:CanvasRendererFidelity={matchPercent:Number(comparison.matchPercent.toFixed(3)),thresholdPercent:FIDELITY_THRESHOLD,passed:comparison.matchPercent>=FIDELITY_THRESHOLD&&comparison.boundsMatch&&comparison.aspectRatioMatch&&alphaEdgeSafety,boundsMatch:comparison.boundsMatch,aspectRatioMatch:comparison.aspectRatioMatch,transformMatch:comparison.transformMatch,alphaEdgeSafety,source:sourceKind};
-    return{dataUrl:exported.dataUrl,sourceDataUrl:source.dataUrl,differenceDataUrl:comparison.differenceDataUrl,width:exported.canvas.width,height:exported.canvas.height,renderPixelWidth:exported.canvas.width,renderPixelHeight:exported.canvas.height,scale:exported.scale,visualBounds:{x:finite(exported.bounds.x),y:finite(exported.bounds.y),width:finite(exported.bounds.width,1),height:finite(exported.bounds.height,1)},fidelity,canvas:exported.canvas};
+    const exported=await captureNode(exportNode,stage,requestedScale,margin,fontFaceCss,signal),live=findLiveCanvasElement(element.id);
+    let sourceDataUrl=exported.dataUrl,differenceDataUrl="",sourceKind:CanvasRendererFidelity["source"]="isolated-canvas-renderer",comparison={matchPercent:100,boundsMatch:true,aspectRatioMatch:true,transformMatch:true};
+    if(live){
+      // Fidelity is a geometry check, not the delivery render. Compare at 2x so
+      // an 8K master exists only once in memory and remains the single source
+      // for final downsampling.
+      const fidelityScale=Math.min(2,requestedScale),sourceStage=createStage(renderElement);
+      try{
+        const clone=referenceClone(live,visualPart,renderElement);sourceStage.appendChild(clone);await waitForPaint();
+        const source=await captureNode(clone,sourceStage,fidelityScale,margin,fontFaceCss,signal),exportedReference=await captureNode(exportNode,stage,fidelityScale,margin,fontFaceCss,signal);
+        const compared=compareCaptures(source,exportedReference);comparison=compared;sourceDataUrl=source.dataUrl;differenceDataUrl=compared.differenceDataUrl;sourceKind="live-canvas";
+      }finally{sourceStage.remove();}
+    }
+    const alphaEdgeSafety=exported.alphaEdgeSafety===true,fidelity:CanvasRendererFidelity={matchPercent:Number(comparison.matchPercent.toFixed(3)),thresholdPercent:FIDELITY_THRESHOLD,passed:comparison.matchPercent>=FIDELITY_THRESHOLD&&comparison.boundsMatch&&comparison.aspectRatioMatch&&alphaEdgeSafety,boundsMatch:comparison.boundsMatch,aspectRatioMatch:comparison.aspectRatioMatch,transformMatch:comparison.transformMatch,alphaEdgeSafety,source:sourceKind};
+    return{dataUrl:exported.dataUrl,sourceDataUrl,differenceDataUrl,width:exported.canvas.width,height:exported.canvas.height,renderPixelWidth:exported.canvas.width,renderPixelHeight:exported.canvas.height,scale:exported.scale,visualBounds:{x:finite(exported.bounds.x),y:finite(exported.bounds.y),width:finite(exported.bounds.width,1),height:finite(exported.bounds.height,1)},fidelity,canvas:exported.canvas};
   }finally{root.unmount();stage.remove();}
 }

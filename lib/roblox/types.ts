@@ -56,6 +56,16 @@ export type RobloxRenderAsset = {
   internalScale?:number;
   internalRenderPixelWidth?:number;
   internalRenderPixelHeight?:number;
+  masterHash?:string;
+  masterQuality?:"PREVIEW"|"SUPERSAMPLED"|"4K_CLASS"|"6K_CLASS"|"8K_CLASS";
+  masterRenderPixelWidth?:number;
+  masterRenderPixelHeight?:number;
+  masterEstimatedWorkingBytes?:number;
+  masterComplexityReasons?:string[];
+  deliveryHash?:string;
+  deliveryPixelWidth?:number;
+  deliveryPixelHeight?:number;
+  sourceResolutionWarning?:string;
   scaleClamped?:boolean;
   scaleWarning?:string;
   mimeType:"image/png";
