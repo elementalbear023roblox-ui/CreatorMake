@@ -152,8 +152,10 @@ local function validateManifest(manifest)
   if manifest.importDiagnostics.schemaVersion~="valid" or manifest.importDiagnostics.project~="valid" or manifest.importDiagnostics.instances~="valid" or manifest.importDiagnostics.assets~="valid" then error("MANIFEST_REJECTED: "..HttpService:JSONEncode(manifest.importDiagnostics)) end
   local textRoots={}
   for _,node in ipairs(manifest.nodes) do
-    local elementType=type(node.attributes)=="table" and node.attributes.CreatorMakeElementType or nil
-    if elementType=="text" or elementType=="button" then table.insert(textRoots,node) end
+    local attributes=type(node.attributes)=="table" and node.attributes or {}
+    local elementType=attributes.CreatorMakeElementType
+    local sourceElementId=attributes.CreatorMakeLayoutSourceId or attributes.CreatorMakeSourceElementId or attributes.CreatorMakeSourceId or node.sourceId
+    if (elementType=="text" or elementType=="button") and tostring(sourceElementId)==tostring(node.sourceId) then table.insert(textRoots,node) end
   end
   if #textRoots>0 and manifest.textExportArchitecture~=3 then error("TEXT_EXPORT_ARCHITECTURE_OUTDATED: Refresh CreatorMake and stage the project again.") end
   for _,node in ipairs(manifest.nodes) do
@@ -162,19 +164,25 @@ local function validateManifest(manifest)
     if role=="PixelText" or (visualPart=="text" and node.className=="ImageLabel" and role~="TransformedText") then error("LEGACY_PIXEL_TEXT_REJECTED: text images are accepted only for explicit shear/perspective TransformedText nodes.") end
   end
   for _,rootNode in ipairs(textRoots) do
+    local rootAttributes=type(rootNode.attributes)=="table" and rootNode.attributes or {}
+    local textBaked=rootAttributes.CreatorMakeTextBaked==true or rootAttributes.CreatorMakeCaptionBaked==true
+    local expectsNativeText=rootAttributes.CreatorMakeHasNativeText==true
     local standaloneNative=(rootNode.className=="TextLabel" or rootNode.className=="TextBox") and type(rootNode.properties)=="table" and type(rootNode.properties.Text)=="string"
     local nativeChild=false
     local exactChild=false
+    local combinedVisual=false
     for _,candidate in ipairs(manifest.nodes) do
       if candidate.parentSourceId==rootNode.sourceId then
         local role=type(candidate.attributes)=="table" and candidate.attributes.CreatorMakeRole or nil
         local visualPart=type(candidate.attributes)=="table" and candidate.attributes.CreatorMakeVisualPart or nil
-        if role=="Visual" or visualPart=="full" then error("LEGACY_TEXT_RASTER_REJECTED: "..tostring(rootNode.name).." still contains a combined _Visual.") end
+        if role=="Visual" or visualPart=="full" then combinedVisual=true end
         if (candidate.className=="TextLabel" or candidate.className=="TextBox") and type(candidate.properties)=="table" and type(candidate.properties.Text)=="string" then nativeChild=true end
         if candidate.className=="ImageLabel" and role=="TransformedText" and candidate.attributes.CreatorMakeRequiresExactTextRaster==true and type(candidate.attributes.CreatorMakeEditableText)=="string" then exactChild=true end
       end
     end
-    if not standaloneNative and not nativeChild and not exactChild then error("TEXT_INSTANCE_MISSING: "..tostring(rootNode.name).." must contain native editable text or an explicit TransformedText ImageLabel.") end
+    if not textBaked and combinedVisual then error("LEGACY_TEXT_RASTER_REJECTED: "..tostring(rootNode.name).." still contains a combined _Visual without declaring baked text.") end
+    if expectsNativeText and not standaloneNative and not nativeChild then error("TEXT_INSTANCE_MISSING: "..tostring(rootNode.name).." resolved to native text but contains no TextLabel or TextBox.") end
+    if not textBaked and not standaloneNative and not nativeChild and not exactChild then error("TEXT_INSTANCE_MISSING: "..tostring(rootNode.name).." must contain native editable text, an explicit TransformedText ImageLabel, or declare baked text.") end
   end
   local manifestNodesById={}
   for _,node in ipairs(manifest.nodes) do manifestNodesById[node.sourceId]=node end
@@ -213,7 +221,7 @@ local function validateManifest(manifest)
       if captionOrientation~=nil and attributes.CreatorMakeCaptionLayoutSpace=="LOCAL_CHILD" then
         if captionOrientation~="horizontal" and captionOrientation~="follow-shape" and captionOrientation~="custom" then error("CAPTION_ORIENTATION_INVALID: "..tostring(node.name).." has unsupported orientation "..tostring(captionOrientation)..".") end
         if type(attributes.CreatorMakeCaptionCenterX)~="number" or type(attributes.CreatorMakeCaptionCenterY)~="number" or type(attributes.CreatorMakeCaptionWidth)~="number" or type(attributes.CreatorMakeCaptionHeight)~="number" or type(attributes.CreatorMakeCaptionSafeWidth)~="number" or type(attributes.CreatorMakeCaptionSafeHeight)~="number" or type(attributes.CreatorMakeGeometryCenterlineAngle)~="number" or type(attributes.CreatorMakeCaptionAngle)~="number" then error("CAPTION_LAYOUT_MISSING: "..tostring(node.name).." is missing canonical caption geometry, safe region, or geometry centerline.") end
-        if type(properties.Position)~="table" or properties.Position.kind~="UDim2" or type(properties.Size)~="table" or properties.Size.kind~="UDim2" or type(properties.AnchorPoint)~="table" or properties.AnchorPoint.kind~="Vector2" then error("CAPTION_LAYOUT_INVALID: "..tostring(node.name).." must export Position, Size, and AnchorPoint from the canonical caption layout.") end
+        if type(properties.Position)~="table" or properties.Position.kind~="UDim2" or type(properties.Size)~="table" or properties.Size.kind~="UDim2" or type(properties.AnchorPoint)~="table" or properties.AnchorPoint.kind~="Vector2" or type(properties.Rotation)~="number" then error("CAPTION_LAYOUT_INVALID: "..tostring(node.name).." must export Position, Size, AnchorPoint, and Rotation from the canonical caption layout.") end
         local safeWidth=tonumber(attributes.CreatorMakeCaptionSafeWidth) or 0
         local safeHeight=tonumber(attributes.CreatorMakeCaptionSafeHeight) or 0
         local minimumWidth=tonumber(attributes.CreatorMakeCaptionMinimumWidth) or 20
@@ -227,9 +235,17 @@ local function validateManifest(manifest)
         if (safeWidth+.001<measuredWidth+glyphSafeX*2 or safeHeight+.001<measuredHeight+glyphSafeY*2) and not declaredOverflow then error("CAPTION_GLYPH_BOUNDS_INVALID: "..tostring(node.name).." does not fit its measured glyphs plus native safety margin.") end
         if (tonumber(properties.Size.xOffset) or 0)<=0 or (tonumber(properties.Size.yOffset) or 0)<=0 then error("CAPTION_TEXTLABEL_COLLAPSED: "..tostring(node.name).." exported a zero-sized native TextLabel.") end
         if math.abs(properties.AnchorPoint.x-.5)>.001 or math.abs(properties.AnchorPoint.y-.5)>.001 then error("CAPTION_ANCHOR_INVALID: "..tostring(node.name).." must use a centered anchor.") end
-        if math.abs(properties.Position.xOffset-attributes.CreatorMakeCaptionCenterX)>1 or math.abs(properties.Position.yOffset-attributes.CreatorMakeCaptionCenterY)>1 then error("CAPTION_CENTER_INVALID: "..tostring(node.name).." does not match the canonical caption center.") end
-        if type(properties.Rotation)~="number" or math.abs(properties.Rotation-attributes.CreatorMakeFinalTextLabelRotationApplied)>.25 then error("CAPTION_ANGLE_INVALID: "..tostring(node.name).." does not match the canonical caption angle.") end
-        if captionOrientation=="follow-shape" and math.abs(attributes.CreatorMakeFinalTextLabelRotationApplied)>.001 and math.abs(properties.Rotation)<=.001 then error("CAPTION_AXIS_LOST: "..tostring(node.name).." requested Follow Geometry but exported a horizontal TextLabel.") end
+        local centerError=math.sqrt((properties.Position.xOffset-attributes.CreatorMakeCaptionCenterX)^2+(properties.Position.yOffset-attributes.CreatorMakeCaptionCenterY)^2)
+        local angleError=math.abs(((properties.Rotation-attributes.CreatorMakeFinalTextLabelRotationApplied+180)%360)-180)
+        local axisLost=captionOrientation=="follow-shape" and math.abs(attributes.CreatorMakeFinalTextLabelRotationApplied)>.001 and math.abs(properties.Rotation or 0)<=.001
+        local captionResult="PASS"
+        if axisLost or angleError>3 or centerError>4 then captionResult="ERROR"
+        elseif angleError>1 or centerError>1 then captionResult="WARNING"
+        elseif angleError>.25 then captionResult="PASS_WITH_TOLERANCE" end
+        attributes.CreatorMakeCaptionValidationResult=captionResult
+        attributes.CreatorMakeCaptionAngleError=angleError
+        attributes.CreatorMakeCaptionCenterError=centerError
+        if captionResult=="WARNING" or captionResult=="ERROR" then warn("[CreatorMake Caption] "..captionResult.." Object="..tostring(node.name).." Angle error="..string.format("%.4f",angleError).." Center error="..string.format("%.4f",centerError)..". Import will continue.") end
       end
     end
   end
@@ -514,9 +530,14 @@ local function verifyTextArchitecture(manifest, instances)
   local items={}
   local passed=true
   for _,node in ipairs(manifest.nodes or {}) do
-    local elementType=type(node.attributes)=="table" and node.attributes.CreatorMakeElementType or nil
-    if elementType=="text" or elementType=="button" then
+    local attributes=type(node.attributes)=="table" and node.attributes or {}
+    local elementType=attributes.CreatorMakeElementType
+    local sourceElementId=attributes.CreatorMakeLayoutSourceId or attributes.CreatorMakeSourceElementId or attributes.CreatorMakeSourceId or node.sourceId
+    if (elementType=="text" or elementType=="button") and tostring(sourceElementId)==tostring(node.sourceId) then
       local root=instances[node.sourceId]
+      local architecture=attributes.CreatorMakeVisualArchitecture or "NATIVE"
+      local textBaked=attributes.CreatorMakeTextBaked==true or attributes.CreatorMakeCaptionBaked==true
+      local expectsNativeText=attributes.CreatorMakeHasNativeText==true
       local background=nil
       local nativeText=nil
       local transformedText=nil
@@ -564,11 +585,21 @@ local function verifyTextArchitecture(manifest, instances)
       local followShape=nativeOk and nativeText:GetAttribute("CreatorMakeResolvedCaptionOrientation")=="follow-shape"
       local safeRegionOk=not nativeOk or declaredOverflow or (safeWidth>=minimumWidth and safeHeight>=minimumHeight and safeWidth+.001>=measuredWidth+glyphSafeX*2 and safeHeight+.001>=measuredHeight+glyphSafeY*2)
       local textLabelSizeOk=not nativeOk or nativeText.Size.X.Offset>0 and nativeText.Size.Y.Offset>0
-      local captionOk=not nativeOk or (angleError<=0.25 and centerError<=1 and safeRegionOk and textLabelSizeOk and (not followShape or math.abs(expectedAngle)<=0.001 or math.abs(actualAngle)>0.001))
-      if nativeOk then print(string.format("[CreatorMake Caption] Object=%s Geometry centerline angle=%.4f Pixel geometry angle=%.4f Parent inherited rotation=%.4f Local text rotation=%.4f Final TextLabel.Rotation=%.4f Safe region=%.3fx%.3f Design/Calculated/Exported TextSize=%.3f/%.3f/%.3f Center=(%.3f, %.3f) TextLabel center=(%.3f, %.3f) Angle error=%.4f Center error=%.4f",tostring(node.name),geometryCenterlineAngle,geometryAngle,inheritedRotation,localRotation,actualAngle,safeWidth,safeHeight,designTextSize,calculatedTextSize,exportedTextSize,expectedCenterX,expectedCenterY,actualCenterX,actualCenterY,angleError,centerError)) end
-      local itemPassed=root~=nil and not combinedVisual and (nativeOk or exactOk) and captionOk
+      local captionApplicable=not textBaked and (nativeOk or expectsNativeText)
+      local axisLost=captionApplicable and followShape and math.abs(expectedAngle)>.001 and math.abs(actualAngle)<=.001
+      local captionResult="NOT_APPLICABLE"
+      if captionApplicable then
+        if not nativeOk or not safeRegionOk or not textLabelSizeOk or axisLost or angleError>3 or centerError>4 then captionResult="ERROR"
+        elseif angleError>1 or centerError>1 then captionResult="WARNING"
+        elseif angleError>.25 then captionResult="PASS_WITH_TOLERANCE"
+        else captionResult="PASS" end
+      end
+      local captionOk=captionResult=="NOT_APPLICABLE" or captionResult=="PASS" or captionResult=="PASS_WITH_TOLERANCE" or captionResult=="WARNING"
+      if nativeOk then print(string.format("[CreatorMake Caption] Object=%s Export As=%s Architecture=%s textBaked=%s hasNativeText=%s Result=%s Geometry centerline angle=%.4f Pixel geometry angle=%.4f Parent inherited rotation=%.4f Local text rotation=%.4f Final TextLabel.Rotation=%.4f Safe region=%.3fx%.3f Design/Calculated/Exported TextSize=%.3f/%.3f/%.3f Center=(%.3f, %.3f) TextLabel center=(%.3f, %.3f) Angle error=%.4f Center error=%.4f",tostring(node.name),tostring(attributes.CreatorMakeExportMode or "AUTO"),tostring(architecture),tostring(textBaked),tostring(nativeOk),captionResult,geometryCenterlineAngle,geometryAngle,inheritedRotation,localRotation,actualAngle,safeWidth,safeHeight,designTextSize,calculatedTextSize,exportedTextSize,expectedCenterX,expectedCenterY,actualCenterX,actualCenterY,angleError,centerError)) else print("[CreatorMake Caption] Object="..tostring(node.name).." Export As="..tostring(attributes.CreatorMakeExportMode or "AUTO").." Architecture="..tostring(architecture).." textBaked="..tostring(textBaked).." hasNativeText=false Result="..captionResult) end
+      local structureOk=root~=nil and (textBaked or nativeOk or exactOk) and (not expectsNativeText or nativeOk)
+      local itemPassed=structureOk and captionOk
       passed=passed and itemPassed
-      table.insert(items,{sourceId=node.sourceId,name=node.name,rootClass=root and root.ClassName or nil,backgroundClass=background and background.ClassName or nil,textClass=nativeText and nativeText.ClassName or transformedText and transformedText.ClassName or nil,textValue=nativeText and nativeText.Text or transformedText and transformedText:GetAttribute("CreatorMakeEditableText") or nil,textRotation=actualAngle,geometryAngle=geometryAngle,geometryCenterlineAngle=geometryCenterlineAngle,parentInheritedRotation=inheritedRotation,localTextRotation=localRotation,safeRegion={width=safeWidth,height=safeHeight,minimumWidth=minimumWidth,minimumHeight=minimumHeight,glyphSafeX=glyphSafeX,glyphSafeY=glyphSafeY,declaredOverflow=declaredOverflow,valid=safeRegionOk},textSize={design=designTextSize,calculated=calculatedTextSize,exported=exportedTextSize},captionCenter={x=expectedCenterX,y=expectedCenterY},textCenter={x=actualCenterX,y=actualCenterY},angleError=angleError,centerError=centerError,textLabelSizeValid=textLabelSizeOk,transformedTextClass=transformedText and transformedText.ClassName or nil,combinedVisual=combinedVisual,glyphsSeparated=not combinedVisual,nativeEditable=nativeOk,exactAppearance=exactOk,captionTransformValid=captionOk,passed=itemPassed})
+      table.insert(items,{sourceId=node.sourceId,name=node.name,exportAs=attributes.CreatorMakeExportMode or "AUTO",resolvedArchitecture=architecture,textBaked=textBaked,hasNativeText=nativeOk,captionValidation=captionApplicable and "NATIVE" or "NOT_APPLICABLE",validationResult=captionResult,rootClass=root and root.ClassName or nil,backgroundClass=background and background.ClassName or nil,textClass=nativeText and nativeText.ClassName or transformedText and transformedText.ClassName or nil,textValue=nativeText and nativeText.Text or transformedText and transformedText:GetAttribute("CreatorMakeEditableText") or nil,textRotation=actualAngle,geometryAngle=geometryAngle,geometryCenterlineAngle=geometryCenterlineAngle,parentInheritedRotation=inheritedRotation,localTextRotation=localRotation,safeRegion={width=safeWidth,height=safeHeight,minimumWidth=minimumWidth,minimumHeight=minimumHeight,glyphSafeX=glyphSafeX,glyphSafeY=glyphSafeY,declaredOverflow=declaredOverflow,valid=safeRegionOk},textSize={design=designTextSize,calculated=calculatedTextSize,exported=exportedTextSize},captionCenter={x=expectedCenterX,y=expectedCenterY},textCenter={x=actualCenterX,y=actualCenterY},angleError=angleError,centerError=centerError,textLabelSizeValid=textLabelSizeOk,transformedTextClass=transformedText and transformedText.ClassName or nil,combinedVisual=combinedVisual,glyphsSeparated=not combinedVisual,nativeEditable=nativeOk,exactAppearance=exactOk,captionTransformValid=captionOk,passed=itemPassed})
     end
   end
   return {version=manifest.textExportArchitecture,passed=passed,count=#items,items=items}

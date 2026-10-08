@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement, createProject } from "../lib/editor/project.ts";
 import { resolveTextRotation } from "../lib/editor/visual-transform.ts";
 import { classifyRobloxElement } from "../lib/roblox/classification.ts";
-import { assertRenderedLayoutFidelity, createRobloxExport } from "../lib/roblox/exporter.ts";
+import { assertRenderedLayoutFidelity, createRobloxExport, validateTextRotationFidelity } from "../lib/roblox/exporter.ts";
 import { planPixelAccurateAssets, renderElementSvg, visualHash } from "../lib/roblox/render-assets.ts";
 import { DEFAULT_ROBLOX_EXPORT_OPTIONS } from "../lib/roblox/types.ts";
 
@@ -108,6 +108,7 @@ test("explicit Button IMAGE flattens caption and surface into one premium clicka
   assert.equal(byId.get("image-frame").className,"Frame");assert.equal(byId.get("image-frame::visual").className,"ImageLabel");
   const exportedButton=byId.get("image-button");assert.equal(exportedButton.className,"ImageButton");assert.equal(exportedButton.properties.Active,true);assert.equal(exportedButton.properties.Selectable,true);assert.equal(exportedButton.properties.Image,"rbxassetid://7001");assert.deepEqual(exportedButton.properties.Size,{kind:"UDim2",xScale:0,xOffset:400,yScale:0,yOffset:70});assert.equal(exportedButton.attributes.CreatorMakeCaptionBaked,true);assert.equal(exportedButton.attributes.CreatorMakeLogicalHitbox,true);assert.equal(byId.get("image-button::text"),undefined);
   assert.equal(exportedButton.attributes.CreatorMakeVisualArchitecture,"FLATTENED_IMAGE_BUTTON");assert.equal(byId.get("image-button::visual"),undefined);assert.match(renderElementSvg(button,1,"full"),/Car Color/);assert.equal(result.layoutFidelityIssues.length,0);
+  const captionDiagnostic=result.textRotationDiagnostics.find((row)=>row.sourceId===button.id);assert.equal(captionDiagnostic.textBaked,true);assert.equal(captionDiagnostic.hasNativeText,false);assert.equal(captionDiagnostic.captionValidation,"NOT_APPLICABLE");assert.equal(captionDiagnostic.validationResult,"PASS");assert.equal(result.textFidelityIssues.length,0);
   const changed=structuredClone(button);changed.text="Vehicle Color";assert.notEqual(visualHash(button,"full"),visualHash(changed,"full"),"baked caption changes must invalidate the full visual");
   const auto=structuredClone(button);auto.robloxExportMode="AUTO";assert.equal(classifyRobloxElement(auto).nativeText,true,"AUTO must keep the existing native-caption architecture");
 });
@@ -135,6 +136,17 @@ test("Garage Image buttons resolve and validate per object without a global fide
   const names=["CarColor","Accessories","RimColor","LicensePlate","PlateDesign","ExitGarage"],project=createProject("Garage");project.elements=names.map((name,index)=>{const button=createElement("button",index);Object.assign(button,{id:name,name,robloxExportMode:"IMAGE",text:name==="ExitGarage"?"EXIT GARAGE":name.replace(/([a-z])([A-Z])/g,"$1 $2"),x:80,y:50+index*84,width:name==="ExitGarage"?360:400,height:70,shadow:index%2?"0 0 16px 0 rgba(0,0,0,.5)":"none"});return button;});
   const result=createRobloxExport(project,options,planPixelAccurateAssets(project,options));assert.equal(result.layoutFidelityIssues.length,0);assert.deepEqual(result.layoutDiagnostics.map((row)=>[row.name,row.exportAs,row.validation]),names.map((name)=>[name,"IMAGE","PASS"]));
   assert.ok(result.manifest.nodes.filter((node)=>node.attributes?.CreatorMakeRole==="FlattenedImageButton").every((node)=>node.className==="ImageButton"&&node.attributes.CreatorMakeCaptionBaked===true));
+  assert.deepEqual(result.textRotationDiagnostics.map((row)=>[row.name,row.exportAs,row.resolvedArchitecture,row.textBaked,row.hasNativeText,row.captionValidation,row.validationResult]),names.map((name)=>[name,"IMAGE",result.manifest.nodes.find((node)=>node.sourceId===name).attributes.CreatorMakeVisualArchitecture,true,false,"NOT_APPLICABLE","PASS"]));
+  assert.deepEqual(result.textFidelitySummary,{exact:0,withinTolerance:0,warnings:0,errors:0,notApplicable:6});
+});
+
+test("native caption differences use tolerance levels and never block project rendering",()=>{
+  const button=createElement("button");Object.assign(button,{id:"tolerance-button",name:"CarColor",robloxExportMode:"AUTO",text:"Car Color",width:400,height:70,fontFamily:"Roboto",shadow:"none",textShadows:[],geometry:{...button.geometry,kind:"trapezoid",skew:10},textOrientation:"follow-shape",followObjectAngle:true});
+  const project=createProject("Caption Tolerance");project.elements=[button];const exported=createRobloxExport(project,options,planPixelAccurateAssets(project,options)),nodes=structuredClone(exported.manifest.nodes),text=nodes.find((node)=>node.sourceId===`${button.id}::text`);
+  assert.equal(text.className,"TextLabel");text.properties.Rotation+=.75;
+  const tolerated=validateTextRotationFidelity(project,nodes),row=tolerated.diagnostics[0];assert.equal(row.hasNativeText,true);assert.equal(row.textBaked,false);assert.equal(row.captionValidation,"NATIVE");assert.equal(row.angleError,.75);assert.equal(row.centerError,0);assert.equal(row.validationResult,"PASS_WITH_TOLERANCE");assert.deepEqual(tolerated.summary,{exact:0,withinTolerance:1,warnings:0,errors:0,notApplicable:0});assert.deepEqual(tolerated.problems,[]);
+  text.properties.Rotation+=29.25;text.properties.Position.xOffset+=80;
+  const major=validateTextRotationFidelity(project,nodes),majorRow=major.diagnostics[0];assert.equal(majorRow.validationResult,"ERROR");assert.ok(majorRow.angleError>=30);assert.equal(majorRow.centerError,80);assert.equal(major.summary.errors,1);assert.doesNotThrow(()=>createRobloxExport(project,options,planPixelAccurateAssets(project,options)));
 });
 
 test("architecture-aware assertion gives an actionable error only when a required overflow visual is missing",()=>{

@@ -120,20 +120,25 @@ function validateManifest(value) {
     if (!projectObjectIds.has(ownerId)) throw manifestFieldError(node, index, "sourceId", `object owner ${ownerId} is not in active project ${value.projectId}; preset libraries cannot be imported`);
   }
 
-  const textRoots = value.nodes.filter((node) => ["text", "button"].includes(node.attributes?.CreatorMakeElementType));
+  const textRoots = value.nodes.filter((node) => {
+    const attributes=node.attributes??{},sourceElementId=attributes.CreatorMakeLayoutSourceId??attributes.CreatorMakeSourceElementId??attributes.CreatorMakeSourceId??node.sourceId;
+    return ["text", "button"].includes(attributes.CreatorMakeElementType)&&String(sourceElementId)===String(node.sourceId);
+  });
   if (textRoots.length > 0 && value.textExportArchitecture !== TEXT_EXPORT_ARCHITECTURE) {
     throw new Error(`TEXT_EXPORT_ARCHITECTURE_OUTDATED: expected ${TEXT_EXPORT_ARCHITECTURE}. Refresh CreatorMake and stage the project again.`);
   }
   if(value.nodes.some((node)=>node.attributes?.CreatorMakeRole==="PixelText"||(node.attributes?.CreatorMakeVisualPart==="text"&&node.className==="ImageLabel"&&node.attributes?.CreatorMakeRole!=="TransformedText")))throw new Error("LEGACY_PIXEL_TEXT_REJECTED: text images are accepted only for explicit shear/perspective TransformedText nodes.");
   for (const root of textRoots) {
+    const attributes=root.attributes??{},textBaked=attributes.CreatorMakeTextBaked===true||attributes.CreatorMakeCaptionBaked===true,expectsNativeText=attributes.CreatorMakeHasNativeText===true;
     const children = value.nodes.filter((node) => node.parentSourceId === root.sourceId);
     const standaloneNative = ["TextLabel", "TextBox"].includes(root.className) && typeof root.properties?.Text === "string";
     const nativeChild = children.some((node) => ["TextLabel", "TextBox"].includes(node.className) && typeof node.properties?.Text === "string");
     const exactChild = children.some((node) => node.className === "ImageLabel" && node.attributes?.CreatorMakeRole === "TransformedText" && node.attributes?.CreatorMakeRequiresExactTextRaster === true && typeof node.attributes?.CreatorMakeEditableText === "string");
     const combinedVisual = children.some((node) => node.attributes?.CreatorMakeRole === "Visual" || node.attributes?.CreatorMakeVisualPart === "full");
     const rootIndex=value.nodes.indexOf(root);
-    if (combinedVisual) throw manifestFieldError(root,rootIndex,"children","LEGACY_TEXT_RASTER_REJECTED: combined _Visual is not valid for split text");
-    if (!standaloneNative && !nativeChild && !exactChild) throw manifestFieldError(root,rootIndex,"children","TEXT_INSTANCE_MISSING: expected native editable text or an explicit TransformedText ImageLabel with preserved source text");
+    if (!textBaked&&combinedVisual) throw manifestFieldError(root,rootIndex,"children","LEGACY_TEXT_RASTER_REJECTED: combined _Visual is not valid unless the architecture explicitly declares baked text");
+    if (expectsNativeText&&!standaloneNative&&!nativeChild) throw manifestFieldError(root,rootIndex,"children","TEXT_INSTANCE_MISSING: resolved architecture requires native editable text");
+    if (!textBaked&&!standaloneNative&&!nativeChild&&!exactChild) throw manifestFieldError(root,rootIndex,"children","TEXT_INSTANCE_MISSING: expected native editable text, an explicit TransformedText ImageLabel, or declared baked text");
   }
   const manifestNodesById=new Map(value.nodes.map((node)=>[node.sourceId,node]));
   for(const [index,node] of value.nodes.entries()){
