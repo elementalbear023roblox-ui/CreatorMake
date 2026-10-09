@@ -122,6 +122,8 @@ export function normalizeProject(project: EditorProject): EditorProject {
 
 type SettingRecord={key:string;value:unknown};
 type AssetRecord={key:string;projectId:string;asset:EditorAsset};
+export type CreatorMakeLibraryPackage={format:"creatormake-cloud-library";formatVersion:1;exportedAt:string;activeProjectId:string|null;projects:EditorProject[];recoveries:RecoverySnapshot[]};
+export type CreatorMakeLibraryMergeResult={added:number;updated:number;kept:number;recoveriesAdded:number;activeProjectId:string|null};
 const memory={projects:new Map<string,EditorProject>(),assets:new Map<string,EditorAsset[]>(),summaries:new Map<string,ProjectSummary>(),recoveries:new Map<string,RecoverySnapshot>(),settings:new Map<string,unknown>()};
 let databasePromise:Promise<IDBDatabase>|null=null;
 let storageReady:Promise<IDBDatabase|null>|null=null;
@@ -190,6 +192,10 @@ async function ensureStorage(){
 
 async function getSetting<T>(key:string){const database=await ensureStorage();if(!database)return memory.settings.get(key) as T|undefined;const value=await requestResult(database.transaction(SETTINGS_STORE,"readonly").objectStore(SETTINGS_STORE).get(key)) as SettingRecord|undefined;return value?.value as T|undefined;}
 
+async function setSetting(key:string,value:unknown){const database=await ensureStorage();if(!database){memory.settings.set(key,value);return;}const transaction=database.transaction(SETTINGS_STORE,"readwrite");transaction.objectStore(SETTINGS_STORE).put({key,value} satisfies SettingRecord);await transactionDone(transaction);}
+
+const announceLibraryChange=(reason:"save"|"delete"|"merge")=>{if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("creatormake:project-library-change",{detail:{reason}}));};
+
 export async function loadProject(id:string):Promise<EditorProject|null>{
   const database=await ensureStorage();
   if(!database){const project=memory.projects.get(id);if(!project)return null;const value=structuredClone(project);value.assets=structuredClone(memory.assets.get(id)??value.assets??[]);return normalizeProject(value);}
@@ -223,13 +229,13 @@ export async function saveProject(project:EditorProject,{createRecovery=true}:{c
   const normalized=normalizeProject(structuredClone(project)),previous=await loadProject(normalized.id);
   if(createRecovery&&previous&&JSON.stringify({...previous,updatedAt:0})!==JSON.stringify({...normalized,updatedAt:0}))await storeRecovery(previous);
   const summary=projectSummary(normalized),database=await ensureStorage();
-  if(!database){const record=structuredClone(normalized);record.assets=[];memory.projects.set(normalized.id,record);memory.assets.set(normalized.id,structuredClone(normalized.assets));memory.summaries.set(normalized.id,summary);memory.settings.set(ACTIVE_KEY,normalized.id);return normalized;}
-  const transaction=database.transaction([PROJECT_STORE,ASSET_STORE,SUMMARY_STORE,SETTINGS_STORE],"readwrite"),record=structuredClone(normalized),assetStore=transaction.objectStore(ASSET_STORE);record.assets=[];transaction.objectStore(PROJECT_STORE).put(record);assetStore.delete(IDBKeyRange.bound(`${normalized.id}:`,`${normalized.id}:\uffff`));normalized.assets.forEach((asset)=>assetStore.put({key:`${normalized.id}:${asset.id}`,projectId:normalized.id,asset} satisfies AssetRecord));transaction.objectStore(SUMMARY_STORE).put(summary);transaction.objectStore(SETTINGS_STORE).put({key:ACTIVE_KEY,value:normalized.id} satisfies SettingRecord);await transactionDone(transaction);return normalized;
+  if(!database){const record=structuredClone(normalized);record.assets=[];memory.projects.set(normalized.id,record);memory.assets.set(normalized.id,structuredClone(normalized.assets));memory.summaries.set(normalized.id,summary);memory.settings.set(ACTIVE_KEY,normalized.id);announceLibraryChange("save");return normalized;}
+  const transaction=database.transaction([PROJECT_STORE,ASSET_STORE,SUMMARY_STORE,SETTINGS_STORE],"readwrite"),record=structuredClone(normalized),assetStore=transaction.objectStore(ASSET_STORE);record.assets=[];transaction.objectStore(PROJECT_STORE).put(record);assetStore.delete(IDBKeyRange.bound(`${normalized.id}:`,`${normalized.id}:\uffff`));normalized.assets.forEach((asset)=>assetStore.put({key:`${normalized.id}:${asset.id}`,projectId:normalized.id,asset} satisfies AssetRecord));transaction.objectStore(SUMMARY_STORE).put(summary);transaction.objectStore(SETTINGS_STORE).put({key:ACTIVE_KEY,value:normalized.id} satisfies SettingRecord);await transactionDone(transaction);announceLibraryChange("save");return normalized;
 }
 
 export async function loadActiveProject(){const id=await getSetting<string>(ACTIVE_KEY);return id?loadProject(id):null;}
 
-export async function deleteStoredProject(id:string){const database=await ensureStorage();if(!database){memory.projects.delete(id);memory.assets.delete(id);memory.summaries.delete(id);return;}const transaction=database.transaction([PROJECT_STORE,ASSET_STORE,SUMMARY_STORE],"readwrite");transaction.objectStore(PROJECT_STORE).delete(id);transaction.objectStore(ASSET_STORE).delete(IDBKeyRange.bound(`${id}:`,`${id}:\uffff`));transaction.objectStore(SUMMARY_STORE).delete(id);await transactionDone(transaction);}
+export async function deleteStoredProject(id:string){const database=await ensureStorage();if(!database){memory.projects.delete(id);memory.assets.delete(id);memory.summaries.delete(id);announceLibraryChange("delete");return;}const transaction=database.transaction([PROJECT_STORE,ASSET_STORE,SUMMARY_STORE],"readwrite");transaction.objectStore(PROJECT_STORE).delete(id);transaction.objectStore(ASSET_STORE).delete(IDBKeyRange.bound(`${id}:`,`${id}:\uffff`));transaction.objectStore(SUMMARY_STORE).delete(id);await transactionDone(transaction);announceLibraryChange("delete");}
 
 export async function discardRecoverySnapshot(id:string){const database=await ensureStorage();if(!database){memory.recoveries.delete(id);return;}const transaction=database.transaction(RECOVERY_STORE,"readwrite");transaction.objectStore(RECOVERY_STORE).delete(id);await transactionDone(transaction);}
 
@@ -244,6 +250,31 @@ export async function importProjectData(value:unknown){
 }
 
 export function exportProjectData(project:EditorProject){return{format:"creatormake-project",formatVersion:1,exportedAt:new Date().toISOString(),schemaVersion:CREATORMAKE_SCHEMA_VERSION,project:normalizeProject(structuredClone(project))};}
+
+export async function exportProjectLibrary():Promise<CreatorMakeLibraryPackage>{
+  const summaries=await listProjects(),projects=(await Promise.all(summaries.map((summary)=>loadProject(summary.id)))).filter((project):project is EditorProject=>Boolean(project));
+  return{format:"creatormake-cloud-library",formatVersion:1,exportedAt:new Date().toISOString(),activeProjectId:(await getSetting<string>(ACTIVE_KEY))??null,projects:projects.map((project)=>normalizeProject(structuredClone(project))),recoveries:(await listRecoverySnapshots()).map((snapshot)=>structuredClone(snapshot))};
+}
+
+const isCloudLibrary=(value:unknown):value is CreatorMakeLibraryPackage=>{const candidate=value as Partial<CreatorMakeLibraryPackage>|null;return Boolean(candidate&&candidate.format==="creatormake-cloud-library"&&candidate.formatVersion===1&&Array.isArray(candidate.projects)&&candidate.projects.every((project)=>project&&typeof project.id==="string"&&project.screen&&Array.isArray(project.elements))&&Array.isArray(candidate.recoveries));};
+
+export async function mergeProjectLibrary(value:unknown):Promise<CreatorMakeLibraryMergeResult>{
+  if(!isCloudLibrary(value))throw new Error("The Google Drive backup is not a valid CreatorMake project library.");
+  const localSummaries=await listProjects(),localById=new Map(localSummaries.map((project)=>[project.id,project])),localActive=(await getSetting<string>(ACTIVE_KEY))??null;
+  let added=0,updated=0,kept=0;
+  for(const incomingValue of value.projects){
+    const incoming=normalizeProject(structuredClone(incomingValue)),local=localById.get(incoming.id);
+    if(!local){await saveProject(incoming,{createRecovery:false});added++;continue;}
+    if(incoming.updatedAt>local.updatedAt){await saveProject(incoming,{createRecovery:true});updated++;}else kept++;
+  }
+  const existingRecoveries=new Set((await listRecoverySnapshots()).map((snapshot)=>snapshot.id)),incomingRecoveries=value.recoveries.filter((snapshot)=>snapshot?.id&&!existingRecoveries.has(snapshot.id)&&snapshot.project&&typeof snapshot.savedAt==="number").slice(0,32);
+  const database=await ensureStorage();
+  if(database&&incomingRecoveries.length){const transaction=database.transaction(RECOVERY_STORE,"readwrite"),store=transaction.objectStore(RECOVERY_STORE);incomingRecoveries.forEach((snapshot)=>store.put({...structuredClone(snapshot),project:normalizeProject(structuredClone(snapshot.project))}));await transactionDone(transaction);}else incomingRecoveries.forEach((snapshot)=>memory.recoveries.set(snapshot.id,{...structuredClone(snapshot),project:normalizeProject(structuredClone(snapshot.project))}));
+  const all=await listProjects(),hasLocalActive=localActive&&all.some((project)=>project.id===localActive),remoteActive=value.activeProjectId&&all.some((project)=>project.id===value.activeProjectId)?value.activeProjectId:null,activeProjectId=hasLocalActive?localActive:remoteActive??all[0]?.id??null;
+  if(activeProjectId)await setSetting(ACTIVE_KEY,activeProjectId);
+  announceLibraryChange("merge");
+  return{added,updated,kept,recoveriesAdded:incomingRecoveries.length,activeProjectId};
+}
 
 export function duplicateProject(source: EditorProject): EditorProject {
   const copy = structuredClone(source);

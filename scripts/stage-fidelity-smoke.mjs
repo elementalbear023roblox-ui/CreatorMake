@@ -128,6 +128,7 @@ const manifest = {
   version: 2,
   projectId: "fidelity-regression",
   projectName: "Fidelity Regression",
+  guiId: "fidelity-regression:screen",
   manifestVersion: "fidelity-regression:1",
   projectObjectIds: ["fidelity-main", "fidelity-title", "fidelity-close"],
   exportDiagnostics: { projectObjectCount: 3, exportedProjectObjectCount: 3, exportNodeCount: 4, presetsExported: 0, presetDefinitionsIncluded: false },

@@ -31,16 +31,31 @@ interaction, class, and visual hash for every generated image.
 
 **Pixel Accurate** remains available as the all-raster regression-safe mode,
 and **Native** remains available for users who prefer editable approximations.
-The local Studio plugin and sync server must use protocol v7 or newer for
+The local Studio plugin and sync server use protocol v10 for project-scoped
 Adaptive image previews. Build the current plugin with `npm run plugin:build`;
 the result is written to `artifacts/CreatorMake-Studio-Local.rbxmx`.
 
-The current plugin version is v10. Restart Studio (or reload local plugins)
+The current plugin version is v21. Restart Studio (or reload local plugins)
 after replacing the `.rbxmx` file so `/health` can report the new version.
 Preview imports are isolated in the local player's `PlayerGui`; permanent
 deployments create or update only CreatorMake-managed `ScreenGui` instances in
 `StarterGui`, so every player receives the UI without duplicating unrelated
-GUIs.
+GUIs. Every permanent root carries stable `CreatorMakeProjectId` and
+`CreatorMakeGuiId` attributes. Sync builds a detached replacement and swaps only
+the matching project after validation, preserving every other CreatorMake GUI,
+its `Enabled` state, its `DisplayOrder`, its viewport scale binding, and its
+asset scope. Final Sync automatically renders changed visuals at Final quality,
+reuses owner-scoped content hashes, publishes missing assets through the secure
+local Open Cloud connection, waits for processing, grants the currently open
+experience `Use` access to each uploaded image, and only then updates
+`StarterGui`. The publishing account can differ from the experience owner, so
+collaborators retain image ownership in their own Roblox account without making
+the asset globally reusable. The API key needs `asset:read`, `asset:write`, and
+`asset-permissions:write`. Local EditableImage content remains preview-only; final import is
+blocked before any existing GUI changes if a required visual lacks a persistent
+Roblox ID. The Studio panel lists all installed CreatorMake
+projects and changes the current action between **IMPORT GUI** and **UPDATE
+GUI**.
 
 CreatorMake's **Scroll** tool inserts an editable 20-card inventory scaffold.
 Its preview scrolls with mouse, trackpad, or touch. Native, Adaptive, and Pixel
@@ -58,12 +73,31 @@ actions. Autosave is debounced and the top bar reports **Unsaved changes**,
 Press Ctrl/Cmd+S to force a save. Backups use the versioned `.creatormake`
 JSON envelope and never contain API keys, Roblox tokens, or bundled font files.
 
-Legacy browser projects are normalized to schema 6 on first open.
+Legacy browser projects are normalized to the current schema on first open.
 The one-time migration copies old full-project `localStorage` records into
 IndexedDB and removes those large legacy records only after the database
 transaction succeeds. Browser storage is origin-scoped, so the Vercel domain
 has its own project library; export a `.creatormake` backup before changing
 domains or clearing site data.
+
+### Google account backup
+
+The account control in the top toolbar adds optional Google sign-in and private
+cloud backup without replacing IndexedDB. On first sign-in, CreatorMake merges
+the complete local project library, imported assets, and recovery snapshots
+with `CreatorMake Library.json` in Google Drive's hidden `appDataFolder`.
+Projects are merged by stable project ID and `updatedAt`; a newer revision wins,
+while unrelated local and cloud projects are retained. Signing out revokes the
+session token and leaves every local project available.
+
+Google OAuth access tokens are session-only and are never stored in project
+files, IndexedDB, or the repository. CreatorMake requests `openid`, `email`,
+`profile`, and `drive.appdata`; it cannot read the user's ordinary Drive files.
+Configure a Google OAuth **Web application** client with the production origin
+`https://creatormake-site.vercel.app` and the local preview origins used for QA.
+Set the public client ID as `VITE_GOOGLE_CLIENT_ID` before `npm run build:site`,
+or enter it in the account dialog for a browser-local setup. The Google Drive
+API must be enabled for the OAuth project.
 
 ## Production deployment
 
@@ -87,7 +121,8 @@ Server-only deployment variables are documented in `.env.example`. Configure
 `OPENAI_API_KEY` and set `CREATORMAKE_AI_ENABLED=true` only if public AI tools
 should be available. Do not create `NEXT_PUBLIC_` copies of secrets. Browser-only
 editing, IndexedDB projects, previews, fonts, and `.creatormake` backup work
-without AI credentials.
+without AI credentials. `VITE_GOOGLE_CLIENT_ID` is a public browser identifier,
+not a secret; it enables the optional Google account control in the static build.
 
 ### Hosted site → local Roblox Studio bridge
 

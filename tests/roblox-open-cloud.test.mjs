@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRobloxImageAsset, publicRobloxPublishingConfig, readRobloxPublishingConfig, waitForRobloxAssetOperation } from "../scripts/roblox-open-cloud.mjs";
+import { createRobloxImageAsset, grantRobloxImageUseToUniverse, publicRobloxPublishingConfig, readRobloxPublishingConfig, waitForRobloxAssetOperation } from "../scripts/roblox-open-cloud.mjs";
 
 test("Roblox publishing configuration never exposes credentials",()=>{
   const config=readRobloxPublishingConfig({ROBLOX_OPEN_CLOUD_API_KEY:"secret-key",ROBLOX_CREATOR_TYPE:"group",ROBLOX_CREATOR_ID:"12345"}),publicConfig=publicRobloxPublishingConfig(config);
@@ -15,3 +15,9 @@ test("Open Cloud image publishing sends original PNG multipart data and polls th
   const result=await waitForRobloxAssetOperation(operation.path,{config,fetchImpl,sleep:async()=>{}});assert.equal(result.robloxAssetId,"rbxassetid://456789");assert.match(calls[1].url,/\/assets\/v1\/operations\/op-1$/);
 });
 
+test("published images grant Use permission only to the target experience",async()=>{
+  const config=readRobloxPublishingConfig({ROBLOX_OPEN_CLOUD_API_KEY:"secret-key",ROBLOX_CREATOR_TYPE:"user",ROBLOX_CREATOR_ID:"987"}),calls=[];
+  const fetchImpl=async(url,options={})=>{calls.push({url,options});return new Response(JSON.stringify({successAssetIds:[456789],errors:[]}),{status:200});};
+  const result=await grantRobloxImageUseToUniverse({assetId:"456789",universeId:"123456",config,fetchImpl});
+  assert.equal(result.subjectType,"Universe");assert.equal(result.subjectId,"123456");assert.equal(calls[0].options.method,"PATCH");assert.equal(calls[0].options.headers["x-api-key"],"secret-key");assert.deepEqual(JSON.parse(calls[0].options.body),{subjectType:"Universe",subjectId:"123456",action:"Use",requests:[{assetId:456789,grantToDependencies:false}]});
+});

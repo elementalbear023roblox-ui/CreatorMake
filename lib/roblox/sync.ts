@@ -13,6 +13,7 @@ function changedPropertyNames(previous:RobloxManifestNode,next:RobloxManifestNod
 
 export function diffRobloxManifests(previous:RobloxManifest|null,next:RobloxManifest):RobloxSyncOperation[]{
   if(!previous)return next.nodes.map((node)=>({type:"create",sourceId:node.sourceId}));
+  if(previous.projectId!==next.projectId||previous.guiId!==next.guiId)return next.nodes.map((node)=>({type:"create",sourceId:node.sourceId}));
   const before=new Map(previous.nodes.map((node,index)=>[node.sourceId,{node,index}]));
   const after=new Map(next.nodes.map((node,index)=>[node.sourceId,{node,index}]));
   const operations:RobloxSyncOperation[]=[];
@@ -28,4 +29,4 @@ export function diffRobloxManifests(previous:RobloxManifest|null,next:RobloxMani
   return operations;
 }
 
-export function manifestFingerprint(manifest:RobloxManifest){return stableJson({screenGuiName:manifest.screenGuiName,nodes:manifest.nodes});}
+export function manifestFingerprint(manifest:RobloxManifest){return stableJson({projectId:manifest.projectId,guiId:manifest.guiId,screenGuiName:manifest.screenGuiName,screenGuiSettings:manifest.screenGuiSettings,nodes:manifest.nodes});}

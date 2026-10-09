@@ -1,4 +1,5 @@
 const ASSETS_ORIGIN = "https://apis.roblox.com/assets/v1";
+const ASSET_PERMISSIONS_URL = "https://apis.roblox.com/asset-permissions-api/v1/assets/permissions";
 
 const numericId = (value) => typeof value === "string" && /^\d+$/.test(value) ? value : null;
 const safeDisplayName = (value) => `CreatorMake - ${String(value || "UI Asset")}`.slice(0, 50);
@@ -31,10 +32,11 @@ export function publicRobloxPublishingConfig(config) {
     authMode: config.authMode,
     creatorType: config.creatorType,
     creatorId: config.creatorId,
+    assetAccess: "current-experience",
     missing: config.missing,
     oauth: {
       status: config.authMode === "oauth" ? "configured" : "future-hosted-flow",
-      scopes: ["asset:read", "asset:write"],
+      scopes: ["asset:read", "asset:write", "asset-permissions:write"],
     },
   };
 }
@@ -55,6 +57,34 @@ async function jsonResponse(response, label) {
   }
   if (!value || typeof value !== "object") throw new Error(`${label} returned invalid JSON.`);
   return value;
+}
+
+export async function grantRobloxImageUseToUniverse({ assetId, universeId, config, fetchImpl = fetch }) {
+  if (!config?.configured) throw new Error("Roblox Open Cloud publishing is not configured.");
+  const normalizedAssetId = numericId(String(assetId ?? ""));
+  const numericAssetId = normalizedAssetId ? Number(normalizedAssetId) : NaN;
+  if (!normalizedAssetId || !Number.isSafeInteger(numericAssetId)) throw new Error("A valid Roblox asset ID is required before sharing an image.");
+  const normalizedUniverseId = numericId(String(universeId ?? ""));
+  if (!normalizedUniverseId) throw new Error("The open Roblox Studio experience does not have a usable universe ID.");
+  const response = await fetchImpl(ASSET_PERMISSIONS_URL, {
+    method: "PATCH",
+    headers: { ...authHeaders(config), "content-type": "application/json" },
+    body: JSON.stringify({
+      subjectType: "Universe",
+      subjectId: normalizedUniverseId,
+      action: "Use",
+      requests: [{ assetId: numericAssetId, grantToDependencies: false }],
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const result = await jsonResponse(response, "Roblox asset permission grant");
+  const succeeded = Array.isArray(result.successAssetIds) && result.successAssetIds.some((value) => String(value) === normalizedAssetId);
+  const failure = Array.isArray(result.errors) ? result.errors.find((item) => String(item?.assetId ?? "") === normalizedAssetId) : null;
+  if (failure || !succeeded) {
+    const detail = failure?.code ? ` (${failure.code})` : "";
+    throw new Error(`Roblox did not grant experience ${normalizedUniverseId} Use permission to image ${normalizedAssetId}${detail}.`);
+  }
+  return { assetId: normalizedAssetId, subjectType: "Universe", subjectId: normalizedUniverseId, action: "Use", response: result };
 }
 
 export async function createRobloxImageAsset({ pngBytes, filename, displayName, config, fetchImpl = fetch }) {
@@ -103,4 +133,3 @@ export async function waitForRobloxAssetOperation(operationPath, { config, fetch
   }
   throw new Error(`Roblox asset operation timed out after ${Math.ceil(timeoutMs / 1_000)} seconds.`);
 }
-

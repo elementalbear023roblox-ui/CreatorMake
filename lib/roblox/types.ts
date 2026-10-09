@@ -8,6 +8,8 @@ export type RobloxRasterPart = "full" | "background" | "text";
 export type RobloxResolution = { label:string;width:number;height:number };
 export type RobloxExportOptions = {
   screenGuiName:string;
+  displayOrder:number;
+  zIndexBehavior:"Global"|"Sibling";
   sizingMode:RobloxSizingMode;
   resolution:RobloxResolution;
   visualMode:RobloxVisualMode;
@@ -129,7 +131,7 @@ export type RobloxManifestNode = {
   attributes?:Record<string,string|number|boolean>;
   decorators:Array<{className:string;name:string;properties:Record<string,RobloxPropertyValue>}>;
 };
-export type RobloxManifest = { kind:"project";messageType:"PROJECT_MANIFEST";schema:"creatormake.roblox-manifest";version:1|2;textExportArchitecture?:2|3;projectId:string;projectName:string;manifestVersion:string;projectObjectIds:string[];exportDiagnostics:{projectObjectCount:number;exportedProjectObjectCount:number;exportNodeCount:number;presetsExported:0;presetDefinitionsIncluded:false};screenGuiName:string;deployTarget?:RobloxDeployTarget;screenGuiSettings?:{enabled:boolean;displayOrder:number;ignoreGuiInset:boolean;resetOnSpawn:boolean;zIndexBehavior:"Global"|"Sibling"};referenceResolution:{width:number;height:number};sizingMode:RobloxSizingMode;visualMode?:RobloxVisualMode;renderScale?:RobloxRenderScale;viewportScaleMode?:"FIT";assets?:RobloxRenderAsset[];imageManifest?:RobloxImageManifestEntry[];nodes:RobloxManifestNode[] };
+export type RobloxManifest = { kind:"project";messageType:"PROJECT_MANIFEST";schema:"creatormake.roblox-manifest";version:1|2;textExportArchitecture?:2|3;projectId:string;projectName:string;guiId:string;manifestVersion:string;projectObjectIds:string[];exportDiagnostics:{projectObjectCount:number;exportedProjectObjectCount:number;exportNodeCount:number;presetsExported:0;presetDefinitionsIncluded:false};screenGuiName:string;deployTarget?:RobloxDeployTarget;screenGuiSettings?:{enabled:boolean;displayOrder:number;ignoreGuiInset:boolean;resetOnSpawn:boolean;zIndexBehavior:"Global"|"Sibling"};referenceResolution:{width:number;height:number};sizingMode:RobloxSizingMode;visualMode?:RobloxVisualMode;renderScale?:RobloxRenderScale;viewportScaleMode?:"FIT";assets?:RobloxRenderAsset[];imageManifest?:RobloxImageManifestEntry[];nodes:RobloxManifestNode[] };
 
 export type RobloxSyncOperation =
   | {type:"create";sourceId:string}
@@ -143,4 +145,4 @@ export const ROBLOX_RESOLUTIONS:RobloxResolution[]=[
   {label:"1920 × 1080",width:1920,height:1080},{label:"1366 × 768",width:1366,height:768},{label:"1280 × 720",width:1280,height:720},{label:"2560 × 1440",width:2560,height:1440},{label:"3840 × 2160",width:3840,height:2160},{label:"Mobile Portrait",width:390,height:844},{label:"Mobile Landscape",width:844,height:390},{label:"Tablet",width:1024,height:768},{label:"Ultrawide",width:3440,height:1440},
 ];
 
-export const DEFAULT_ROBLOX_EXPORT_OPTIONS:RobloxExportOptions={screenGuiName:"CreatorMakeGui",sizingMode:"AUTO",resolution:ROBLOX_RESOLUTIONS[0],visualMode:"ADAPTIVE",renderScale:2,imageResampling:"BEST_QUALITY",effectsQuality:"HIGH",resetOnSpawn:false,includeStroke:true,includeCorners:true,includeGradients:true,includeLayouts:true,includeConstraints:true};
+export const DEFAULT_ROBLOX_EXPORT_OPTIONS:RobloxExportOptions={screenGuiName:"CreatorMakeGui",displayOrder:0,zIndexBehavior:"Global",sizingMode:"AUTO",resolution:ROBLOX_RESOLUTIONS[0],visualMode:"ADAPTIVE",renderScale:2,imageResampling:"BEST_QUALITY",effectsQuality:"HIGH",resetOnSpawn:false,includeStroke:true,includeCorners:true,includeGradients:true,includeLayouts:true,includeConstraints:true};

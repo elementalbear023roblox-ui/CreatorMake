@@ -27,7 +27,7 @@ local INSTANCE_ID = HttpService:GenerateGUID(false)
 local toolbar = plugin:CreateToolbar("CreatorMake")
 -- Keep the icon empty until CreatorMake has a valid published Roblox ContentId.
 local openButton = toolbar:CreateButton("CreatorMake", "Connect to the local CreatorMake editor", "")
-local widgetInfo = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right, false, false, 370, 520, 320, 420)
+local widgetInfo = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right, false, false, 390, 680, 340, 560)
 local widget = plugin:CreateDockWidgetPluginGui("CreatorMakeStudioSync", widgetInfo)
 widget.Title = "CREATORMAKE"
 openButton.Click:Connect(function() widget.Enabled = not widget.Enabled end)
@@ -50,6 +50,7 @@ local statusLabel = label("CreatorMake: Disconnected", 26, Color3.fromRGB(255,10
 local endpointLabel = label("Web "..CREATORMAKE_APP_VERSION.." · Bridge "..EXPECTED_BRIDGE_VERSION.." · Protocol "..tostring(SUPPORTED_PROTOCOL_VERSION).." · Port ${creatorMakeBridgePort}", 28, Color3.fromRGB(154,160,180))
 local guiLabel = label("Current Project: —", 22)
 local deployLabel = label("Deploy Target: StarterGui — Current Project", 24, Color3.fromRGB(76,222,143))
+local installedLabel = label("CREATORMAKE GUIS\\nNone installed in StarterGui", 105, Color3.fromRGB(190,196,216))
 local function button(text)
   local item=make("TextButton", {Size=UDim2.new(1,0,0,36),BackgroundColor3=Color3.fromRGB(104,79,242),TextColor3=Color3.fromRGB(255,255,255),Text=text,Font=Enum.Font.GothamBold,TextSize=13,BorderSizePixel=0,AutoButtonColor=true}, root)
   make("UICorner", {CornerRadius=UDim.new(0,6)}, item); return item
@@ -58,21 +59,67 @@ local connectButton=button("RETRY CONNECTION")
 local basicImportButton=button("TEST BASIC FRAME IMPORT")
 local previewButton=button("PREVIEW CURRENT CREATORMAKE PROJECT")
 local installButton=button("IMPORT CURRENT CREATORMAKE PROJECT")
+local repairButton=button("REPAIR CREATORMAKE GUIS")
 local disconnectButton=button("DISCONNECT")
 local detailLabel=label("Preview uses a temporary PlayerGui copy. Permanent sync updates only the CreatorMake-managed StarterGui source used for every player.", 90, Color3.fromRGB(154,160,180))
 
 local connected = false
 local busy = false
 local autoSyncEnabled = true
-local previewProjectName = nil
 local previewScreenGui = nil
-local previewImages = {}
-local previewByHash = {}
-local viewportCameraConnection = nil
-local viewportWorkspaceConnection = nil
+local previewScopeKey = nil
+local imageScopes = {}
+local sharedImagesByHash = {}
+local viewportBindings = {}
+
+local function validAssetId(value)
+  return type(value)=="string" and string.match(value,"^rbxassetid://%d+$")~=nil
+end
+
+local function unsafeVisualsForScreenGui(screenGui)
+  local unsafe={}
+  for _,item in ipairs(screenGui:GetDescendants()) do
+    if item:IsA("ImageLabel") or item:IsA("ImageButton") then
+      local image=tostring(item.Image or "")
+      local status=tostring(item:GetAttribute("CreatorMakeAssetStatus") or "")
+      local delegatesVisualToChild=item:GetAttribute("CreatorMakeExpectsVisualChild")==true or tostring(item:GetAttribute("CreatorMakeRole") or "")=="HitTarget"
+      if not delegatesVisualToChild and (not validAssetId(image) or (status~="" and status~="mapped")) then
+        table.insert(unsafe,{name=item.Name,reason=validAssetId(image) and ("Asset status "..status) or "Missing permanent Roblox asset"})
+      end
+    end
+  end
+  return unsafe
+end
+
+local function installedCreatorMakeProjects()
+  local projects={}
+  for _,item in ipairs(StarterGui:GetChildren()) do
+    if item:IsA("ScreenGui") and item:GetAttribute("CreatorMakeManaged")==true then
+      local projectId=tostring(item:GetAttribute("CreatorMakeProjectId") or "")
+      if projectId~="" then table.insert(projects,{projectId=projectId,guiId=tostring(item:GetAttribute("CreatorMakeGuiId") or ""),name=item.Name,enabled=item.Enabled,displayOrder=item.DisplayOrder,resetOnSpawn=item.ResetOnSpawn,unsafeVisuals=unsafeVisualsForScreenGui(item)}) end
+    end
+  end
+  table.sort(projects,function(a,b) if a.displayOrder==b.displayOrder then return a.name<b.name end return a.displayOrder<b.displayOrder end)
+  return projects
+end
+
+local function refreshInstalledProjects(incomingProjectId, incomingProjectName)
+  local projects=installedCreatorMakeProjects()
+  local lines={"CREATORMAKE GUIS"}
+  local incomingInstalled=false
+  for _,project in ipairs(projects) do
+    if incomingProjectId and project.projectId==tostring(incomingProjectId) then incomingInstalled=true end
+    local safety=#project.unsafeVisuals==0 and " · ready" or (" · "..tostring(#project.unsafeVisuals).." unsafe visual(s)")
+    table.insert(lines,(project.enabled and "✓ " or "○ ")..project.name.."  ["..project.projectId.."] · order "..tostring(project.displayOrder)..safety)
+  end
+  if #projects==0 then table.insert(lines,"None installed in StarterGui") end
+  installedLabel.Text=table.concat(lines,"\\n")
+  installButton.Text=incomingInstalled and ("UPDATE GUI · "..tostring(incomingProjectName or "CURRENT PROJECT")) or ("IMPORT GUI · "..tostring(incomingProjectName or "CURRENT PROJECT"))
+  return projects,incomingInstalled
+end
 
 local function pluginPayload(status)
-  return {instanceId=INSTANCE_ID,appVersion=CREATORMAKE_APP_VERSION,pluginVersion=PLUGIN_VERSION,protocolVersion=SUPPORTED_PROTOCOL_VERSION,status=status or (busy and "busy" or "idle"),placeId=game.PlaceId}
+  return {instanceId=INSTANCE_ID,appVersion=CREATORMAKE_APP_VERSION,pluginVersion=PLUGIN_VERSION,protocolVersion=SUPPORTED_PROTOCOL_VERSION,status=status or (busy and "busy" or "idle"),placeId=game.PlaceId,universeId=game.GameId,experienceCreatorId=game.CreatorId,experienceCreatorType=game.CreatorType.Name,installedProjects=installedCreatorMakeProjects()}
 end
 
 local function showStatus(text, color)
@@ -111,10 +158,6 @@ local function request(method, path, body)
   return decoded
 end
 
-local function validAssetId(value)
-  return type(value)=="string" and string.match(value,"^rbxassetid://%d+$")~=nil
-end
-
 local function validateHealth(health)
   if type(health)~="table" then error("HEALTH_INVALID_JSON: /health did not decode to an object.") end
   if health.status~="ok" or health.app~="CreatorMake" or health.service~="CreatorMake Studio Sync" then error("SERVICE_IDENTITY_MISMATCH: Expected CreatorMake Studio Sync at "..LOCAL_ORIGIN..".") end
@@ -133,7 +176,7 @@ local function validateManifest(manifest)
   if manifest.protocolVersion~=SUPPORTED_PROTOCOL_VERSION then error("MANIFEST_PROTOCOL_MISMATCH: plugin="..tostring(SUPPORTED_PROTOCOL_VERSION)..", manifest="..tostring(manifest.protocolVersion)..".") end
   if manifest.schema~="creatormake.roblox-manifest" then error("MANIFEST_SCHEMA_INVALID: schema="..tostring(manifest.schema)..".") end
   if manifest.schemaVersion~=1 and manifest.schemaVersion~=2 then error("MANIFEST_SCHEMA_VERSION_INVALID: schemaVersion="..tostring(manifest.schemaVersion)..".") end
-  if type(manifest.projectId)~="string" or manifest.projectId=="" or type(manifest.projectName)~="string" or manifest.projectName=="" then error("MANIFEST_PROJECT_INVALID: projectId and projectName are required.") end
+  if type(manifest.projectId)~="string" or manifest.projectId=="" or type(manifest.projectName)~="string" or manifest.projectName=="" or type(manifest.guiId)~="string" or manifest.guiId=="" then error("MANIFEST_PROJECT_INVALID: projectId, projectName, and stable guiId are required.") end
   if type(manifest.screenGuiName)~="string" or manifest.screenGuiName=="" then error("MANIFEST_PROJECT_INVALID: screenGuiName is missing.") end
   if type(manifest.nodes)~="table" then error("MANIFEST_INSTANCES_MISSING: nodes must be an array.") end
   if type(manifest.projectObjectIds)~="table" then error("MANIFEST_PROJECT_OBJECTS_MISSING: projectObjectIds must be an array.") end
@@ -307,33 +350,35 @@ local function downloadPixelBuffer(asset, assetIndex, assetCount)
   return pixels,width,height
 end
 
-local function releasePreviewSource(sourceId)
-  local record=previewImages[sourceId]
-  if not record then return end
-  previewImages[sourceId]=nil
-  local shared=record.shared
-  shared.refs-=1
-  if shared.refs<=0 then
-    previewByHash[record.visualHash]=nil
-    pcall(function() shared.image:Destroy() end)
+local function releaseImageEntries(entries)
+  for _,record in pairs(entries or {}) do
+    local shared=record.shared
+    shared.refs-=1
+    if shared.refs<=0 then
+      sharedImagesByHash[record.visualHash]=nil
+      pcall(function() shared.image:Destroy() end)
+    end
   end
 end
 
-local function releaseAllPreviewImages()
-  local sourceIds={}
-  for sourceId in pairs(previewImages) do table.insert(sourceIds,sourceId) end
-  for _,sourceId in ipairs(sourceIds) do releasePreviewSource(sourceId) end
-  previewProjectName=nil
+local function releaseImageScope(scopeKey)
+  local scope=imageScopes[scopeKey]
+  if not scope then return end
+  imageScopes[scopeKey]=nil
+  releaseImageEntries(scope.entries)
 end
 
-local function acquirePreview(asset, assetIndex, assetCount)
-  local current=previewImages[asset.sourceId]
-  if current and current.visualHash==asset.visualHash then return current.shared.content,false end
-  if current then releasePreviewSource(asset.sourceId) end
-  local shared=previewByHash[asset.visualHash]
+local function releaseAllPreviewImages()
+  local scopeKeys={}
+  for scopeKey in pairs(imageScopes) do if string.sub(scopeKey,1,17)=="PlayerGuiPreview:" then table.insert(scopeKeys,scopeKey) end end
+  for _,scopeKey in ipairs(scopeKeys) do releaseImageScope(scopeKey) end
+end
+
+local function acquirePreview(asset, assetIndex, assetCount, candidate)
+  local shared=sharedImagesByHash[asset.visualHash]
   if shared then
     shared.refs+=1
-    previewImages[asset.sourceId]={visualHash=asset.visualHash,shared=shared}
+    candidate.entries[asset.sourceId]={visualHash=asset.visualHash,shared=shared}
     return shared.content,false
   end
   if type(asset.localPath)~="string" then error("Rendered PNG is not staged for "..tostring(asset.elementName or asset.sourceId)..". Sync from CreatorMake again.") end
@@ -344,39 +389,56 @@ local function acquirePreview(asset, assetIndex, assetCount)
   if not writeOk then image:Destroy();error("Studio could not write CreatorMake RGBA pixels: "..tostring(problem)) end
   local content=Content.fromObject(image)
   shared={image=image,content=content,refs=1}
-  previewByHash[asset.visualHash]=shared
-  previewImages[asset.sourceId]={visualHash=asset.visualHash,shared=shared}
+  sharedImagesByHash[asset.visualHash]=shared
+  candidate.entries[asset.sourceId]={visualHash=asset.visualHash,shared=shared}
   return content,true
 end
 
-local function preparePreviewContent(manifest, jobId)
-  if manifest.visualMode~="PIXEL_ACCURATE" and manifest.visualMode~="ADAPTIVE" then releaseAllPreviewImages();return {},0,0 end
-  if previewProjectName and previewProjectName~=manifest.screenGuiName then releaseAllPreviewImages() end
-  previewProjectName=manifest.screenGuiName
+local function preparePreviewContent(manifest, jobId, deployTarget)
+  local candidate={scopeKey=tostring(deployTarget)..":"..tostring(manifest.projectId),entries={}}
   local contentBySource={}
-  local activeSources={}
   local created=0
   local reused=0
-  for index,asset in ipairs(manifest.assets or {}) do
-    if jobId then request("POST","/sync/progress",{messageType="PROJECT_SYNC_PROGRESS",jobId=jobId,instanceId=INSTANCE_ID,message="Preparing Studio preview "..tostring(index).."/"..tostring(#manifest.assets)..": "..tostring(asset.elementName or asset.sourceId),result={created=created,reused=reused,nodes=0}}) end
-    local content,wasCreated=acquirePreview(asset,index,#manifest.assets)
-    contentBySource[asset.sourceId]=content;activeSources[asset.sourceId]=true
-    if wasCreated then created+=1 else reused+=1 end
-  end
-  local stale={}
-  for sourceId in pairs(previewImages) do if not activeSources[sourceId] then table.insert(stale,sourceId) end end
-  for _,sourceId in ipairs(stale) do releasePreviewSource(sourceId) end
-  return contentBySource,created,reused
+  local ok,problem=pcall(function()
+    if manifest.visualMode~="PIXEL_ACCURATE" and manifest.visualMode~="ADAPTIVE" then return end
+    for index,asset in ipairs(manifest.assets or {}) do
+      if not validAssetId(asset.robloxAssetId) then
+        if jobId then request("POST","/sync/progress",{messageType="PROJECT_SYNC_PROGRESS",jobId=jobId,instanceId=INSTANCE_ID,message="Preparing project-scoped Studio visual "..tostring(index).."/"..tostring(#manifest.assets)..": "..tostring(asset.elementName or asset.sourceId),result={created=created,reused=reused,nodes=0}}) end
+        local content,wasCreated=acquirePreview(asset,index,#manifest.assets,candidate)
+        contentBySource[asset.sourceId]=content
+        if wasCreated then created+=1 else reused+=1 end
+      end
+    end
+  end)
+  if not ok then releaseImageEntries(candidate.entries);error(problem) end
+  return contentBySource,created,reused,candidate
 end
 
-local function releaseViewportScale()
-  if viewportCameraConnection then viewportCameraConnection:Disconnect();viewportCameraConnection=nil end
-  if viewportWorkspaceConnection then viewportWorkspaceConnection:Disconnect();viewportWorkspaceConnection=nil end
+local function commitImageScope(candidate)
+  if not candidate then return end
+  local previous=imageScopes[candidate.scopeKey]
+  imageScopes[candidate.scopeKey]=candidate
+  if previous then releaseImageEntries(previous.entries) end
+end
+
+local function discardImageScope(candidate)
+  if candidate then releaseImageEntries(candidate.entries) end
+end
+
+local function disconnectViewportBinding(binding)
+  if not binding then return end
+  if binding.camera then binding.camera:Disconnect() end
+  if binding.workspace then binding.workspace:Disconnect() end
+end
+
+local function releaseViewportScale(scopeKey)
+  if scopeKey then disconnectViewportBinding(viewportBindings[scopeKey]);viewportBindings[scopeKey]=nil;return end
+  for _,binding in pairs(viewportBindings) do disconnectViewportBinding(binding) end
+  viewportBindings={}
 end
 
 local function configureViewportScale(manifest, instances)
-  releaseViewportScale()
-  if manifest.visualMode~="PIXEL_ACCURATE" and manifest.visualMode~="ADAPTIVE" then return end
+  if manifest.visualMode~="PIXEL_ACCURATE" and manifest.visualMode~="ADAPTIVE" then return nil end
   local viewport=nil
   for _,node in ipairs(manifest.nodes or {}) do
     if type(node.attributes)=="table" and node.attributes.CreatorMakeRole=="Viewport" then viewport=instances[node.sourceId];break end
@@ -387,6 +449,7 @@ local function configureViewportScale(manifest, instances)
   local referenceWidth=manifest.referenceResolution.width
   local referenceHeight=manifest.referenceResolution.height
   if type(referenceWidth)~="number" or type(referenceHeight)~="number" or referenceWidth<=0 or referenceHeight<=0 then error("MANIFEST_REFERENCE_INVALID: referenceResolution must be positive.") end
+  local binding={camera=nil,workspace=nil}
   local function updateScale()
     local camera=workspace.CurrentCamera
     if not camera then return end
@@ -397,13 +460,19 @@ local function configureViewportScale(manifest, instances)
     viewport:SetAttribute("CreatorMakeViewportHeight",viewportSize.Y)
   end
   local function bindCamera()
-    if viewportCameraConnection then viewportCameraConnection:Disconnect();viewportCameraConnection=nil end
+    if binding.camera then binding.camera:Disconnect();binding.camera=nil end
     local camera=workspace.CurrentCamera
-    if camera then viewportCameraConnection=camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale) end
+    if camera then binding.camera=camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale) end
     updateScale()
   end
-  viewportWorkspaceConnection=workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindCamera)
+  binding.workspace=workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindCamera)
   bindCamera()
+  return binding
+end
+
+local function commitViewportBinding(scopeKey, binding)
+  disconnectViewportBinding(viewportBindings[scopeKey])
+  viewportBindings[scopeKey]=binding
 end
 
 local function printTextScaleDiagnostics(manifest, instances)
@@ -437,7 +506,11 @@ local function printTextScaleDiagnostics(manifest, instances)
 end
 
 local function manifestProjectId(manifest)
-  return tostring(manifest.projectId or manifest.screenGuiName)
+  return tostring(manifest.projectId)
+end
+
+local function managedScopeKey(manifest, deployTarget)
+  return tostring(deployTarget)..":"..manifestProjectId(manifest)
 end
 
 local function previewParent()
@@ -453,12 +526,17 @@ end
 local function findManagedScreenGui(parent, manifest, deployTarget)
   local projectId=manifestProjectId(manifest)
   for _,item in ipairs(parent:GetChildren()) do
-    if item:IsA("ScreenGui") and item:GetAttribute("CreatorMakeManaged")==true and item:GetAttribute("CreatorMakeProjectId")==projectId and item:GetAttribute("CreatorMakeDeployTarget")==deployTarget then return item end
+    local itemTarget=item:GetAttribute("CreatorMakeDeployTarget")
+    if item:IsA("ScreenGui") and item:GetAttribute("CreatorMakeManaged")==true and item:GetAttribute("CreatorMakeProjectId")==projectId and (itemTarget==deployTarget or (parent==StarterGui and deployTarget=="StarterGui" and itemTarget==nil)) then return item end
   end
-  -- Upgrade one legacy CreatorMake preview only when its name and old ownership marker match.
+  -- Upgrade one genuinely legacy CreatorMake preview/root only when it has no modern
+  -- project identity. Name-only fallback must never replace another project
+  -- that happens to use the same ScreenGui name.
   if parent==StarterGui and deployTarget=="StarterGui" then
     for _,item in ipairs(parent:GetChildren()) do
-      if item:IsA("ScreenGui") and item.Name==manifest.screenGuiName and item:GetAttribute("CreatorMakeLocal")==true then return item end
+      local legacyProjectId=item:GetAttribute("CreatorMakeProjectId")
+      local legacyGuiId=item:GetAttribute("CreatorMakeGuiId")
+      if item:IsA("ScreenGui") and item.Name==manifest.screenGuiName and item:GetAttribute("CreatorMakeLocal")==true and legacyProjectId==nil and legacyGuiId==nil then return item end
     end
   end
   return nil
@@ -467,6 +545,7 @@ end
 local function destroyPreviewScreenGui()
   if previewScreenGui and previewScreenGui.Parent then previewScreenGui:Destroy() end
   previewScreenGui=nil
+  if previewScopeKey then releaseImageScope(previewScopeKey);releaseViewportScale(previewScopeKey);previewScopeKey=nil end
 end
 
 local function applyManifest(manifest, deployTarget)
@@ -481,49 +560,47 @@ local function applyManifest(manifest, deployTarget)
   if deployTarget=="StarterGui" and RunService:IsRunning() then error("Studio is currently running. Changes made only to PlayerGui during a test session are temporary. Stop the test before syncing CreatorMake permanently to StarterGui.") end
   local parent,previewFallback=StarterGui,false
   if deployTarget=="PlayerGuiPreview" then parent,previewFallback=previewParent() end
-  local screenGui=findManagedScreenGui(parent,manifest,deployTarget)
-  if not screenGui then screenGui=Instance.new("ScreenGui");screenGui.Parent=parent end
+  local previousScreenGui=findManagedScreenGui(parent,manifest,deployTarget)
+  local screenGui=Instance.new("ScreenGui")
   local settings=manifest.screenGuiSettings or {}
   screenGui.Name=deployTarget=="PlayerGuiPreview" and previewFallback and (manifest.screenGuiName.."_Preview") or manifest.screenGuiName
-  screenGui.Enabled=settings.enabled~=false
+  screenGui.Enabled=previousScreenGui and previousScreenGui.Enabled or settings.enabled~=false
   screenGui.DisplayOrder=tonumber(settings.displayOrder) or 0
   screenGui.ResetOnSpawn=settings.resetOnSpawn==true
   screenGui.IgnoreGuiInset=settings.ignoreGuiInset==true or ((manifest.visualMode=="PIXEL_ACCURATE" or manifest.visualMode=="ADAPTIVE") and settings.ignoreGuiInset~=false)
   screenGui.ZIndexBehavior=settings.zIndexBehavior=="Sibling" and Enum.ZIndexBehavior.Sibling or Enum.ZIndexBehavior.Global
   screenGui.Archivable=deployTarget=="StarterGui"
-  screenGui:SetAttribute("CreatorMakeManaged",true);screenGui:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest));screenGui:SetAttribute("CreatorMakeDeployTarget",deployTarget);screenGui:SetAttribute("CreatorMakeVisualMode",manifest.visualMode or "NATIVE");screenGui:SetAttribute("CreatorMakeLocal",nil)
-  if deployTarget=="PlayerGuiPreview" then previewScreenGui=screenGui end
+  screenGui:SetAttribute("CreatorMakeManaged",true);screenGui:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest));screenGui:SetAttribute("CreatorMakeProjectName",manifest.projectName);screenGui:SetAttribute("CreatorMakeGuiId",manifest.guiId);screenGui:SetAttribute("CreatorMakeSchemaVersion",manifest.schemaVersion or manifest.version);screenGui:SetAttribute("CreatorMakeManifestVersion",manifest.manifestVersion);screenGui:SetAttribute("CreatorMakeLastSync",DateTime.now():ToIsoDate());screenGui:SetAttribute("CreatorMakeDeployTarget",deployTarget);screenGui:SetAttribute("CreatorMakeVisualMode",manifest.visualMode or "NATIVE");screenGui:SetAttribute("CreatorMakeLocal",nil)
   local existing={}
-  for _,item in ipairs(screenGui:GetDescendants()) do local id=item:GetAttribute("CreatorMakeId");if id and item:GetAttribute("CreatorMakeManaged")==true and item:GetAttribute("CreatorMakeProjectId")==manifestProjectId(manifest) then existing[id]=item end end
-  local retained={}
   for _,node in ipairs(manifest.nodes) do
-    local instance=existing[node.sourceId]
-    -- Replacing a parent class destroys its descendants. Never reuse one of
-    -- those destroyed (Parent-locked) references later in the same import.
-    if instance and instance.Parent==nil then existing[node.sourceId]=nil;instance=nil end
-    if instance and instance.ClassName~=node.className then instance:Destroy();instance=nil end
-    if not instance then instance=Instance.new(node.className) end
-    retained[node.sourceId]=true;instance.Name=node.name;instance:SetAttribute("CreatorMakeId",node.sourceId);instance:SetAttribute("CreatorMakeManaged",true);instance:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest))
+    local instance=Instance.new(node.className)
+    instance.Name=node.name
     for key,value in pairs(node.attributes or {}) do instance:SetAttribute(key,value) end
+    instance:SetAttribute("CreatorMakeId",node.sourceId);instance:SetAttribute("CreatorMakeManaged",true);instance:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest));instance:SetAttribute("CreatorMakeGuiId",manifest.guiId)
     setProperties(instance,node.properties)
     local parent=node.parentSourceId and existing[node.parentSourceId] or nil
     instance.Parent=parent or screenGui;existing[node.sourceId]=instance
     local decoratorKeys={}
     for _,decorator in ipairs(node.decorators or {}) do
       local key=decorator.className..":"..decorator.name;decoratorKeys[key]=true
-      local child=nil
-      for _,candidate in ipairs(instance:GetChildren()) do if candidate:GetAttribute("CreatorMakeDecorator")==key then child=candidate;break end end
-      if child and child.ClassName~=decorator.className then child:Destroy();child=nil end
-      if not child then child=Instance.new(decorator.className);child:SetAttribute("CreatorMakeDecorator",key) end
-      child:SetAttribute("CreatorMakeManaged",true);child:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest))
+      local child=Instance.new(decorator.className);child:SetAttribute("CreatorMakeDecorator",key)
+      child:SetAttribute("CreatorMakeManaged",true);child:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest));child:SetAttribute("CreatorMakeGuiId",manifest.guiId)
       child.Name=decorator.name;setProperties(child,decorator.properties);child.Parent=instance
     end
-    for _,candidate in ipairs(instance:GetChildren()) do local key=candidate:GetAttribute("CreatorMakeDecorator");if key and not decoratorKeys[key] then candidate:Destroy() end end
   end
-  for id,instance in pairs(existing) do if not retained[id] then instance:Destroy() end end
-  configureViewportScale(manifest,existing)
-  printTextScaleDiagnostics(manifest,existing)
-  return screenGui,existing
+  return screenGui,existing,previousScreenGui,parent,managedScopeKey(manifest,deployTarget)
+end
+
+local function commitManifest(manifest, deployTarget, screenGui, instances, previousScreenGui, parent, scopeKey)
+  screenGui.Parent=parent
+  local scaleOk,binding=pcall(function() return configureViewportScale(manifest,instances) end)
+  if not scaleOk then screenGui:Destroy();error(binding) end
+  if previousScreenGui and previousScreenGui~=screenGui then previousScreenGui:Destroy() end
+  commitViewportBinding(scopeKey,binding)
+  if deployTarget=="PlayerGuiPreview" then previewScreenGui=screenGui;previewScopeKey=scopeKey end
+  printTextScaleDiagnostics(manifest,instances)
+  refreshInstalledProjects(manifest.projectId,manifest.projectName)
+  return screenGui
 end
 
 local function verifyTextArchitecture(manifest, instances)
@@ -641,6 +718,7 @@ local function connectLocal()
   end
   autoSyncEnabled=true;connected=true;lastConnectionProblem=""
   showStatus("CreatorMake: Connected",Color3.fromRGB(76,222,143))
+  refreshInstalledProjects(health.currentProjectId,health.currentProjectName)
   detailLabel.Text=(health.manifestReady and "Connected · manifest ready" or "Connected · no manifest staged").." · Web "..CREATORMAKE_APP_VERSION.." · Bridge "..tostring(health.bridgeVersion).." · Plugin "..tostring(PLUGIN_VERSION).." · Protocol "..tostring(SUPPORTED_PROTOCOL_VERSION).."."
   return true
 end
@@ -652,7 +730,9 @@ basicImportButton.Activated:Connect(function()
   busy=true
   local ok,result=pcall(function()
     local manifest=validateManifest(request("GET","/basic-test"))
-    local gui=applyManifest(manifest,"PlayerGuiPreview")
+    destroyPreviewScreenGui()
+    local gui,instances,previous,parent,scopeKey=applyManifest(manifest,"PlayerGuiPreview")
+    commitManifest(manifest,"PlayerGuiPreview",gui,instances,previous,parent,scopeKey)
     return {manifest=manifest,gui=gui}
   end)
   busy=false
@@ -664,30 +744,41 @@ local function runImport(jobId, jobMode)
   if busy then return end
   if not connected and not connectLocal() then return end
   busy=true;detailLabel.Text="Fetching CURRENT PROJECT MANIFEST…"
+  local pendingImageScope=nil
+  local pendingScreenGui=nil
   local ok,result=pcall(function()
     local manifest=validateManifest(request("GET",jobId and ("/project/current/manifest?jobId="..HttpService:UrlEncode(jobId)) or "/project/current/manifest"))
     local starterGuiImport=jobMode=="apply-published" or jobMode=="install-starter-gui"
+    local deployTarget=starterGuiImport and "StarterGui" or "PlayerGuiPreview"
     local publishedAssets=starterGuiImport
     if starterGuiImport then for _,asset in ipairs(manifest.assets or {}) do if not validAssetId(asset.robloxAssetId) then publishedAssets=false;break end end end
-    local localAssetImport=starterGuiImport and not publishedAssets
+    if starterGuiImport and not publishedAssets then error("MULTIPLAYER_VISIBILITY_BLOCKED: Required CreatorMake visuals do not have persistent Roblox asset IDs. StarterGui was left unchanged.") end
+    local localAssetImport=false
     local contentBySource,created,reused={},0,0
     if starterGuiImport then destroyPreviewScreenGui() end
-    if publishedAssets then releaseAllPreviewImages() else contentBySource,created,reused=preparePreviewContent(manifest,jobId) end
-    detailLabel.Text=starterGuiImport and (localAssetImport and ("Importing project "..manifest.projectName.." and local RGBA visuals into StarterGui…") or ("Installing project "..manifest.projectName.." into StarterGui with published assets…")) or ("Building PlayerGui preview for project "..manifest.projectName.."…")
-    local gui,instances=applyManifest(manifest,starterGuiImport and "StarterGui" or "PlayerGuiPreview")
+    if not starterGuiImport then destroyPreviewScreenGui() end
+    if publishedAssets then pendingImageScope={scopeKey=managedScopeKey(manifest,deployTarget),entries={}} else contentBySource,created,reused,pendingImageScope=preparePreviewContent(manifest,jobId,deployTarget) end
+    detailLabel.Text=starterGuiImport and ("Installing project "..manifest.projectName.." into StarterGui with multiplayer-safe assets…") or ("Building PlayerGui preview for project "..manifest.projectName.."…")
+    local gui,instances,previous,parent,scopeKey=applyManifest(manifest,deployTarget)
+    pendingScreenGui=gui
     local assigned=publishedAssets and 0 or assignPreviewContent(manifest,instances,contentBySource)
-    if gui and starterGuiImport then gui:SetAttribute("CreatorMakeLocal",localAssetImport and true or nil);gui:SetAttribute("CreatorMakeMultiPlayerReady",publishedAssets) end
-    return {gui=gui,projectId=manifest.projectId,projectName=manifest.projectName,manifestVersion=manifest.manifestVersion,count=#manifest.nodes,created=created,reused=reused,assigned=assigned,permanent=starterGuiImport,localAssetImport=localAssetImport,multiPlayerReady=starterGuiImport and publishedAssets,textArchitecture=verifyTextArchitecture(manifest,instances)}
+    if gui and starterGuiImport then gui:SetAttribute("CreatorMakeLocal",nil);gui:SetAttribute("CreatorMakeMultiPlayerReady",publishedAssets) end
+    local textArchitecture=verifyTextArchitecture(manifest,instances)
+    commitManifest(manifest,deployTarget,gui,instances,previous,parent,scopeKey)
+    commitImageScope(pendingImageScope);pendingImageScope=nil;pendingScreenGui=nil
+    return {gui=gui,projectId=manifest.projectId,projectName=manifest.projectName,manifestVersion=manifest.manifestVersion,count=#manifest.nodes,created=created,reused=reused,assigned=assigned,permanent=starterGuiImport,localAssetImport=localAssetImport,multiPlayerReady=starterGuiImport and publishedAssets,textArchitecture=textArchitecture,installedProjects=installedCreatorMakeProjects()}
   end)
   busy=false
   if not ok then
+    if pendingScreenGui and pendingScreenGui.Parent==nil then pcall(function() pendingScreenGui:Destroy() end) end
+    discardImageScope(pendingImageScope)
     local problem=tostring(result)
     if jobId then pcall(function() request("POST","/sync/result",{messageType="PROJECT_SYNC_RESULT",jobId=jobId,instanceId=INSTANCE_ID,status="failed",message="Studio sync failed.",error=problem}) end) end
     showStatus("CreatorMake: Connected",Color3.fromRGB(76,222,143));detailLabel.Text="Studio sync stopped: "..problem;warn("CreatorMake Studio sync failed: "..problem);return
   end
-  local doneMessage=result.permanent and (result.localAssetImport and ("STARTERGUI IMPORT READY — project "..result.projectName.." installed "..tostring(result.count).." managed GUI objects with "..tostring(result.assigned).." local RGBA image surface(s).") or ("STARTERGUI READY — project "..result.projectName.." installed "..tostring(result.count).." managed GUI objects with published assets.")) or ("PREVIEW READY — project "..result.projectName.."; "..tostring(result.created).." changed visual(s), "..tostring(result.reused).." cached visual(s), "..tostring(result.assigned).." image surface(s), "..tostring(result.count).." GUI objects.")
+  local doneMessage=result.permanent and ("STARTERGUI READY — project "..result.projectName.." installed "..tostring(result.count).." managed GUI objects with verified multiplayer-safe assets.") or ("PREVIEW READY — project "..result.projectName.."; "..tostring(result.created).." changed visual(s), "..tostring(result.reused).." cached visual(s), "..tostring(result.assigned).." image surface(s), "..tostring(result.count).." GUI objects.")
   if jobId then
-    local reported,reportError=pcall(function() return request("POST","/sync/result",{messageType="PROJECT_SYNC_RESULT",jobId=jobId,instanceId=INSTANCE_ID,status="completed",message=doneMessage,result={projectId=result.projectId,projectName=result.projectName,manifestVersion=result.manifestVersion,created=result.created,reused=result.reused,nodes=result.count,screenGuiName=result.gui and result.gui.Name or nil,previewImages=result.assigned,permanent=result.permanent,localAssetImport=result.localAssetImport,deployTarget=result.permanent and "StarterGui" or "PlayerGuiPreview",multiPlayerReady=result.multiPlayerReady,textArchitecture=result.textArchitecture}}) end)
+    local reported,reportError=pcall(function() return request("POST","/sync/result",{messageType="PROJECT_SYNC_RESULT",jobId=jobId,instanceId=INSTANCE_ID,status="completed",message=doneMessage,result={projectId=result.projectId,projectName=result.projectName,manifestVersion=result.manifestVersion,created=result.created,reused=result.reused,nodes=result.count,screenGuiName=result.gui and result.gui.Name or nil,previewImages=result.assigned,permanent=result.permanent,localAssetImport=result.localAssetImport,deployTarget=result.permanent and "StarterGui" or "PlayerGuiPreview",multiPlayerReady=result.multiPlayerReady,textArchitecture=result.textArchitecture,installedProjects=result.installedProjects}}) end)
     if not reported then warn("CreatorMake synced the GUI but could not report completion: "..tostring(reportError)) end
   end
   showStatus("CreatorMake: Connected",Color3.fromRGB(76,222,143));guiLabel.Text="Current Project: "..result.projectName;deployLabel.Text=result.permanent and "Deploy Target: StarterGui — Current Project" or "Deploy Target: Current PlayerGui — Preview Only";detailLabel.Text=doneMessage
@@ -695,11 +786,25 @@ end
 
 previewButton.Activated:Connect(function() runImport(nil,"preview") end)
 installButton.Activated:Connect(function() runImport(nil,"install-starter-gui") end)
+repairButton.Activated:Connect(function()
+  if busy then return end
+  local projects=installedCreatorMakeProjects()
+  local unsafeCount=0
+  for _,project in ipairs(projects) do unsafeCount+=#project.unsafeVisuals end
+  if unsafeCount==0 then detailLabel.Text="REPAIR CHECK PASSED — every CreatorMake-managed StarterGui image uses a persistent Roblox asset ID.";return end
+  local ok,manifest=pcall(function() return validateManifest(request("GET","/project/current/manifest")) end)
+  if not ok then detailLabel.Text=tostring(unsafeCount).." unsafe visual(s) found. Stage the matching CreatorMake project, then run Repair again.";return end
+  local matchingUnsafe=false
+  for _,project in ipairs(projects) do if project.projectId==manifest.projectId and #project.unsafeVisuals>0 then matchingUnsafe=true;break end end
+  if not matchingUnsafe then detailLabel.Text=tostring(unsafeCount).." unsafe visual(s) belong to another CreatorMake project. Open and sync that project so CreatorMake can restore its permanent assets.";return end
+  for _,asset in ipairs(manifest.assets or {}) do if not validAssetId(asset.robloxAssetId) then detailLabel.Text="Repair stopped: the staged project still needs permanent Roblox assets.";return end end
+  runImport(nil,"install-starter-gui")
+end)
 disconnectButton.Activated:Connect(function()
-  autoSyncEnabled=false;connected=false;releaseViewportScale();destroyPreviewScreenGui();releaseAllPreviewImages();showStatus("CreatorMake: Disconnected",Color3.fromRGB(255,105,120));guiLabel.Text="ScreenGui: —";detailLabel.Text="Polling stopped and the temporary PlayerGui preview was removed. The managed StarterGui source was not changed."
+  autoSyncEnabled=false;connected=false;destroyPreviewScreenGui();releaseAllPreviewImages();showStatus("CreatorMake: Disconnected",Color3.fromRGB(255,105,120));guiLabel.Text="ScreenGui: —";detailLabel.Text="Polling stopped and the temporary PlayerGui preview was removed. Every project-scoped managed StarterGui source was left unchanged."
 end)
 
-pcall(function() plugin.Unloading:Connect(function() releaseViewportScale();destroyPreviewScreenGui();releaseAllPreviewImages() end) end)
+pcall(function() plugin.Unloading:Connect(function() destroyPreviewScreenGui();releaseAllPreviewImages() end) end)
 
 -- A queued web sync is claimed by exactly one Studio process. The manual button remains a fallback.
 task.spawn(function()
@@ -711,6 +816,7 @@ task.spawn(function()
         local heartbeatOk,heartbeat=pcall(function() return request("POST","/plugin/heartbeat",pluginPayload("idle")) end)
         if heartbeatOk and heartbeat.accepted==true then
           connected=true;showStatus("CreatorMake: Connected",Color3.fromRGB(76,222,143))
+          refreshInstalledProjects(health.currentProjectId,health.currentProjectName)
           local claimOk,claim=pcall(function() return request("POST","/sync/claim",pluginPayload("claiming")) end)
           if claimOk and claim.status=="claimed" and claim.jobId then detailLabel.Text="PROJECT_SYNC_REQUEST received. Importing current project…";runImport(claim.jobId,claim.mode) end
         else

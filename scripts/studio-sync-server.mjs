@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
@@ -11,7 +11,7 @@ import {
   CREATORMAKE_PRODUCTION_ORIGIN,
   CREATORMAKE_PROTOCOL_VERSION,
 } from "../lib/creatormake-version.js";
-import { createRobloxImageAsset, publicRobloxPublishingConfig, readRobloxPublishingConfig, waitForRobloxAssetOperation } from "./roblox-open-cloud.mjs";
+import { createRobloxImageAsset, grantRobloxImageUseToUniverse, publicRobloxPublishingConfig, readRobloxPublishingConfig, waitForRobloxAssetOperation } from "./roblox-open-cloud.mjs";
 
 const bridgeUrl = new URL(CREATORMAKE_BRIDGE_ORIGIN);
 const DEFAULT_HOST = bridgeUrl.hostname;
@@ -78,6 +78,7 @@ function validateManifest(value) {
   if (value.kind !== "project" || value.messageType !== "PROJECT_MANIFEST") throw new Error("Manifest validation failed: Object: project | Type: ProjectManifest | Field: kind | Reason: only PROJECT_MANIFEST payloads are accepted");
   if (typeof value.projectId !== "string" || value.projectId.trim().length === 0) throw new Error("Manifest validation failed: Object: project | Type: ProjectManifest | Field: projectId | Reason: expected the active CreatorMake project id");
   if (typeof value.projectName !== "string" || value.projectName.trim().length === 0) throw new Error("Manifest validation failed: Object: project | Type: ProjectManifest | Field: projectName | Reason: expected the active CreatorMake project name");
+  if (typeof value.guiId !== "string" || value.guiId.trim().length === 0) throw new Error("Manifest validation failed: Object: project | Type: ProjectManifest | Field: guiId | Reason: expected a stable CreatorMake GUI id");
   if (typeof value.manifestVersion !== "string" || value.manifestVersion.length === 0) throw new Error("Manifest validation failed: Object: project | Type: ProjectManifest | Field: manifestVersion | Reason: expected a non-empty version");
   if (!Array.isArray(value.projectObjectIds) || value.projectObjectIds.some((id) => typeof id !== "string" || id.length === 0) || new Set(value.projectObjectIds).size !== value.projectObjectIds.length) throw new Error("Manifest validation failed: Object: project | Type: ProjectManifest | Field: projectObjectIds | Reason: expected unique active-project object ids");
   if (!plainObject(value.exportDiagnostics) || value.exportDiagnostics.presetsExported !== 0 || value.exportDiagnostics.presetDefinitionsIncluded !== false) throw new Error("Manifest validation failed: Object: project | Type: ProjectManifest | Field: exportDiagnostics | Reason: preset definitions must never be exported");
@@ -179,26 +180,38 @@ function validateManifest(value) {
 
 const safeSegment = (value) => String(value || "asset").replace(/[^a-z0-9_-]+/gi, "-").replace(/(^-|-$)/g, "").slice(0, 80) || "asset";
 const validAssetId = (value) => /^rbxassetid:\/\/\d+$/.test(value ?? "");
-const assetMappingKey = (screenGuiName, sourceId, visualHash) => `${screenGuiName}:${sourceId}:${visualHash}`;
-const visualMappingKey = (screenGuiName, visualHash) => `${screenGuiName}:visual:${visualHash}`;
+const assetReadyForExperience = (asset) => validAssetId(asset?.robloxAssetId) && asset?.robloxUsePermission !== "pending";
+const unsafeImageReference = (value) => typeof value === "string" && value.trim() !== "" && !validAssetId(value.trim());
+const manifestScopeKey = (manifest) => String(manifest?.projectId || manifest?.guiId || manifest?.screenGuiName || "project");
+const assetMappingKey = (ownership, projectId, sourceId, visualHash) => `${ownership}:${projectId}:${sourceId}:${visualHash}`;
+const visualMappingKey = (ownership, projectId, visualHash) => `${ownership}:${projectId}:visual:${visualHash}`;
 
-function applyAssetMappings(manifest, mappingCache, incoming = []) {
+function applyAssetMappings(manifest, mappingCache, incoming = [], ownership = "unscoped") {
   if (!manifest) return 0;
   const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
   for (const mapping of incoming) {
     if (!mapping || typeof mapping.sourceId !== "string" || typeof mapping.visualHash !== "string" || !validAssetId(mapping.robloxAssetId)) {
       throw new Error("Every asset mapping needs sourceId, visualHash, and a real rbxassetid:// number.");
     }
-    mappingCache.set(assetMappingKey(manifest.screenGuiName, mapping.sourceId, mapping.visualHash), mapping.robloxAssetId);
-    mappingCache.set(visualMappingKey(manifest.screenGuiName, mapping.visualHash), mapping.robloxAssetId);
+    const scopeKey = manifestScopeKey(manifest);
+    mappingCache.set(assetMappingKey(ownership, scopeKey, mapping.sourceId, mapping.visualHash), mapping.robloxAssetId);
+    mappingCache.set(visualMappingKey(ownership, scopeKey, mapping.visualHash), mapping.robloxAssetId);
   }
   let mapped = 0;
   for (const asset of assets) {
-    const cached = mappingCache.get(assetMappingKey(manifest.screenGuiName, asset.sourceId, asset.visualHash))
-      ?? mappingCache.get(visualMappingKey(manifest.screenGuiName, asset.visualHash));
+    const scopeKey = manifestScopeKey(manifest);
+    const cached = mappingCache.get(assetMappingKey(ownership, scopeKey, asset.sourceId, asset.visualHash))
+      ?? mappingCache.get(visualMappingKey(ownership, scopeKey, asset.visualHash))
+      ?? mappingCache.get(assetMappingKey(ownership, manifest.screenGuiName, asset.sourceId, asset.visualHash))
+      ?? mappingCache.get(visualMappingKey(ownership, manifest.screenGuiName, asset.visualHash))
+      ?? (ownership === "unscoped" ? mappingCache.get(`${scopeKey}:${asset.sourceId}:${asset.visualHash}`) : null)
+      ?? (ownership === "unscoped" ? mappingCache.get(`${scopeKey}:visual:${asset.visualHash}`) : null);
     const assetId = validAssetId(asset.robloxAssetId) ? asset.robloxAssetId : cached;
     if (!validAssetId(assetId)) continue;
     asset.robloxAssetId = assetId;
+    asset.robloxUsePermission = "granted";
+    mappingCache.set(assetMappingKey(ownership, scopeKey, asset.sourceId, asset.visualHash), assetId);
+    mappingCache.set(visualMappingKey(ownership, scopeKey, asset.visualHash), assetId);
     asset.status = "mapped";
     asset.dirty = false;
     mapped += 1;
@@ -217,7 +230,7 @@ function applyAssetMappings(manifest, mappingCache, incoming = []) {
 function refreshManifestDiagnostics(manifest) {
   if (!manifest) return;
   const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
-  const unmappedAssets = assets.filter((asset) => !validAssetId(asset.robloxAssetId)).length;
+  const unmappedAssets = assets.filter((asset) => !assetReadyForExperience(asset)).length;
   const unstagedAssets = assets.filter((asset) => !asset.localPath && !validAssetId(asset.robloxAssetId)).length;
   manifest.importDiagnostics = {
     schemaVersion: "valid",
@@ -233,6 +246,34 @@ function refreshManifestDiagnostics(manifest) {
   };
 }
 
+function finalVisibilityFailures(manifest) {
+  if (!manifest) return [];
+  const failures = new Map();
+  for (const asset of manifest.assets ?? []) {
+    if (!assetReadyForExperience(asset)) failures.set(asset.sourceId, {
+      sourceId: asset.sourceId,
+      elementName: asset.elementName || asset.sourceId,
+      reason: asset.robloxUsePermission === "pending" ? "Roblox image exists, but this experience does not have Use permission yet" : asset.localPath ? "Missing permanent Roblox asset" : "Rendered PNG is unavailable",
+    });
+  }
+  for (const node of manifest.nodes ?? []) {
+    if (node.className !== "ImageLabel" && node.className !== "ImageButton") continue;
+    if (failures.has(node.sourceId)) continue;
+    const image = node.properties?.Image;
+    const attributes = node.attributes ?? {};
+    const delegatesVisualToChild = attributes.CreatorMakeExpectsVisualChild === true || attributes.CreatorMakeRole === "HitTarget";
+    const requiresImage = unsafeImageReference(image)
+      || typeof attributes.CreatorMakeAssetStatus === "string"
+      || (typeof attributes.CreatorMakeVisualHash === "string" && !delegatesVisualToChild);
+    if (requiresImage && !validAssetId(image)) failures.set(node.sourceId, {
+      sourceId: node.sourceId,
+      elementName: node.name || node.sourceId,
+      reason: image ? `Unsafe image reference: ${String(image).slice(0, 80)}` : "Missing permanent Roblox asset",
+    });
+  }
+  return [...failures.values()];
+}
+
 function createBasicTestManifest() {
   return {
     kind: "project",
@@ -243,6 +284,7 @@ function createBasicTestManifest() {
     schemaVersion: 1,
     projectId: "creatormake-connection-test",
     projectName: "CreatorMake Connection Test",
+    guiId: "creatormake-connection-test:screen",
     manifestVersion: "connection-test:1",
     projectObjectIds: ["creatormake-connection-frame"],
     exportDiagnostics: { projectObjectCount: 1, exportedProjectObjectCount: 1, exportNodeCount: 1, presetsExported: 0, presetDefinitionsIncluded: false },
@@ -392,7 +434,8 @@ async function persistRenderedAssets(manifest, outputRoot) {
   refreshManifestDiagnostics(stored);
   const assets = Array.isArray(stored.assets) ? stored.assets : [];
   if (!assets.length) return stored;
-  const projectDirectory = join(outputRoot, safeSegment(stored.screenGuiName));
+  const projectDirectoryName = safeSegment(manifestScopeKey(stored));
+  const projectDirectory = join(outputRoot, projectDirectoryName);
   await mkdir(projectDirectory, { recursive: true });
   const retainedFiles = new Set();
   for (const asset of assets) {
@@ -404,8 +447,17 @@ async function persistRenderedAssets(manifest, outputRoot) {
       const filePath = join(projectDirectory, basename(filename));
       await writeFile(filePath, Buffer.from(match[1], "base64"));
       asset.localPath = relative(process.cwd(), filePath).split(sep).join("/");
-      asset.localUrl = `/assets/${encodeURIComponent(safeSegment(stored.screenGuiName))}/${encodeURIComponent(basename(filename))}`;
+      asset.localUrl = `/assets/${encodeURIComponent(projectDirectoryName)}/${encodeURIComponent(basename(filename))}`;
       delete asset.dataUrl;
+    } else if (asset.localPath) {
+      const filename = basename(asset.localPath);
+      const previousPath = resolve(process.cwd(), asset.localPath);
+      const nextPath = join(projectDirectory, filename);
+      const allowedRoot = `${resolve(outputRoot)}${sep}`;
+      if (!previousPath.startsWith(allowedRoot)) throw new Error(`Rendered asset ${asset.sourceId} has an invalid local path.`);
+      if (previousPath !== nextPath) await copyFile(previousPath, nextPath);
+      asset.localPath = relative(process.cwd(), nextPath).split(sep).join("/");
+      asset.localUrl = `/assets/${encodeURIComponent(projectDirectoryName)}/${encodeURIComponent(filename)}`;
     }
     if (asset.localPath) retainedFiles.add(basename(asset.localPath));
     asset.dirty = false;
@@ -455,18 +507,21 @@ export async function startStudioSyncServer({
 } = {}) {
   let currentManifest = null;
   let currentManifestRevision = 0;
-  let lastSuccessfulManifest = null;
+  const lastSuccessfulManifests = new Map();
   let lastUpdatedAt = null;
   let syncSequence = 0;
   let syncJob = null;
   let publishSequence = 0;
   let publishingJob = null;
   const mappingCache = new Map();
+  const pendingPermissionCache = new Map();
   const pixelCache = new Map();
   const pluginSessions = new Map();
   const requestedUrl = `http://${host}:${port}`;
   const publishingConfig = readRobloxPublishingConfig(publishingEnvironment);
+  const mappingOwnership = publishingConfig.configured ? `${publishingConfig.creatorType}:${publishingConfig.creatorId}` : "unscoped";
   const mappingFile = join(outputDir, "asset-mappings.json");
+  const pendingPermissionFile = join(outputDir, "pending-asset-permissions.json");
 
   await mkdir(outputDir, { recursive: true });
   try {
@@ -478,13 +533,36 @@ export async function startStudioSyncServer({
     if (error?.code !== "ENOENT" && !quiet) console.warn(`[CreatorMake] Ignoring invalid asset mapping cache: ${error instanceof Error ? error.message : String(error)}`);
   }
 
+  try {
+    const entries = JSON.parse(await readFile(pendingPermissionFile, "utf8"));
+    if (Array.isArray(entries)) for (const entry of entries) {
+      if (Array.isArray(entry) && typeof entry[0] === "string" && validAssetId(entry[1])) pendingPermissionCache.set(entry[0], entry[1]);
+    }
+  } catch (error) {
+    if (error?.code !== "ENOENT" && !quiet) console.warn(`[CreatorMake] Ignoring invalid pending permission cache: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   const persistMappingCache = () => writeFile(mappingFile, JSON.stringify([...mappingCache.entries()], null, 2));
+  const persistPendingPermissionCache = () => writeFile(pendingPermissionFile, JSON.stringify([...pendingPermissionCache.entries()], null, 2));
+  const pendingPermissionKey = (manifest, asset) => visualMappingKey(mappingOwnership, manifestScopeKey(manifest), asset.visualHash);
+  const applyPendingPermissions = (manifest) => {
+    for (const asset of manifest?.assets ?? []) {
+      if (assetReadyForExperience(asset)) continue;
+      const pendingAssetId = pendingPermissionCache.get(pendingPermissionKey(manifest, asset));
+      if (!validAssetId(pendingAssetId)) continue;
+      asset.robloxAssetId = pendingAssetId;
+      asset.robloxUsePermission = "pending";
+      asset.status = "needs-publish";
+    }
+    refreshManifestDiagnostics(manifest);
+  };
 
   const activePlugins = () => {
     const threshold = Date.now() - PLUGIN_ONLINE_MS;
     for (const [instanceId, session] of pluginSessions) if (session.lastSeenMs < threshold) pluginSessions.delete(instanceId);
     return [...pluginSessions.values()];
   };
+  const activeExperience = () => activePlugins().find((plugin) => plugin.protocolVersion === PROTOCOL_VERSION && plugin.pluginVersion >= REQUIRED_PLUGIN_VERSION) ?? null;
   const publicSyncJob = () => syncJob ? {
     id: syncJob.id,
     mode: syncJob.mode,
@@ -500,6 +578,7 @@ export async function startStudioSyncServer({
   } : null;
   const publicPublishingJob = () => publishingJob ? {
     id: publishingJob.id,
+    phase: publishingJob.phase,
     status: publishingJob.status,
     message: publishingJob.message,
     error: publishingJob.error,
@@ -507,21 +586,26 @@ export async function startStudioSyncServer({
     completed: publishingJob.completed,
     published: publishingJob.published,
     reused: publishingJob.reused,
+    universeId: publishingJob.universeId,
     requestedAt: publishingJob.requestedAt,
     completedAt: publishingJob.completedAt,
   } : null;
   const publishingSummary = () => {
     const assets = currentManifest?.assets ?? [];
     const unique = new Map();
-    for (const asset of assets) if (!unique.has(asset.visualHash) || validAssetId(asset.robloxAssetId)) unique.set(asset.visualHash, asset);
-    const needsPublish = [...unique.values()].filter((asset) => !validAssetId(asset.robloxAssetId)).length;
+    for (const asset of assets) if (!unique.has(asset.visualHash) || assetReadyForExperience(asset)) unique.set(asset.visualHash, asset);
+    const needsPublish = [...unique.values()].filter((asset) => !assetReadyForExperience(asset)).length;
     return {
       config: publicRobloxPublishingConfig(publishingConfig),
       totalAssets: assets.length,
       uniqueVisuals: unique.size,
       needsPublish,
       publishedVisuals: unique.size - needsPublish,
-      previewOnlyAssets: assets.filter((asset) => !validAssetId(asset.robloxAssetId)).length,
+      previewOnlyAssets: assets.filter((asset) => !assetReadyForExperience(asset)).length,
+      publishingOwner: publishingConfig.configured ? `${publishingConfig.creatorType}:${publishingConfig.creatorId}` : null,
+      experienceOwner: activeExperience()?.experienceCreatorId && activeExperience()?.experienceCreatorType ? `${activeExperience().experienceCreatorType}:${activeExperience().experienceCreatorId}` : null,
+      sharingUniverseId: activeExperience()?.universeId ?? null,
+      crossOwnerPublishing: Boolean(activeExperience()?.experienceCreatorId && activeExperience()?.experienceCreatorType && (publishingConfig.creatorId !== String(activeExperience().experienceCreatorId) || publishingConfig.creatorType !== activeExperience().experienceCreatorType)),
       job: publicPublishingJob(),
     };
   };
@@ -538,7 +622,7 @@ export async function startStudioSyncServer({
       completedAt: null,
       claimedBy: null,
       leaseUntilMs: 0,
-      plan: createSyncPlan(currentManifest, lastSuccessfulManifest),
+      plan: createSyncPlan(currentManifest, lastSuccessfulManifests.get(currentManifest?.projectId) ?? null),
       result: null,
     };
     return true;
@@ -547,46 +631,73 @@ export async function startStudioSyncServer({
     const job = publishingJob;
     if (!job || !currentManifest) return;
     job.status = "running";
+    job.phase = "Preparing";
     try {
       const unique = new Map();
-      for (const asset of currentManifest.assets ?? []) if (!validAssetId(asset.robloxAssetId) && !unique.has(asset.visualHash)) unique.set(asset.visualHash, asset);
+      for (const asset of currentManifest.assets ?? []) if (!assetReadyForExperience(asset) && !unique.has(asset.visualHash)) unique.set(asset.visualHash, asset);
       job.total = unique.size;
       let index = 0;
       for (const asset of unique.values()) {
         index += 1;
-        job.message = `Publishing ${index}/${job.total}: ${asset.elementName || asset.sourceId}`;
-        if (!asset.localPath) throw new Error(`Rendered PNG is not staged for ${asset.elementName || asset.sourceId}.`);
-        const filePath = resolve(outputDir, safeSegment(currentManifest.screenGuiName), basename(asset.localPath));
-        const allowedRoot = `${resolve(outputDir)}${sep}`;
-        if (!filePath.startsWith(allowedRoot)) throw new Error("Invalid rendered asset path.");
-        const operation = await createRobloxImageAsset({
-          pngBytes: new Uint8Array(await readFile(filePath)),
-          filename: basename(filePath),
-          displayName: asset.elementName,
-          config: publishingConfig,
-          fetchImpl: openCloudFetch,
-        });
-        const result = await waitForRobloxAssetOperation(operation.path, {
-          config: publishingConfig,
-          fetchImpl: openCloudFetch,
-          ...(publishingSleep ? { sleep: publishingSleep } : {}),
-        });
+        let result = validAssetId(asset.robloxAssetId) && asset.robloxUsePermission === "pending"
+          ? { assetId: asset.robloxAssetId.slice("rbxassetid://".length), robloxAssetId: asset.robloxAssetId }
+          : null;
+        if (!result) {
+          job.phase = "Uploading";
+          job.message = `Publishing ${index}/${job.total}: ${asset.elementName || asset.sourceId}`;
+          if (!asset.localPath) throw new Error(`Rendered PNG is not staged for ${asset.elementName || asset.sourceId}.`);
+          const filePath = resolve(outputDir, safeSegment(manifestScopeKey(currentManifest)), basename(asset.localPath));
+          const allowedRoot = `${resolve(outputDir)}${sep}`;
+          if (!filePath.startsWith(allowedRoot)) throw new Error("Invalid rendered asset path.");
+          const operation = await createRobloxImageAsset({
+            pngBytes: new Uint8Array(await readFile(filePath)),
+            filename: basename(filePath),
+            displayName: asset.elementName,
+            config: publishingConfig,
+            fetchImpl: openCloudFetch,
+          });
+          job.phase = "Processing";
+          result = await waitForRobloxAssetOperation(operation.path, {
+            config: publishingConfig,
+            fetchImpl: openCloudFetch,
+            ...(publishingSleep ? { sleep: publishingSleep } : {}),
+          });
+          pendingPermissionCache.set(pendingPermissionKey(currentManifest, asset), result.robloxAssetId);
+          for (const candidate of currentManifest.assets ?? []) if (candidate.visualHash === asset.visualHash) {
+            candidate.robloxAssetId = result.robloxAssetId;
+            candidate.robloxUsePermission = "pending";
+            candidate.status = "needs-publish";
+          }
+          refreshManifestDiagnostics(currentManifest);
+          await persistPendingPermissionCache();
+        }
+        job.phase = "Sharing";
+        job.message = `Granting this experience access to ${index}/${job.total}: ${asset.elementName || asset.sourceId}`;
+        await grantRobloxImageUseToUniverse({ assetId: result.assetId, universeId: job.universeId, config: publishingConfig, fetchImpl: openCloudFetch });
         const mappings = (currentManifest.assets ?? [])
           .filter((candidate) => candidate.visualHash === asset.visualHash)
           .map((candidate) => ({ sourceId: candidate.sourceId, visualHash: candidate.visualHash, robloxAssetId: result.robloxAssetId }));
-        applyAssetMappings(currentManifest, mappingCache, mappings);
-        await persistMappingCache();
+        applyAssetMappings(currentManifest, mappingCache, mappings, mappingOwnership);
+        pendingPermissionCache.delete(pendingPermissionKey(currentManifest, asset));
+        for (const candidate of currentManifest.assets ?? []) if (candidate.visualHash === asset.visualHash) {
+          candidate.robloxCreatorType = publishingConfig.creatorType;
+          candidate.robloxCreatorId = publishingConfig.creatorId;
+          candidate.robloxUsePermission = "granted";
+        }
+        await Promise.all([persistMappingCache(), persistPendingPermissionCache()]);
         job.completed += 1;
         job.published += 1;
         job.reused += Math.max(0, mappings.length - 1);
       }
       job.status = "completed";
+      job.phase = "Ready";
       job.completedAt = new Date().toISOString();
-      job.message = job.total === 0 ? "All visual hashes already have permanent Roblox IDs." : `Published ${job.published} unique visual asset(s).`;
+      job.message = job.total === 0 ? "All visual hashes already have permanent Roblox IDs." : `Published ${job.published} unique visual asset(s) under your Roblox account and shared them with this experience.`;
       lastUpdatedAt = new Date().toISOString();
       queueStudioSync("install-starter-gui", "Waiting for Studio to install the managed ScreenGui in StarterGui for every player.");
     } catch (error) {
       job.status = "failed";
+      job.phase = "Failed";
       job.completedAt = new Date().toISOString();
       job.error = error instanceof Error ? error.message : "Roblox Open Cloud publishing failed.";
       job.message = "Publishing stopped.";
@@ -596,6 +707,11 @@ export async function startStudioSyncServer({
     if (!body || typeof body.instanceId !== "string" || body.instanceId.length < 8 || typeof body.pluginVersion !== "number") {
       throw new Error("Plugin heartbeat requires instanceId and pluginVersion.");
     }
+    const installedProjects = Array.isArray(body.installedProjects) ? body.installedProjects.slice(0, 100).flatMap((project) => {
+      if (!project || typeof project.projectId !== "string" || project.projectId.length === 0) return [];
+      const unsafeVisuals = Array.isArray(project.unsafeVisuals) ? project.unsafeVisuals.slice(0, 25).flatMap((item) => item && typeof item.name === "string" ? [{ name: item.name.slice(0, 120), reason: typeof item.reason === "string" ? item.reason.slice(0, 240) : "Missing permanent asset" }] : []) : [];
+      return [{ projectId: project.projectId.slice(0, 200), guiId: typeof project.guiId === "string" ? project.guiId.slice(0, 240) : "", name: typeof project.name === "string" ? project.name.slice(0, 100) : "ScreenGui", enabled: project.enabled !== false, displayOrder: Number.isFinite(project.displayOrder) ? project.displayOrder : 0, resetOnSpawn: project.resetOnSpawn === true, unsafeVisuals }];
+    }) : [];
     const session = {
       instanceId: body.instanceId.slice(0, 100),
       pluginVersion: body.pluginVersion,
@@ -603,6 +719,10 @@ export async function startStudioSyncServer({
       appVersion: typeof body.appVersion === "string" ? body.appVersion.slice(0, 40) : null,
       status: typeof body.status === "string" ? body.status.slice(0, 80) : "idle",
       placeId: typeof body.placeId === "number" ? body.placeId : null,
+      universeId: typeof body.universeId === "number" ? body.universeId : null,
+      experienceCreatorId: typeof body.experienceCreatorId === "number" && body.experienceCreatorId > 0 ? String(Math.trunc(body.experienceCreatorId)) : null,
+      experienceCreatorType: typeof body.experienceCreatorType === "string" && ["user", "group"].includes(body.experienceCreatorType.toLowerCase()) ? body.experienceCreatorType.toLowerCase() : null,
+      installedProjects,
       lastSeenAt: new Date().toISOString(),
       lastSeenMs: Date.now(),
     };
@@ -659,7 +779,8 @@ export async function startStudioSyncServer({
         connectionState,
         pluginOnline: Boolean(compatiblePlugin),
         pluginVersionRequired: REQUIRED_PLUGIN_VERSION,
-        plugins: plugins.map(({ instanceId, pluginVersion, protocolVersion, appVersion, status, placeId, lastSeenAt }) => ({ instanceId, pluginVersion, protocolVersion, appVersion, status, placeId, lastSeenAt })),
+        plugins: plugins.map(({ instanceId, pluginVersion, protocolVersion, appVersion, status, placeId, universeId, experienceCreatorId, experienceCreatorType, installedProjects, lastSeenAt }) => ({ instanceId, pluginVersion, protocolVersion, appVersion, status, placeId, universeId, experienceCreatorId, experienceCreatorType, installedProjects, lastSeenAt })),
+        installedProjects: compatiblePlugin?.installedProjects ?? newestPlugin?.installedProjects ?? [],
         manifestReady: currentManifest !== null,
         currentProjectId: currentManifest?.projectId ?? null,
         currentProjectName: currentManifest?.projectName ?? null,
@@ -670,6 +791,7 @@ export async function startStudioSyncServer({
         renderedAssets: assets.filter((asset) => asset.localPath).length,
         unmappedAssets: assets.filter((asset) => !validAssetId(asset.robloxAssetId)).length,
         uploadReady: assets.filter((asset) => asset.localPath && !validAssetId(asset.robloxAssetId)).length,
+        visibility: { ready: finalVisibilityFailures(currentManifest).length === 0, failures: finalVisibilityFailures(currentManifest) },
         previewReady: Boolean(currentManifest?.importDiagnostics?.previewReady),
         lastSuccessfulSyncAt: syncJob?.status === "completed" ? syncJob.completedAt : null,
         publishing: publishingSummary(),
@@ -687,10 +809,10 @@ export async function startStudioSyncServer({
           manifest: currentManifest ? "valid" : "not-staged",
           pixelTransport: currentManifest?.assets?.some((asset) => asset.localPath) ? "ready" : "not-staged",
           studioPreview: currentManifest?.importDiagnostics?.previewReady ? "ready" : "not-staged",
-          deployTarget: assets.every((asset) => validAssetId(asset.robloxAssetId)) ? "StarterGui — Every Player" : "StarterGui — Local Studio Import",
+          deployTarget: finalVisibilityFailures(currentManifest).length === 0 ? "StarterGui — Every Player" : "StarterGui — Blocked Until Assets Are Safe",
           managedScreenGui: currentManifest?.screenGuiName ?? null,
           runtime: "Client",
-          multiPlayerReady: assets.every((asset) => validAssetId(asset.robloxAssetId)),
+          multiPlayerReady: finalVisibilityFailures(currentManifest).length === 0,
           previewClient: compatiblePlugin ? "connected" : "not-running",
           assetUpload: publishingConfig.configured ? "open-cloud-ready" : "not-configured",
           lastError: syncJob?.status === "failed" ? syncJob.error : publishingJob?.status === "failed" ? publishingJob.error : null,
@@ -715,7 +837,12 @@ export async function startStudioSyncServer({
         return;
       }
       if (!publishingConfig.configured) {
-        sendJson(response, 409, { error: `Roblox publishing is not configured: ${publishingConfig.missing.join(", ")}. Configure the CreatorMake server environment; credentials are never sent to Studio or the browser.` }, origin);
+        sendJson(response, 409, { error: "CreatorMake needs a Roblox publishing account for this project's visual assets.", action: "Configure the secure CreatorMake Roblox publishing connection.", missing: publishingConfig.missing }, origin);
+        return;
+      }
+      const experience = activeExperience();
+      if (!experience?.universeId) {
+        sendJson(response, 409, { error: "Open the target experience in Roblox Studio before publishing so CreatorMake can grant that experience access to your images.", action: "Open Studio, enable HTTP requests, and reconnect CreatorMake Studio Sync." }, origin);
         return;
       }
       if (publishingJob && ["pending", "running"].includes(publishingJob.status)) {
@@ -725,13 +852,15 @@ export async function startStudioSyncServer({
       const summary = publishingSummary();
       publishingJob = {
         id: `publish-${Date.now().toString(36)}-${(++publishSequence).toString(36)}`,
+        phase: "Preparing",
         status: "pending",
-        message: "Preparing original CreatorMake PNGs for Roblox Open Cloud.",
+        message: "Preparing original CreatorMake PNGs for your Roblox account.",
         error: null,
         total: summary.needsPublish,
         completed: 0,
         published: 0,
         reused: 0,
+        universeId: experience.universeId,
         requestedAt: new Date().toISOString(),
         completedAt: null,
       };
@@ -815,14 +944,16 @@ export async function startStudioSyncServer({
         if (body.messageType !== "PROJECT_SYNC_RESULT") throw new Error("Sync result must use PROJECT_SYNC_RESULT.");
         if (!syncJob || body.jobId !== syncJob.id || body.instanceId !== syncJob.claimedBy) throw new Error("Sync result does not match the active Studio job.");
         touchPlugin(body.instanceId, body.status === "completed" ? "idle" : "error");
-        const succeeded = body.status === "completed";
+        const finalImport = syncJob.mode === "install-starter-gui";
+        const visibilityVerified = !finalImport || (body.result?.multiPlayerReady === true && finalVisibilityFailures(currentManifest).length === 0);
+        const succeeded = body.status === "completed" && visibilityVerified;
         syncJob.status = succeeded ? "completed" : "failed";
         syncJob.completedAt = new Date().toISOString();
         syncJob.message = typeof body.message === "string" ? body.message.slice(0, 500) : succeeded ? "Studio sync completed." : "Studio sync failed.";
-        syncJob.error = succeeded ? null : (typeof body.error === "string" ? body.error.slice(0, 2_000) : "Studio sync failed.");
+        syncJob.error = succeeded ? null : !visibilityVerified ? "CreatorMake refused to report final sync success because multiplayer visibility was not verified." : (typeof body.error === "string" ? body.error.slice(0, 2_000) : "Studio sync failed.");
         syncJob.result = body.result && typeof body.result === "object" ? body.result : syncJob.result;
         syncJob.leaseUntilMs = 0;
-        if (succeeded) lastSuccessfulManifest = structuredClone(currentManifest);
+        if (succeeded && currentManifest?.projectId) lastSuccessfulManifests.set(currentManifest.projectId, structuredClone(currentManifest));
         sendJson(response, 200, { status: "ok", sync: publicSyncJob() }, origin);
       } catch (error) {
         sendJson(response, 409, { error: error instanceof Error ? error.message : "Invalid sync result." }, origin);
@@ -848,6 +979,13 @@ export async function startStudioSyncServer({
       if (body.messageType !== "PROJECT_SYNC_REQUEST" || body.kind !== "project") { sendJson(response, 400, { error: "Studio sync accepts only PROJECT_SYNC_REQUEST messages for kind project." }, origin); return; }
       if (body.projectId !== currentManifest.projectId || body.manifestVersion !== currentManifest.manifestVersion) { sendJson(response, 409, { error: `Sync request project ${String(body.projectId)} does not match current project ${currentManifest.projectId}.` }, origin); return; }
       const mode = body.mode === "install-starter-gui" || body.mode === "apply-published" ? "install-starter-gui" : "preview";
+      if (mode === "install-starter-gui") {
+        const failures = finalVisibilityFailures(currentManifest);
+        if (failures.length) {
+          sendJson(response, 409, { error: `${failures.length} visual${failures.length === 1 ? "" : "s"} could not be made multiplayer-safe. Final StarterGui import was stopped before any existing GUI was changed.`, code: "MULTIPLAYER_VISIBILITY_BLOCKED", failures }, origin);
+          return;
+        }
+      }
       queueStudioSync(mode, mode === "preview" ? "Waiting for Studio to build the current PlayerGui preview." : "Waiting for Studio to import the managed ScreenGui into StarterGui.");
       sendJson(response, 202, { status: "ok", sync: publicSyncJob() }, origin);
       return;
@@ -862,10 +1000,10 @@ export async function startStudioSyncServer({
         const asset = currentManifest.assets?.find((candidate) => candidate.sourceId === sourceId && candidate.visualHash === visualHash);
         if (!asset?.localPath) throw new Error("Rendered asset not found in the current manifest.");
         if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("Invalid pixel offset.");
-        const cacheKey = `${sourceId}:${visualHash}`;
+        const cacheKey = `${manifestScopeKey(currentManifest)}:${sourceId}:${visualHash}`;
         let decoded = pixelCache.get(cacheKey);
         if (!decoded) {
-          const filePath = resolve(outputDir, safeSegment(currentManifest.screenGuiName), basename(asset.localPath));
+          const filePath = resolve(outputDir, safeSegment(manifestScopeKey(currentManifest)), basename(asset.localPath));
           const allowedRoot = `${resolve(outputDir)}${sep}`;
           if (!filePath.startsWith(allowedRoot)) throw new Error("Invalid rendered asset path.");
           const image = sharp(filePath);
@@ -956,7 +1094,7 @@ export async function startStudioSyncServer({
       if (origin && !isAllowedOrigin(origin)) { sendJson(response, 403, { error: "Origin is not allowed." }); return; }
       const unlessProjectId = requestUrl.searchParams.get("unlessProjectId");
       if (!unlessProjectId || currentManifest?.projectId !== unlessProjectId) {
-        currentManifest = null;lastSuccessfulManifest = null;syncJob = null;publishingJob = null;lastUpdatedAt = new Date().toISOString();currentManifestRevision += 1;pixelCache.clear();
+        currentManifest = null;syncJob = null;publishingJob = null;lastUpdatedAt = new Date().toISOString();currentManifestRevision += 1;pixelCache.clear();
       }
       sendJson(response, 200, { status: "ok", messageType: "PROJECT_MANIFEST_CLEARED", currentProjectId: currentManifest?.projectId ?? null, currentManifestRevision }, origin);
       return;
@@ -995,12 +1133,14 @@ export async function startStudioSyncServer({
       try {
         currentManifest = await persistRenderedAssets(validateManifest(await readJsonBody(request)), outputDir);
         for (const asset of currentManifest.assets ?? []) {
-          if (validAssetId(asset.robloxAssetId)) {
-            mappingCache.set(assetMappingKey(currentManifest.screenGuiName, asset.sourceId, asset.visualHash), asset.robloxAssetId);
-            mappingCache.set(visualMappingKey(currentManifest.screenGuiName, asset.visualHash), asset.robloxAssetId);
+          if (assetReadyForExperience(asset)) {
+            const scopeKey = manifestScopeKey(currentManifest);
+            mappingCache.set(assetMappingKey(mappingOwnership, scopeKey, asset.sourceId, asset.visualHash), asset.robloxAssetId);
+            mappingCache.set(visualMappingKey(mappingOwnership, scopeKey, asset.visualHash), asset.robloxAssetId);
           }
         }
-        applyAssetMappings(currentManifest, mappingCache);
+        applyAssetMappings(currentManifest, mappingCache, [], mappingOwnership);
+        applyPendingPermissions(currentManifest);
         await persistMappingCache();
         pixelCache.clear();
         lastUpdatedAt = new Date().toISOString();
@@ -1022,7 +1162,7 @@ export async function startStudioSyncServer({
           presetsExported: currentManifest.exportDiagnostics.presetsExported,
           nodes: currentManifest.nodes.length,
           assets: currentManifest.assets?.length ?? 0,
-          mappedAssets: currentManifest.assets?.filter((asset) => validAssetId(asset.robloxAssetId)).length ?? 0,
+          mappedAssets: currentManifest.assets?.filter((asset) => assetReadyForExperience(asset)).length ?? 0,
           renderedAssets: currentManifest.assets ?? [],
           layoutDiagnostics,
           lastUpdatedAt,
@@ -1044,7 +1184,7 @@ export async function startStudioSyncServer({
         if (!currentManifest) throw new Error("No CreatorMake manifest is staged.");
         const body = await readJsonBody(request);
         if (body.screenGuiName !== currentManifest.screenGuiName || !Array.isArray(body.mappings)) throw new Error("Mappings do not match the current CreatorMake project.");
-        const mappedAssets = applyAssetMappings(currentManifest, mappingCache, body.mappings);
+        const mappedAssets = applyAssetMappings(currentManifest, mappingCache, body.mappings, mappingOwnership);
         await persistMappingCache();
         lastUpdatedAt = new Date().toISOString();
         sendJson(response, 200, { status: "ok", mappedAssets, unmappedAssets: (currentManifest.assets?.length ?? 0) - mappedAssets, lastUpdatedAt }, origin);

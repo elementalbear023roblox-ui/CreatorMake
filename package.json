@@ -7,16 +7,16 @@
   },
   "scripts": {
     "install:ci": "node scripts/install-ci.mjs",
-    "dev": "node scripts/run-framework.mjs dev",
+    "dev": "node --env-file-if-exists=.env.local scripts/run-framework.mjs dev",
     "build": "node scripts/run-framework.mjs build",
     "build:site": "vite build --config vite.vercel.config.ts",
-    "bridge": "node scripts/studio-sync-server.mjs",
+    "bridge": "node --env-file-if-exists=.env.local scripts/studio-sync-server.mjs",
     "build:netlify": "node scripts/run-netlify-build.mjs",
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern site",
     "plugin:build": "node --experimental-strip-types scripts/generate-studio-plugin.mjs",
     "test:options": "node --experimental-strip-types --test tests/options-quality.test.mjs",
-    "test:core": "node --experimental-strip-types --test tests/geometry-precision.test.mjs tests/intent.test.mjs tests/layout.test.mjs tests/snapping.test.mjs tests/image-workflow.test.mjs tests/roblox.test.mjs tests/roblox-pixel-export.test.mjs tests/roblox-adaptive-export.test.mjs tests/roblox-text-export.test.mjs tests/roblox-text-scaling.test.mjs tests/roblox-font-registry.test.mjs tests/layer-reparent.test.mjs tests/commission-workflow.test.mjs tests/sync.test.mjs tests/studio-sync-server.test.mjs tests/roblox-open-cloud.test.mjs tests/ai-agent.test.mjs tests/editor-stability.test.mjs tests/fonts.test.mjs tests/geometry.test.mjs tests/boolean.test.mjs tests/interface-themes.test.mjs",
+    "test:core": "node --experimental-strip-types --test tests/geometry-precision.test.mjs tests/intent.test.mjs tests/layout.test.mjs tests/snapping.test.mjs tests/image-workflow.test.mjs tests/roblox.test.mjs tests/roblox-pixel-export.test.mjs tests/roblox-adaptive-export.test.mjs tests/roblox-text-export.test.mjs tests/roblox-text-scaling.test.mjs tests/roblox-font-registry.test.mjs tests/layer-reparent.test.mjs tests/commission-workflow.test.mjs tests/sync.test.mjs tests/studio-sync-server.test.mjs tests/roblox-open-cloud.test.mjs tests/ai-agent.test.mjs tests/editor-stability.test.mjs tests/google-account.test.mjs tests/fonts.test.mjs tests/geometry.test.mjs tests/boolean.test.mjs tests/interface-themes.test.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

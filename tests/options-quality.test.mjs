@@ -16,12 +16,12 @@ test("project export options persist in schema 14 while editor options remain ou
 test("the primary Preview and Final choices resolve to predictable render quality",()=>{
   assert.equal(resolveProjectRenderScale({...DEFAULT_PROJECT_EXPORT_OPTIONS,exportQuality:"PREVIEW"}),2);
   assert.equal(resolveProjectRenderScale({...DEFAULT_PROJECT_EXPORT_OPTIONS,exportQuality:"FINAL"}),8);
-  assert.equal(DEFAULT_PROJECT_EXPORT_OPTIONS.effectsQuality,"ULTRA");assert.equal(DEFAULT_PROJECT_EXPORT_OPTIONS.renderedVisualQuality,"MAXIMUM_SAFE");
+  assert.equal(DEFAULT_PROJECT_EXPORT_OPTIONS.effectsQuality,"ULTRA");assert.equal(DEFAULT_PROJECT_EXPORT_OPTIONS.renderedVisualQuality,"MAXIMUM_SAFE");assert.equal(DEFAULT_PROJECT_EXPORT_OPTIONS.autoUploadChangedVisuals,"ON");
   assert.equal(resolveProjectRenderScale({...DEFAULT_PROJECT_EXPORT_OPTIONS,exportQuality:"FINAL",internalRenderScale:"4"}),8,"Final owns automatic master planning even for projects saved with an old manual override");
   const preview=applyProjectOptionPreset("FAST_PREVIEW"),final=applyProjectOptionPreset("ROBLOX_FINAL"),commission=applyProjectOptionPreset("COMMISSION_FINAL"),maximum=applyProjectOptionPreset("MAX_QUALITY");
   assert.equal(preview.exportQuality,"PREVIEW");assert.equal(resolveProjectRenderScale(preview),2);
-  assert.equal(final.exportQuality,"FINAL");assert.equal(final.nativeTextLabelExport,true);assert.equal(resolveProjectRenderScale(final),8);
-  assert.equal(commission.exportQuality,"FINAL");assert.equal(resolveProjectRenderScale(commission),8);
+  assert.equal(final.exportQuality,"FINAL");assert.equal(final.nativeTextLabelExport,true);assert.equal(final.autoUploadChangedVisuals,"ON");assert.equal(resolveProjectRenderScale(final),8);
+  assert.equal(commission.exportQuality,"FINAL");assert.equal(commission.autoUploadChangedVisuals,"ON");assert.equal(resolveProjectRenderScale(commission),8);
   assert.equal(maximum.exportQuality,"FINAL");assert.equal(maximum.preset,"MAX_QUALITY");assert.equal(maximum.renderedVisualQuality,"MAXIMUM_SAFE");assert.equal(maximum.imageResampling,"BEST_QUALITY");assert.equal(maximum.robloxImages,"PUBLISHABLE");assert.equal(maximum.safeExportCheck,"REQUIRE");
 });
 
@@ -56,9 +56,10 @@ test("adaptive master planning steps down on constrained devices without changin
 });
 
 test("properties alignment uses one tokenized grid and exposes the simplified export workflow",async()=>{
-  const [css,inspector,options,toolbar]=await Promise.all([readFile(new URL("../app/property-grid.css",import.meta.url),"utf8"),readFile(new URL("../components/editor/Inspector.tsx",import.meta.url),"utf8"),readFile(new URL("../components/editor/OptionsSection.tsx",import.meta.url),"utf8"),readFile(new URL("../components/editor/TopToolbar.tsx",import.meta.url),"utf8")]);
+  const [css,inspector,options,toolbar,robloxDialog]=await Promise.all([readFile(new URL("../app/property-grid.css",import.meta.url),"utf8"),readFile(new URL("../components/editor/Inspector.tsx",import.meta.url),"utf8"),readFile(new URL("../components/editor/OptionsSection.tsx",import.meta.url),"utf8"),readFile(new URL("../components/editor/TopToolbar.tsx",import.meta.url),"utf8"),readFile(new URL("../components/editor/RobloxExportDialog.tsx",import.meta.url),"utf8")]);
   for(const token of ["--property-label-width","--control-height","--section-padding","--panel-gap","--field-gap","--section-icon-size"])assert.match(css,new RegExp(token));
   assert.ok(inspector.indexOf("Roblox Export")<inspector.indexOf("<summary>Options</summary>"));assert.match(inspector,/Export As/);assert.match(inspector,/AUTO/);assert.match(inspector,/ORIGINAL/);assert.match(inspector,/IMAGE/);assert.match(inspector,/Render the complete button, including its text/);assert.match(inspector,/Runtime text changes require Auto\/Original export/);
   assert.match(options,/PROJECT EXPORT/);assert.match(options,/Default Export/);assert.match(options,/PREVIEW/);assert.match(options,/FINAL/);assert.match(options,/ADVANCED EXPORT/);assert.match(options,/Search advanced options/);assert.doesNotMatch(options,/MAX QUALITY EXPORT/);assert.doesNotMatch(options,/Internal Render Scale/);
   assert.match(toolbar,/\+ Create/);assert.match(toolbar,/>Import</);assert.match(toolbar,/Roblox Check/);assert.match(toolbar,/SYNC/);assert.match(toolbar,/> Export</);assert.doesNotMatch(toolbar,/QUICK BUILD/);
+  assert.match(robloxDialog,/SYNC TO STUDIO · AUTO PREPARE FOR ALL PLAYERS/);assert.match(robloxDialog,/mode:"auto-prepare-for-all-players"/);assert.match(robloxDialog,/needs a Roblox publishing account/);assert.match(robloxDialog,/asset-permissions:write/);assert.match(robloxDialog,/FAST PREVIEW · CURRENT PLAYER ONLY/);
 });

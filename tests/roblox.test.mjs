@@ -35,7 +35,7 @@ test("premium prompt creates a distinct dark shop with codes", () => {
 test("Roblox export preserves names, hierarchy, decorators, and valid syntax", () => {
   const shop = makeShop("Create a colorful Roblox simulator shop with six product cards and category tabs.");
   const project = { screen: { width: 960, height: 600 }, elements: shop.elements };
-  const result = createRobloxExport(project, { ...DEFAULT_ROBLOX_EXPORT_OPTIONS, visualMode:"NATIVE", screenGuiName: "CreatorMakeShop" });
+  const result = createRobloxExport(project, { ...DEFAULT_ROBLOX_EXPORT_OPTIONS, visualMode:"NATIVE", screenGuiName: "CreatorMakeShop", displayOrder:20, zIndexBehavior:"Sibling" });
   const requiredInstances = ["ScreenGui", "Frame", "TextLabel", "ImageButton", "UIStroke", "UICorner", "UIGradient", "UIListLayout", "UIGridLayout"];
   for (const className of requiredInstances) assert.match(result.lua, new RegExp(`Instance\\.new\\(\"${className}\"\\)`), className);
   for (const name of ["ShopWindow", "TitleText", "CloseButton", "ProductGrid", "SideTabs"]) assert.ok(result.lua.includes(`.Name = \"${name}\"`), name);
@@ -43,6 +43,12 @@ test("Roblox export preserves names, hierarchy, decorators, and valid syntax", (
   assert.ok(result.hierarchy.includes("ProductGrid [Frame]"));
   assert.ok(result.hierarchy.includes("UIGridLayout [UIGridLayout]"));
   assert.ok(result.lua.trim().endsWith("return screenGui"));
+  assert.equal(result.manifest.guiId,"CreatorMakeShop:screen");
+  assert.equal(result.manifest.screenGuiSettings.displayOrder,20);
+  assert.equal(result.manifest.screenGuiSettings.zIndexBehavior,"Sibling");
+  assert.match(result.lua,/screenGui\.DisplayOrder = 20/);
+  assert.match(result.lua,/screenGui\.ZIndexBehavior = Enum\.ZIndexBehavior\.Sibling/);
+  assert.match(result.lua,/CreatorMakeGuiId/);
   assert.deepEqual(verifyGeneratedLua(result.lua), { valid: true, errors: [] });
   assert.ok(!result.lua.includes("undefined"));
   assert.ok(!result.lua.includes("NaN"));
@@ -51,7 +57,7 @@ test("Roblox export preserves names, hierarchy, decorators, and valid syntax", (
 test("active-project manifest exports one placed frame and zero preset definitions",()=>{
   const project=createProject("Single Object"),frame=createElement("frame");Object.assign(frame,{id:"frame-only",name:"Frame1",parentId:null});project.elements=[frame];project.activePresetIds=SYSTEM_PRESETS.map((preset)=>preset.id);project.updatedAt=123;
   const result=buildActiveProjectRobloxManifest(project,{...DEFAULT_ROBLOX_EXPORT_OPTIONS,visualMode:"NATIVE",screenGuiName:"SingleObjectGui"}),manifest=result.manifest;
-  assert.equal(manifest.kind,"project");assert.equal(manifest.messageType,"PROJECT_MANIFEST");assert.equal(manifest.projectId,project.id);assert.equal(manifest.projectName,"Single Object");assert.deepEqual(manifest.projectObjectIds,["frame-only"]);assert.equal(manifest.exportDiagnostics.projectObjectCount,1);assert.equal(manifest.exportDiagnostics.exportedProjectObjectCount,1);assert.equal(manifest.exportDiagnostics.presetsExported,0);assert.equal(manifest.exportDiagnostics.presetDefinitionsIncluded,false);assert.equal(SYSTEM_PRESETS.length>0,true);assert.deepEqual(manifest.nodes.map((node)=>node.sourceId),["frame-only"]);
+  assert.equal(manifest.kind,"project");assert.equal(manifest.messageType,"PROJECT_MANIFEST");assert.equal(manifest.projectId,project.id);assert.equal(manifest.projectName,"Single Object");assert.equal(manifest.guiId,`${project.id}:screen`);assert.deepEqual(manifest.projectObjectIds,["frame-only"]);assert.equal(manifest.exportDiagnostics.projectObjectCount,1);assert.equal(manifest.exportDiagnostics.exportedProjectObjectCount,1);assert.equal(manifest.exportDiagnostics.presetsExported,0);assert.equal(manifest.exportDiagnostics.presetDefinitionsIncluded,false);assert.equal(SYSTEM_PRESETS.length>0,true);assert.deepEqual(manifest.nodes.map((node)=>node.sourceId),["frame-only"]);
 });
 
 test("active-project manifest removes a deleted button without importing preset library objects",()=>{
