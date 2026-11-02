@@ -46,4 +46,6 @@ test("effect presets create independent editable stacks",()=>{
 test("effects inspector exposes the complete stack workflow",async()=>{
   const source=await readFile(new URL("../components/editor/EffectsSection.tsx",import.meta.url),"utf8");
   for(const label of ["Add Effect","Effects Library","Disable all","Enable all","Clear stack","Save stack as preset","Animation","Delay","Phase offset","Duplicate effect","Reset effect"])assert.match(source,new RegExp(label));
+  const inspectorSource=await readFile(new URL("../components/editor/Inspector.tsx",import.meta.url),"utf8");
+  assert.match(inspectorSource,/querySelectorAll<HTMLDetailsElement>\(\":scope > details\"\)/,"nested animation disclosures must not be persisted as top-level inspector sections");
 });
