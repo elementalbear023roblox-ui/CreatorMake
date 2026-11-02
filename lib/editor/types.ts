@@ -63,6 +63,10 @@ export type GradientType = "none" | "linear" | "radial" | "conic" | "diamond" | 
 export type GradientStop = { id: string; color: string; position: number; opacity: number };
 export type GradientPoint = { id:string;color:string;x:number;y:number;opacity:number;radius:number };
 export type BlendMode = "normal" | "multiply" | "screen" | "overlay" | "darken" | "lighten" | "difference" | "exclusion";
+export type EffectCategory = "Lighting & Glow" | "Pixel & Retro" | "Blur & Focus" | "Distortion & Warping" | "Color & Gradients" | "Shadows & Depth" | "Holographic & Futuristic" | "Text & Typography" | "Stroke Effects" | "Texture & Material" | "Animation & Motion";
+export type EffectParameterValue = string | number | boolean;
+export type EffectAnimation = { enabled:boolean;duration:number;speed:number;direction:"normal"|"reverse"|"alternate";loopMode:"loop"|"once"|"ping-pong";easing:"linear"|"ease"|"ease-in"|"ease-out"|"ease-in-out";delay:number;phaseOffset:number };
+export type VisualEffectInstance = { id:string;type:string;name:string;enabled:boolean;expanded:boolean;parameters:Record<string,EffectParameterValue>;animation:EffectAnimation };
 export type LayoutMode = "none" | "horizontal" | "vertical" | "grid";
 export type LayoutSizing = "fixed" | "hug" | "fill";
 export type LayoutAlignment = "start" | "center" | "end" | "space-between";
@@ -140,6 +144,7 @@ export type EditorElement = {
   gradientPoints: GradientPoint[];
   fourCornerColors: {tl:string;tr:string;bl:string;br:string};
   blendMode: BlendMode;
+  effects: VisualEffectInstance[];
   shadow: string;
   text: string;
   textColor: string;
@@ -271,7 +276,7 @@ export type ProjectExportOptions = {
 };
 
 export type EditorProject = {
-  schemaVersion: 14;
+  schemaVersion: 15;
   id: string;
   name: string;
   createdAt: number;

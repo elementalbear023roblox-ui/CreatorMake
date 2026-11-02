@@ -18,6 +18,13 @@ Live production site: [https://creatormake-site.vercel.app/](https://creatormake
 
 The canonical app, bridge, plugin, and protocol versions live in `lib/creatormake-version.js`. The bridge allows the exact production origin and the intended local development origins; it does not use wildcard CORS.
 
+The production bundle includes the CreatorMake visual-effects registry,
+compositor, inspector stack, animation styles, and effect-aware Roblox export
+classification. Always run `npm run build:site` after modifying an effect
+definition or renderer so `site/assets/` and the production plugin download are
+regenerated together. Project schema 15 stores ordered effect instances; older
+projects receive an empty stack during normalization and remain fully editable.
+
 ## Google account backup
 
 CreatorMake remains local-first. Projects and assets are always saved in the

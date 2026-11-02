@@ -46,15 +46,21 @@ const simpleImage=(element:EditorElement)=>Boolean(element.roblox?.imageAssetId&
 type AutomaticClassification=Omit<RobloxElementClassification,"requestedMode"|"resolvedLabel"|"nativeLimitations">;
 
 function automaticClassification(element:EditorElement):AutomaticClassification{
+  const activeEffects=(element.effects??[]).filter((effect)=>effect.enabled),effectReason=activeEffects.length?`effect stack: ${activeEffects.map((effect)=>effect.name).join(", ")}`:"";
   if(element.type==="image"||element.type==="image-button"){
-    const native=simpleImage(element),reasons=native?[]:[!/^rbxassetid:\/\/\d+$/.test(element.roblox?.imageAssetId??"")?"image needs a published Roblox asset ID":"image crop or adjustments need exact pixel rendering"];
+    const native=simpleImage(element)&&!activeEffects.length,reasons=native?[]:[effectReason||(!/^rbxassetid:\/\/\d+$/.test(element.roblox?.imageAssetId??"")?"image needs a published Roblox asset ID":"image crop or adjustments need exact pixel rendering")];
     return{classification:native?"NATIVE":"RASTERIZED",rasterPart:native?undefined:"full",intendedRobloxClass:element.type==="image-button"?"ImageButton":"ImageLabel",interactionEnabled:element.type==="image-button",nativeText:false,reasons};
   }
   const reasons:string[]=[],kind=geometryKindForElement(element),isText=element.type==="text"||element.type==="button",textDecision=isText?classifyTextExport(element):undefined;
-  const surfaceNative=(kind==="rectangle"||kind==="rounded-rectangle")&&!element.imageAssetId&&!element.booleanOperation&&!element.booleanOperands.length&&simpleCorners(element)&&simpleGradient(element)&&!hasShadow(element.shadow)&&element.blendMode==="normal"&&simpleTransform(element)&&!(element.clipContent&&kind==="rounded-rectangle"&&Math.max(...Object.values(element.corners))>0);
-  if(element.imageAssetId)reasons.push("image fill");
+  const surfaceNative=(kind==="rectangle"||kind==="rounded-rectangle")&&!element.imageAssetId&&!element.booleanOperation&&!element.booleanOperands.length&&simpleCorners(element)&&simpleGradient(element)&&!hasShadow(element.shadow)&&element.blendMode==="normal"&&simpleTransform(element)&&!activeEffects.length&&!(element.clipContent&&kind==="rounded-rectangle"&&Math.max(...Object.values(element.corners))>0);
+  if(element.imageAssetId)reasons.push("image fill");if(effectReason)reasons.push(effectReason);
   if(kind!=="rectangle"&&kind!=="rounded-rectangle")reasons.push(`custom ${kind} geometry`);if(element.booleanOperation||element.booleanOperands.length)reasons.push("boolean geometry");if(!simpleCorners(element))reasons.push("non-uniform or advanced corners");if(!simpleGradient(element))reasons.push(`${element.gradientType} gradient`);if(hasShadow(element.shadow))reasons.push("surface shadow");if(element.blendMode!=="normal")reasons.push(`${element.blendMode} blend mode`);if(!simpleTransform(element))reasons.push("advanced transform");if(element.clipContent&&kind==="rounded-rectangle"&&Math.max(...Object.values(element.corners))>0)reasons.push("rounded clipping mask");if(textDecision)reasons.push(...textDecision.reasons);
   if(isText){
+    if(activeEffects.length){
+      if(element.textInput)return{classification:"HYBRID",rasterPart:"background",intendedRobloxClass:"TextBox",interactionEnabled:true,nativeText:true,reasons:[...reasons,"editable TextBox text remains native; surface effects use a rendered layer"]};
+      if(element.type==="button")return{classification:"HYBRID",rasterPart:"full",intendedRobloxClass:"ImageButton",interactionEnabled:true,nativeText:false,reasons:[...reasons,"visual effects are flattened while button interaction remains native"]};
+      return{classification:"RASTERIZED",rasterPart:"full",intendedRobloxClass:"ImageLabel",interactionEnabled:false,nativeText:false,reasons:[...reasons,"text remains editable in CreatorMake and is rasterized only for Roblox delivery"]};
+    }
     const visibleBackground=hasVisibleTextBackground(element);
     if(element.type==="button")return{classification:"HYBRID",rasterPart:visibleBackground?"background":undefined,intendedRobloxClass:"ImageButton",interactionEnabled:true,nativeText:true,reasons};
     if(visibleBackground)return{classification:"HYBRID",rasterPart:"background",intendedRobloxClass:"Frame",interactionEnabled:textDecision!.className==="TextBox",nativeText:true,reasons};

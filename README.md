@@ -18,6 +18,32 @@ silently substitute the Local Generator. Use **Settings → AI → Test Connecti
 to verify the provider before generating. `npm run dev` also starts the local
 Roblox Studio Sync service on `http://127.0.0.1:32145`.
 
+## Professional visual effects engine
+
+Every editable GUI element has a dedicated **✦ Effects** stack in the
+Properties panel. Effects are non-destructive, ordered, serialized with the
+project, and rendered on the real editor surface. The searchable library ships
+with 42 parameterized effects across lighting, glow, pixel/retro, blur,
+distortion, color, depth, holographic, typography, stroke, material, and motion
+categories. Built-in stacks include Neon Arcade, CRT Terminal, Holographic
+Interface, Cyberpunk Neon, polished chrome, crystal glass, and pixel corruption.
+
+Effect instances can be renamed, enabled, disabled, reset, duplicated, copied,
+pasted, reordered, and saved as reusable local presets. Parameters support both
+sliders and precise numeric entry. Compatible effects expose repeatable
+animation duration, speed, direction, easing, delay, phase, and loop settings;
+preview animation can be paused and honors the operating system's reduced-motion
+preference. Custom preset and clipboard records contain only effect definitions
+and never modify the source geometry, text, image, gradient, or vector path.
+
+Roblox Adaptive export classifies effect-bearing objects explicitly. Exact
+native representations stay native; interactive controls use a hybrid native
+container where possible; unsupported appearance is captured by CreatorMake's
+high-resolution transparent renderer with effect-aware safety padding. Text
+remains editable in CreatorMake even when a delivery-only Roblox image fallback
+is required, and export diagnostics name the effect stack instead of silently
+dropping it.
+
 ## Roblox export modes
 
 **Adaptive** is the default export mode. CreatorMake classifies each visible

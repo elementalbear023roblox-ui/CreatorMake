@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { EditorElement } from "./types";
 import { designFontSize, textPadding } from "./text-sizing.ts";
+import { composeVisualEffects } from "../effects/render.ts";
 
 const alpha = (hex: string, opacity: number) => {
   if (!hex.startsWith("#") || hex.length !== 7) return hex;
@@ -38,8 +39,9 @@ export function elementStyle(element: EditorElement): CSSProperties {
 }
 
 export function elementSurfaceStyle(element: EditorElement): CSSProperties {
+  const effects=composeVisualEffects(element),boxShadow=[element.shadow,...effects.boxShadows].filter((value)=>value&&value!=="none").join(", ")||undefined;
   const clipPath = element.type === "ellipse" ? "ellipse(50% 50% at 50% 50%)" : element.type === "polygon" ? "polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%)" : element.type === "star" ? "polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 94%,50% 72%,21% 94%,32% 57%,2% 35%,39% 35%)" : undefined;
   const alignItems=element.type === "button" || element.type === "text" ? element.verticalAlign === "top" ? "flex-start" : element.verticalAlign === "bottom" ? "flex-end" : "center" : "flex-start";
   const padding=element.type==="text"||element.type==="button"?textPadding(element):element.padding;
-  return { position: "absolute", inset: 0, display: "flex", alignItems, justifyContent: element.type === "button" ? "center" : undefined, background: elementBackground(element), borderColor: element.borderColor, borderWidth: element.borderWidth, borderStyle: "solid", borderRadius: `${element.corners.tl}px ${element.corners.tr}px ${element.corners.br}px ${element.corners.bl}px`, boxShadow: element.shadow, padding:typeof padding==="number"?padding:`${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`, clipPath, overflow: "visible", boxSizing: "border-box" };
+  return { position: "absolute", inset: 0, display: "flex", alignItems, justifyContent: element.type === "button" ? "center" : undefined, background: elementBackground(element), borderColor: element.borderColor, borderWidth: element.borderWidth, borderStyle: "solid", borderRadius: `${element.corners.tl}px ${element.corners.tr}px ${element.corners.br}px ${element.corners.bl}px`, boxShadow, filter:effects.filter,backdropFilter:effects.backdropFilter,WebkitBackdropFilter:effects.backdropFilter,imageRendering:effects.imageRendering,mixBlendMode:effects.mixBlendMode,isolation:"isolate", padding:typeof padding==="number"?padding:`${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`, clipPath, overflow: "visible", boxSizing: "border-box" };
 }

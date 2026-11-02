@@ -2,6 +2,7 @@ import { elementStyle } from "./render.ts";
 import type { EditorAsset, EditorElement } from "./types.ts";
 import { CREATORMAKE_MASTER_CAPABILITIES } from "../roblox/image-capabilities.ts";
 import type { RobloxRasterPart } from "../roblox/types.ts";
+import { visualEffectExtent } from "../effects/render.ts";
 
 export type RendererBounds={x:number;y:number;width:number;height:number};
 export type CanvasRendererFidelity={
@@ -55,7 +56,7 @@ const effectExtent=(value:string)=>{
 };
 const renderMargin=(element:EditorElement,visualPart:RobloxRasterPart)=>{
   const includeSurface=visualPart!=="text",includeText=visualPart!=="background",textEffects=includeText?element.textShadows.map(effectExtent):[];
-  const raw=Math.max(includeSurface?effectExtent(element.shadow):0,...textEffects,includeText?element.textStrokeWidth:0,2);
+  const raw=Math.max(includeSurface?effectExtent(element.shadow):0,...textEffects,includeText?element.textStrokeWidth:0,visualEffectExtent(element),2);
   return Math.ceil((raw+3)*Math.max(1,Math.abs(element.scaleX),Math.abs(element.scaleY)));
 };
 
