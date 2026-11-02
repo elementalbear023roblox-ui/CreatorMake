@@ -14,6 +14,7 @@ Live production site: [https://creatormake-site.vercel.app/](https://creatormake
 - Local bridge: `http://127.0.0.1:32145`, started automatically with development or independently with `npm run bridge`.
 - Production frontend: `https://creatormake-site.vercel.app/`, served from `site/`.
 - Studio plugin: `CreatorMake-Studio-Local.rbxmx`, which communicates only with the loopback bridge.
+- Production plugin download: `https://creatormake-site.vercel.app/downloads/CreatorMake-Studio-Local.rbxmx`, regenerated from the canonical plugin source by `npm run build:site`.
 
 The canonical app, bridge, plugin, and protocol versions live in `lib/creatormake-version.js`. The bridge allows the exact production origin and the intended local development origins; it does not use wildcard CORS.
 

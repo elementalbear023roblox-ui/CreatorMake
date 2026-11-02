@@ -15,7 +15,7 @@ import { buildActiveProjectRobloxManifest } from "@/lib/roblox/active-project-ma
 import { SYSTEM_PRESETS } from "@/lib/design-intelligence/system-presets";
 import { classifyRobloxElement } from "@/lib/roblox/classification";
 import { assetMappingKey, normalizeRobloxAssetId, planPixelAccurateAssets, renderPixelAccurateAssets } from "@/lib/roblox/render-assets";
-import { createRobloxPluginModel, creatorMakePluginFilename } from "@/lib/roblox/plugin";
+import { creatorMakePluginFilename } from "@/lib/roblox/plugin";
 import { DEFAULT_ROBLOX_EXPORT_OPTIONS, ROBLOX_RESOLUTIONS } from "@/lib/roblox/types";
 import type { EditorElement, EditorProject } from "@/lib/editor/types";
 import type { RobloxAssetMappings } from "@/lib/roblox/render-assets";
@@ -34,6 +34,7 @@ type LocalHealth={ok?:boolean;status:string;app:string;service?:string;appVersio
 type View="studio"|"preview"|"assets"|"hierarchy"|"lua"|"compatibility";
 
 const LOCAL_SYNC_ORIGIN=CREATORMAKE_BRIDGE_ORIGIN;
+const PLUGIN_DOWNLOAD_PATH="/downloads/CreatorMake-Studio-Local.rbxmx";
 const safeName=(value:string)=>value.trim().replace(/[^a-zA-Z0-9_ -]/g,"")||"CreatorMakeGui";
 const download=(content:string,name:string,type:string)=>{const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=url;anchor.download=name;anchor.click();URL.revokeObjectURL(url);};
 const downloadUrl=(url:string,name:string)=>{const anchor=document.createElement("a");anchor.href=url;anchor.download=name;anchor.click();};
@@ -112,7 +113,7 @@ export function RobloxExportDialog({open,project,onClose,onStudioStatusChange,qu
   const copyLua=async()=>{try{await navigator.clipboard.writeText(output.lua);setNotice("Lua copied to the clipboard.");}catch{setNotice("Clipboard access was unavailable.");}};
   const update=<K extends keyof RobloxExportOptions>(key:K,value:RobloxExportOptions[K])=>setOptions((current)=>({...current,[key]:value}));
   const updateMapping=(asset:RobloxRenderAsset,value:string)=>{const normalized=normalizeRobloxAssetId(value),key=assetMappingKey(asset.sourceId,asset.visualHash),next={...mappings,[key]:normalized||value.trim()};if(!next[key])delete next[key];setMappings(next);localStorage.setItem(mappingStorageKey(project.id),JSON.stringify(next));};
-  const downloadPlugin=()=>{try{const model=createRobloxPluginModel(CREATORMAKE_PRODUCTION_ORIGIN);download(model,creatorMakePluginFilename(CREATORMAKE_PRODUCTION_ORIGIN),"application/xml");setNotice(`CreatorMake Studio plugin v${health?.pluginVersionRequired??CREATORMAKE_PLUGIN_VERSION} downloaded for ${CREATORMAKE_PRODUCTION_ORIGIN}/. Replace the local copy, then reload it in Studio.`);}catch(error){setNotice(error instanceof Error?error.message:"Plugin generation failed.");}};
+  const downloadPlugin=()=>{try{downloadUrl(PLUGIN_DOWNLOAD_PATH,creatorMakePluginFilename(CREATORMAKE_PRODUCTION_ORIGIN));setNotice(`CreatorMake Studio plugin v${health?.pluginVersionRequired??CREATORMAKE_PLUGIN_VERSION} downloaded from the verified production artifact. Replace the local copy, then reload it in Studio.`);}catch(error){setNotice(error instanceof Error?error.message:"Plugin download failed.");}};
   const publishConfigured=publishing?.config.configured===true,publishBusy=publishing?.job?.status==="pending"||publishing?.job?.status==="running";
   const connectionHelp=!health?{level:"error",what:"Local Studio Sync is not reachable.",why:`CreatorMake could not validate ${LOCAL_SYNC_ORIGIN}/health.`,next:"Start the CreatorMake bridge, then recheck the connection."}:!bridgeCurrent?{level:"error",what:"CreatorMake and the local bridge do not match.",why:`Web expects bridge ${CREATORMAKE_BRIDGE_VERSION} / protocol ${CREATORMAKE_PROTOCOL_VERSION}; received ${health.bridgeVersion??"unknown"} / ${health.protocolVersion??"unknown"}.`,next:"Restart this repository’s current development environment so its bridge replaces the outdated process."}:health.connectionState==="PLUGIN_OUTDATED"?{level:"error",what:"The Studio plugin is outdated.",why:`Installed build ${health.plugins?.[0]?.pluginVersion??"unknown"}; CreatorMake requires ${health.pluginVersionRequired??CREATORMAKE_PLUGIN_VERSION}.`,next:"Download the current plugin, replace the old copy, and reload Studio."}:health.connectionState!=="STUDIO_CONNECTED"||!pluginOnline?{level:"warning",what:"The bridge is ready, but Studio is offline.",why:"No compatible plugin heartbeat has reached the bridge yet.",next:"Open Roblox Studio, enable HTTP requests, and reload CreatorMake Studio Sync."}:{level:"success",what:"CreatorMake is connected to Roblox Studio.",why:`Web, bridge, plugin, and protocol ${health.protocolVersion} are compatible.`,next:"Preview in PlayerGui or deploy the managed ScreenGui to StarterGui."};
 

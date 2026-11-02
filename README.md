@@ -33,7 +33,12 @@ interaction, class, and visual hash for every generated image.
 and **Native** remains available for users who prefer editable approximations.
 The local Studio plugin and sync server use protocol v10 for project-scoped
 Adaptive image previews. Build the current plugin with `npm run plugin:build`;
-the result is written to `artifacts/CreatorMake-Studio-Local.rbxmx`.
+the result is written to both `artifacts/CreatorMake-Studio-Local.rbxmx` and the
+tracked production download at `public/downloads/CreatorMake-Studio-Local.rbxmx`.
+The deployed copy is available at
+`https://creatormake-site.vercel.app/downloads/CreatorMake-Studio-Local.rbxmx`.
+`npm run build:site` regenerates the plugin before bundling the Vercel site so
+the hosted download cannot lag behind the app's required plugin version.
 
 The current plugin version is v21. Restart Studio (or reload local plugins)
 after replacing the `.rbxmx` file so `/health` can report the new version.

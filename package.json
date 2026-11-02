@@ -9,6 +9,7 @@
     "install:ci": "node scripts/install-ci.mjs",
     "dev": "node --env-file-if-exists=.env.local scripts/run-framework.mjs dev",
     "build": "node scripts/run-framework.mjs build",
+    "prebuild:site": "npm run plugin:build",
     "build:site": "vite build --config vite.vercel.config.ts",
     "bridge": "node --env-file-if-exists=.env.local scripts/studio-sync-server.mjs",
     "build:netlify": "node scripts/run-netlify-build.mjs",

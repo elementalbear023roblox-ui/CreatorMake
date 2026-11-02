@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createElement } from "../lib/editor/project.ts";
 import { createRobloxExport } from "../lib/roblox/exporter.ts";
 import { createRobloxPluginModel, createRobloxPluginSource } from "../lib/roblox/plugin.ts";
 import { diffRobloxManifests } from "../lib/roblox/sync.ts";
 import { DEFAULT_ROBLOX_EXPORT_OPTIONS } from "../lib/roblox/types.ts";
-import { CREATORMAKE_APP_VERSION, CREATORMAKE_BRIDGE_VERSION, CREATORMAKE_PLUGIN_VERSION, CREATORMAKE_PROTOCOL_VERSION } from "../lib/creatormake-version.js";
+import { CREATORMAKE_APP_VERSION, CREATORMAKE_BRIDGE_VERSION, CREATORMAKE_PLUGIN_VERSION, CREATORMAKE_PRODUCTION_ORIGIN, CREATORMAKE_PROTOCOL_VERSION } from "../lib/creatormake-version.js";
 
 const projectWithButton=()=>{const frame=createElement("frame");Object.assign(frame,{id:"frame-stable",name:"Shop",parentId:null});const button=createElement("button");Object.assign(button,{id:"button-stable",name:"BuyButton",parentId:frame.id,fill:"#7457ff",text:"BUY"});return{screen:{width:960,height:600},elements:[frame,button]};};
 
@@ -46,6 +47,13 @@ test("generated Studio plugin validates local health and retains deduplicated Ed
   assert.match(source,/TEXT EXPORT DEBUG\\nName:/);
   assert.doesNotMatch(source,/TEXT EXPORT DEBUG\r?\nName:/);
   const model=createRobloxPluginModel("https://creator.example");assert.match(model,/CreatorMake Studio Sync/);assert.match(model,/<!\[CDATA\[/);
+});
+
+test("published Studio plugin artifact exactly matches the current production generator",async()=>{
+  const published=await readFile(new URL("../public/downloads/CreatorMake-Studio-Local.rbxmx",import.meta.url),"utf8");
+  assert.equal(published,createRobloxPluginModel(CREATORMAKE_PRODUCTION_ORIGIN));
+  assert.match(published,new RegExp(`PLUGIN_VERSION = ${CREATORMAKE_PLUGIN_VERSION}`));
+  assert.match(published,new RegExp(`SUPPORTED_PROTOCOL_VERSION = ${CREATORMAKE_PROTOCOL_VERSION}`));
 });
 
 test("generated Studio plugin separates PlayerGui preview from managed StarterGui deployment",()=>{
