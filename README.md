@@ -95,14 +95,20 @@ Projects are merged by stable project ID and `updatedAt`; a newer revision wins,
 while unrelated local and cloud projects are retained. Signing out revokes the
 session token and leaves every local project available.
 
+When `VITE_GOOGLE_CLIENT_ID` is present, the signed-out toolbar control opens
+Google's account chooser directly; ordinary visitors never see or enter OAuth
+configuration. Google Identity is preloaded so this user-initiated popup remains
+reliable. The account dialog is then reserved for sync status and sign-out.
+
 Google OAuth access tokens are session-only and are never stored in project
 files, IndexedDB, or the repository. CreatorMake requests `openid`, `email`,
 `profile`, and `drive.appdata`; it cannot read the user's ordinary Drive files.
 Configure a Google OAuth **Web application** client with the production origin
 `https://creatormake-site.vercel.app` and the local preview origins used for QA.
-Set the public client ID as `VITE_GOOGLE_CLIENT_ID` before `npm run build:site`,
-or enter it in the account dialog for a browser-local setup. The Google Drive
-API must be enabled for the OAuth project.
+Set the public client ID as `VITE_GOOGLE_CLIENT_ID` before `npm run build:site`.
+If an administrator has not configured production yet, the account dialog shows
+an explicit browser-local setup fallback instead of presenting it as a normal
+user sign-in step. The Google Drive API must be enabled for the OAuth project.
 
 ## Production deployment
 

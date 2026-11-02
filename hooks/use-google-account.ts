@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getGoogleClientId, getLastGoogleSync, loadGoogleSession, saveGoogleClientId, signInWithGoogle, signOutGoogle, syncGoogleProjectLibrary, type GoogleAccountSession, type GoogleCloudSyncResult } from "@/lib/google/account";
+import { getGoogleClientId, getLastGoogleSync, isGoogleClientId, loadGoogleSession, preloadGoogleIdentity, saveGoogleClientId, signInWithGoogle, signOutGoogle, syncGoogleProjectLibrary, type GoogleAccountSession, type GoogleCloudSyncResult } from "@/lib/google/account";
 
 export type GoogleAccountStatus="signed-out"|"connecting"|"syncing"|"synced"|"error";
 
@@ -14,6 +14,7 @@ export function useGoogleAccount({beforeSync,onLibraryMerged}:{beforeSync:()=>Pr
   const[lastResult,setLastResult]=useState<GoogleCloudSyncResult|null>(null);
   const syncing=useRef(false),timer=useRef<number|null>(null),sessionRef=useRef(session);
   useEffect(()=>{sessionRef.current=session;},[session]);
+  useEffect(()=>{if(clientId)void preloadGoogleIdentity();},[clientId]);
 
   const runSync=useCallback(async(activeSession=sessionRef.current)=>{
     if(!activeSession||syncing.current)return null;
@@ -43,5 +44,5 @@ export function useGoogleAccount({beforeSync,onLibraryMerged}:{beforeSync:()=>Pr
     return()=>{window.removeEventListener("creatormake:project-library-change",schedule);if(timer.current!==null)window.clearTimeout(timer.current);};
   },[runSync]);
 
-  return{session,clientId,status,error,lastSyncAt,lastResult,connect,disconnect,syncNow:()=>runSync(),setClientId:changeClientId};
+  return{session,clientId,configured:isGoogleClientId(clientId),status,error,lastSyncAt,lastResult,connect,disconnect,syncNow:()=>runSync(),setClientId:changeClientId};
 }

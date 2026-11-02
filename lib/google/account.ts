@@ -32,6 +32,8 @@ export function getGoogleClientId(){
   return isGoogleClientId(saved)?saved:isGoogleClientId(buildClientId)?buildClientId:"";
 }
 
+export const isGoogleSignInConfigured=()=>Boolean(getGoogleClientId());
+
 export function saveGoogleClientId(value:string){
   const normalized=value.trim();
   if(!isGoogleClientId(normalized))throw new Error("Enter a valid Google OAuth web client ID ending in .apps.googleusercontent.com.");
@@ -52,13 +54,19 @@ async function loadGoogleIdentity(){
   await new Promise<void>((resolve,reject)=>{
     const existing=document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement|null;
     const script=existing??document.createElement("script");
-    const finish=()=>window.google?.accounts?.oauth2?resolve():reject(new Error("Google sign-in did not become available."));
-    script.addEventListener("load",finish,{once:true});script.addEventListener("error",()=>reject(new Error("CreatorMake could not load Google sign-in.")),{once:true});
+    let settled=false;
+    const finish=()=>{if(settled)return;settled=true;window.clearTimeout(timeout);if(window.google?.accounts?.oauth2)resolve();else reject(new Error("Google sign-in did not become available."));};
+    const fail=()=>{if(settled)return;settled=true;window.clearTimeout(timeout);reject(new Error("CreatorMake could not load Google sign-in."));};
+    const timeout=window.setTimeout(fail,10_000);
+    script.addEventListener("load",finish,{once:true});script.addEventListener("error",fail,{once:true});
     if(!existing){script.id=GOOGLE_SCRIPT_ID;script.src=GOOGLE_SCRIPT_URL;script.async=true;script.defer=true;document.head.appendChild(script);}
+    else if(window.google?.accounts?.oauth2)finish();
   });
   if(!window.google?.accounts?.oauth2)throw new Error("Google sign-in did not become available.");
   return window.google.accounts;
 }
+
+export const preloadGoogleIdentity=async()=>{try{await loadGoogleIdentity();return true;}catch{return false;}};
 
 const fetchGoogleProfile=async(accessToken:string)=>{
   const response=await fetch(GOOGLE_USERINFO_URL,{headers:{Authorization:`Bearer ${accessToken}`}});
@@ -69,7 +77,7 @@ const fetchGoogleProfile=async(accessToken:string)=>{
 };
 
 export async function signInWithGoogle(clientId=getGoogleClientId()):Promise<GoogleAccountSession>{
-  const normalized=saveGoogleClientId(clientId),accounts=await loadGoogleIdentity();
+  const normalized=saveGoogleClientId(clientId),accounts=window.google?.accounts?.oauth2?window.google.accounts:await loadGoogleIdentity();
   const token=await new Promise<GoogleTokenResponse>((resolve,reject)=>{
     const client=accounts.oauth2.initTokenClient({client_id:normalized,scope:GOOGLE_SCOPES,callback:(response)=>response.error?reject(new Error(response.error_description||response.error)):resolve(response),error_callback:(error)=>reject(new Error(error.message||error.type||"Google sign-in was interrupted."))});
     client.requestAccessToken({prompt:"select_account consent"});

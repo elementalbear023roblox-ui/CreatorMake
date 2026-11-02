@@ -32,3 +32,7 @@ JavaScript origin, and have the Google Drive API enabled. The app requests only
 identity scopes and `drive.appdata`, not access to normal Drive documents. If no
 build-time client ID is present, the account dialog accepts one locally and
 stores that public identifier in the current browser.
+
+With the build-time client ID present, clicking the signed-out Google control
+opens Google's account chooser directly. The manual client-ID field is not shown
+to visitors; it appears only as an administrator fallback on unconfigured builds.
