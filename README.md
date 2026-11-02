@@ -3,6 +3,23 @@
 CreatorMake is a visual UI editor with a deterministic Local Generator, optional
 server-side OpenAI generation, and local Roblox Studio synchronization.
 
+## Roblox-first editing workflow
+
+New installations open in the Roblox workspace with **Simple** properties by
+default. The left-side Roblox library inserts real editable Frame,
+ScrollingFrame, TextLabel, TextButton, TextBox, ImageLabel, ImageButton,
+UIListLayout, and UIGridLayout representations, plus native-first menu, HUD,
+inventory, panel, notification, and control components. The library replaces
+the previous placeholder component/template tabs.
+
+Preview uses the same project hierarchy and constraint engine as editing and
+export. Desktop, laptop, tablet, phone, large-monitor, portrait, and landscape
+simulations apply saved constraints without mutating the project, display
+Roblox safe-area guides, and report offscreen objects, clipped text, and small
+touch targets. Contextual quick actions can center an object, assign responsive
+constraints, add an editable glow, or convert a compatible object into a
+button; every change participates in normal undo and project persistence.
+
 ## CreatorMake AI
 
 Fast AI, Balanced AI, and Precise AI use the OpenAI Responses API exclusively
