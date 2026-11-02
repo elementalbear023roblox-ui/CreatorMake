@@ -100,15 +100,21 @@ Google's account chooser directly; ordinary visitors never see or enter OAuth
 configuration. Google Identity is preloaded so this user-initiated popup remains
 reliable. The account dialog is then reserved for sync status and sign-out.
 
+The same dialog also provides a CreatorMake email/password account that works
+without an external provider. Passwords are never stored directly: the browser
+keeps only a PBKDF2-SHA-256 verifier with a unique random salt and 210,000
+iterations. This initial CreatorMake account is device-local and does not claim
+cross-device identity or cloud sync; existing IndexedDB projects remain local.
+
 Google OAuth access tokens are session-only and are never stored in project
 files, IndexedDB, or the repository. CreatorMake requests `openid`, `email`,
 `profile`, and `drive.appdata`; it cannot read the user's ordinary Drive files.
 Configure a Google OAuth **Web application** client with the production origin
 `https://creatormake-site.vercel.app` and the local preview origins used for QA.
 Set the public client ID as `VITE_GOOGLE_CLIENT_ID` before `npm run build:site`.
-If an administrator has not configured production yet, the account dialog shows
-an explicit browser-local setup fallback instead of presenting it as a normal
-user sign-in step. The Google Drive API must be enabled for the OAuth project.
+OAuth configuration is never exposed in the customer sign-in dialog. If Google
+is not configured, the interface offers the device-local CreatorMake account
+instead. The Google Drive API must be enabled for the OAuth project.
 
 ## Production deployment
 

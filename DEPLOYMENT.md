@@ -30,9 +30,10 @@ For a preconfigured production sign-in button, set the public
 application, allow `https://creatormake-site.vercel.app` as an authorized
 JavaScript origin, and have the Google Drive API enabled. The app requests only
 identity scopes and `drive.appdata`, not access to normal Drive documents. If no
-build-time client ID is present, the account dialog accepts one locally and
-stores that public identifier in the current browser.
+build-time client ID is present, the Google provider is shown as unavailable;
+OAuth administration is never exposed to visitors.
 
 With the build-time client ID present, clicking the signed-out Google control
 opens Google's account chooser directly. The manual client-ID field is not shown
-to visitors; it appears only as an administrator fallback on unconfigured builds.
+to visitors. Device-local CreatorMake email/password accounts remain available
+without Google and store only salted PBKDF2 password verifiers in the browser.
