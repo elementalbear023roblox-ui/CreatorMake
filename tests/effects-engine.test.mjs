@@ -45,5 +45,5 @@ test("effect presets create independent editable stacks",()=>{
 
 test("effects inspector exposes the complete stack workflow",async()=>{
   const source=await readFile(new URL("../components/editor/EffectsSection.tsx",import.meta.url),"utf8");
-  for(const label of ["Add Effect","Effects Library","Disable all","Enable all","Clear stack","Save stack as preset","Animation","Duplicate effect","Reset effect"])assert.match(source,new RegExp(label));
+  for(const label of ["Add Effect","Effects Library","Disable all","Enable all","Clear stack","Save stack as preset","Animation","Delay","Phase offset","Duplicate effect","Reset effect"])assert.match(source,new RegExp(label));
 });
