@@ -36,6 +36,13 @@ preview animation can be paused and honors the operating system's reduced-motion
 preference. Custom preset and clipboard records contain only effect definitions
 and never modify the source geometry, text, image, gradient, or vector path.
 
+The live editor keeps effects responsive by composing each stack once per
+object, bounding expensive glow and extrusion passes, allocating GPU layers only
+for active animation, pausing motion during direct manipulation or while the tab
+is hidden, and batching continuous property edits to one update per animation
+frame. Long inspector and asset lists use browser rendering containment so
+off-screen cards do not consume paint time.
+
 Roblox Adaptive export classifies effect-bearing objects explicitly. Exact
 native representations stay native; interactive controls use a hybrid native
 container where possible; unsupported appearance is captured by CreatorMake's

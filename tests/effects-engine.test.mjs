@@ -22,6 +22,18 @@ test("effect composition preserves stack order and computes export-safe glow bou
   assert.ok(visualEffectExtent(element)>20);
 });
 
+test("effects compositor stays inside its GPU performance budget",()=>{
+  const element=createElement("frame"),glow=createVisualEffect("neon-glow");
+  glow.parameters.layers=8;element.effects=[glow];
+  const optimized=composeVisualEffects(element),passes=(optimized.filter?.match(/drop-shadow/g)??[]).length;
+  assert.equal(passes,4,"high-layer glows should preserve their look without creating unbounded filter passes");
+  assert.equal(optimized.animated,false);
+  const scanlines=createVisualEffect("scanlines");element.effects=[scanlines];
+  assert.doesNotMatch(composeVisualEffects(element).overlays[0].className,/effect-is-animated/);
+  scanlines.animation.enabled=true;
+  const animated=composeVisualEffects(element);assert.equal(animated.animated,true);assert.match(animated.overlays[0].className,/effect-is-animated/);
+});
+
 test("effect instances serialize, normalize unsafe input, and survive project migration",()=>{
   const glow=createVisualEffect("neon-glow");
   const normalized=normalizeVisualEffects([{...glow,parameters:{...glow.parameters,radius:9999}},{type:"not-real"}]);
@@ -48,4 +60,8 @@ test("effects inspector exposes the complete stack workflow",async()=>{
   for(const label of ["Add Effect","Effects Library","Disable all","Enable all","Clear stack","Save stack as preset","Animation","Delay","Phase offset","Duplicate effect","Reset effect"])assert.match(source,new RegExp(label));
   const inspectorSource=await readFile(new URL("../components/editor/Inspector.tsx",import.meta.url),"utf8");
   assert.match(inspectorSource,/querySelectorAll<HTMLDetailsElement>\(\":scope > details\"\)/,"nested animation disclosures must not be persisted as top-level inspector sections");
+  const surfaceSource=await readFile(new URL("../components/editor/ElementSurface.tsx",import.meta.url),"utf8");
+  assert.doesNotMatch(surfaceSource,/composeVisualEffects\(element\)\.overlays/,"an element must reuse one composed effect presentation");
+  const editorSource=await readFile(new URL("../hooks/use-editor.ts",import.meta.url),"utf8");
+  assert.match(editorSource,/if\(transactionRef\.current\)transient\(mutate,projectRef\.current\.selectedIds\)/,"continuous property edits should be frame-batched instead of deep-cloning every input event");
 });

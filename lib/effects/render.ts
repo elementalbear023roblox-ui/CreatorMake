@@ -2,23 +2,25 @@ import type { CSSProperties } from "react";
 import type { EditorElement, VisualEffectInstance } from "../editor/types";
 
 export type EffectOverlay={id:string;className:string;style:CSSProperties};
-export type EffectPresentation={filter?:string;boxShadows:string[];backdropFilter?:string;imageRendering?:CSSProperties["imageRendering"];mixBlendMode?:CSSProperties["mixBlendMode"];overlays:EffectOverlay[];classes:string[];maxExtent:number};
+export type EffectPresentation={filter?:string;boxShadows:string[];backdropFilter?:string;imageRendering?:CSSProperties["imageRendering"];mixBlendMode?:CSSProperties["mixBlendMode"];overlays:EffectOverlay[];classes:string[];maxExtent:number;animated:boolean};
 const num=(effect:VisualEffectInstance,key:string,fallback=0)=>typeof effect.parameters[key]==="number"?Number(effect.parameters[key]):fallback;
 const str=(effect:VisualEffectInstance,key:string,fallback="")=>typeof effect.parameters[key]==="string"?String(effect.parameters[key]):fallback;
 const flag=(effect:VisualEffectInstance,key:string,fallback=false)=>typeof effect.parameters[key]==="boolean"?Boolean(effect.parameters[key]):fallback;
 const alpha=(color:string,opacity:number)=>`color-mix(in srgb, ${color} ${Math.max(0,Math.min(100,opacity))}%, transparent)`;
 const animationStyle=(effect:VisualEffectInstance,name:string):CSSProperties=>effect.animation.enabled?{animationName:name,animationDuration:`${Math.max(.15,effect.animation.duration/Math.max(.1,effect.animation.speed))}s`,animationDelay:`${effect.animation.delay-Math.max(0,effect.animation.phaseOffset)}s`,animationDirection:effect.animation.loopMode==="ping-pong"?"alternate":effect.animation.direction,animationIterationCount:effect.animation.loopMode==="once"?1:"infinite",animationTimingFunction:effect.animation.easing}:{animation:"none"};
-const overlay=(effect:VisualEffectInstance,suffix:string,className:string,style:CSSProperties):EffectOverlay=>({id:`${effect.id}:${suffix}`,className:`cm-effect-overlay ${className}`,style});
+const overlay=(effect:VisualEffectInstance,suffix:string,className:string,style:CSSProperties):EffectOverlay=>({id:`${effect.id}:${suffix}`,className:`cm-effect-overlay ${className}${effect.animation.enabled?" effect-is-animated":""}`,style});
 
 export function composeVisualEffects(element:Pick<EditorElement,"effects"|"corners">):EffectPresentation{
   const filters:string[]=[],boxShadows:string[]=[],overlays:EffectOverlay[]=[],classes:string[]=[];
-  let backdropFilter:string|undefined,imageRendering:CSSProperties["imageRendering"],mixBlendMode:CSSProperties["mixBlendMode"],maxExtent=0;
+  let backdropFilter:string|undefined,imageRendering:CSSProperties["imageRendering"],mixBlendMode:CSSProperties["mixBlendMode"],maxExtent=0,animated=false;
   for(const effect of element.effects.filter((item)=>item.enabled)){
+    animated||=effect.animation.enabled;
     classes.push(`has-effect-${effect.type}`);
     if(["neon-glow","outer-glow","inner-glow","bloom","edge-glow","rainbow-glow"].includes(effect.type)){
       const color=str(effect,"color","#8b5cff"),radius=num(effect,"radius",18),opacity=num(effect,"opacity",90),intensity=num(effect,"intensity",100)/100,layers=Math.max(1,Math.round(num(effect,"layers",3))),outer=flag(effect,"outer",effect.type!=="inner-glow"),inner=flag(effect,"inner",effect.type==="inner-glow"),spread=num(effect,"spread",3),softness=num(effect,"softness",65)/100,falloff=num(effect,"falloff",65)/100,blend=str(effect,"blendMode","screen") as CSSProperties["mixBlendMode"];
       if(blend&&blend!=="normal")mixBlendMode=blend;
-      if(outer)for(let layer=1;layer<=layers;layer++){const progress=layer/layers,blur=Math.max(.25,radius*(.28+progress*.72)*(1+softness*.35)+spread*progress),layerOpacity=opacity*intensity*(1-progress*falloff*.9);filters.push(`drop-shadow(0 0 ${blur.toFixed(2)}px ${alpha(color,layerOpacity)})`);maxExtent=Math.max(maxExtent,blur*1.8+spread);}
+      const renderLayers=Math.min(4,layers);
+      if(outer)for(let layer=1;layer<=renderLayers;layer++){const progress=layer/renderLayers,blur=Math.max(.25,radius*(.28+progress*.72)*(1+softness*.35)+spread*progress),layerOpacity=opacity*intensity*(1-progress*falloff*.9)*(layers/renderLayers);filters.push(`drop-shadow(0 0 ${blur.toFixed(2)}px ${alpha(color,layerOpacity)})`);maxExtent=Math.max(maxExtent,blur*1.8+spread);}
       if(inner)boxShadows.push(`inset 0 0 ${Math.max(1,radius).toFixed(2)}px ${Math.max(0,spread).toFixed(2)}px ${alpha(color,opacity*intensity)}`);
       if(effect.type==="rainbow-glow"){const distance=Math.max(1,radius*.3);filters.push(`drop-shadow(${distance}px 0 ${radius*.45}px ${alpha("#ff3b81",opacity*.55)})`,`drop-shadow(${-distance}px 0 ${radius*.45}px ${alpha("#31d7ff",opacity*.55)})`);}
       continue;
@@ -72,7 +74,7 @@ export function composeVisualEffects(element:Pick<EditorElement,"effects"|"corne
       filters.push(`contrast(${num(effect,"contrast",160)}%)`);overlays.push(overlay(effect,"chrome","effect-chrome",{opacity:num(effect,"opacity",65)/100,background:`linear-gradient(${num(effect,"angle",90)}deg,#080b12 0%,#f8fbff 18%,#526174 36%,#fff 51%,#1a2431 69%,#d9e8f5 86%,#090d14 100%)`,mixBlendMode:"screen"}));continue;
     }
     if(effect.type==="text-extrusion"){
-      const depth=Math.max(1,Math.round(num(effect,"depth",8))),angle=num(effect,"angle",135)*Math.PI/180,color=str(effect,"color","#321b78"),opacity=num(effect,"opacity",85),passes=Math.min(12,depth);for(let layer=1;layer<=passes;layer++){const distance=depth*layer/passes;filters.push(`drop-shadow(${(Math.cos(angle)*distance).toFixed(2)}px ${(Math.sin(angle)*distance).toFixed(2)}px 0 ${alpha(color,opacity*(1-layer/passes*.45))})`);}maxExtent=Math.max(maxExtent,depth+2);continue;
+      const depth=Math.max(1,Math.round(num(effect,"depth",8))),angle=num(effect,"angle",135)*Math.PI/180,color=str(effect,"color","#321b78"),opacity=num(effect,"opacity",85),passes=Math.min(6,depth);for(let layer=1;layer<=passes;layer++){const distance=depth*layer/passes;filters.push(`drop-shadow(${(Math.cos(angle)*distance).toFixed(2)}px ${(Math.sin(angle)*distance).toFixed(2)}px 0 ${alpha(color,opacity*(1-layer/passes*.45))})`);}maxExtent=Math.max(maxExtent,depth+2);continue;
     }
     if(effect.type==="text-outline-glow"){
       const color=str(effect,"color","#68e7ff"),width=num(effect,"width",2),glow=num(effect,"glow",12),opacity=num(effect,"opacity",90);filters.push(`drop-shadow(${width}px 0 0 ${alpha(color,opacity)})`,`drop-shadow(${-width}px 0 0 ${alpha(color,opacity)})`,`drop-shadow(0 ${width}px 0 ${alpha(color,opacity)})`,`drop-shadow(0 ${-width}px 0 ${alpha(color,opacity)})`,`drop-shadow(0 0 ${glow}px ${alpha(color,opacity*.75)})`);maxExtent=Math.max(maxExtent,width+glow*1.5);continue;
@@ -99,7 +101,7 @@ export function composeVisualEffects(element:Pick<EditorElement,"effects"|"corne
       const color=flag(effect,"invert")?"#ffffff":str(effect,"color","#000"),amount=num(effect,"amount",45),softness=num(effect,"softness",65);overlays.push(overlay(effect,"vignette","effect-vignette",{background:`radial-gradient(ellipse at center,transparent ${Math.max(0,softness-35)}%,${alpha(color,amount)} 100%)`}));continue;
     }
   }
-  return{filter:filters.length?filters.join(" "):undefined,boxShadows,backdropFilter,imageRendering,mixBlendMode,overlays,classes,maxExtent};
+  return{filter:filters.length?filters.join(" "):undefined,boxShadows,backdropFilter,imageRendering,mixBlendMode,overlays,classes,maxExtent,animated};
 }
 
 export function visualEffectExtent(element:Pick<EditorElement,"effects"|"corners">){return composeVisualEffects(element).maxExtent;}

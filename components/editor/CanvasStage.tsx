@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { elementStyle } from "@/lib/editor/render";
 import { contentClipPath } from "@/lib/editor/clipping";
-import { resolveTextRotation } from "@/lib/editor/visual-transform";
+import { resolveCanvasTextRotation as resolveTextRotation } from "@/lib/editor/visual-transform";
 import { selectionBounds } from "@/lib/editor/operations";
 import { calculateSelectionResize, resizeElementWithConstraints } from "@/lib/editor/transforms";
 import { supportsAdvancedCorners } from "@/lib/editor/geometry";
@@ -30,6 +30,7 @@ export function CanvasStage({ project, zoom, onZoomChange, viewCommand, showGrid
   useEffect(()=>{if(!didFit.current&&viewportRef.current){didFit.current=true;requestAnimationFrame(()=>runViewAction("fit-frame"));}},[]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{if(viewCommand)runViewAction(viewCommand.action);},[viewCommand?.token]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{const down=(event:KeyboardEvent)=>{if(event.code==="Space"&&!['INPUT','TEXTAREA'].includes((event.target as HTMLElement)?.tagName)){event.preventDefault();spacePressed.current=true;}};const up=(event:KeyboardEvent)=>{if(event.code==="Space")spacePressed.current=false;};window.addEventListener("keydown",down);window.addEventListener("keyup",up);return()=>{window.removeEventListener("keydown",down);window.removeEventListener("keyup",up);};},[]);
+  useEffect(()=>{const update=()=>{document.documentElement.dataset.effectsVisibilityPaused=String(document.visibilityState!=="visible");};update();document.addEventListener("visibilitychange",update);return()=>{document.removeEventListener("visibilitychange",update);delete document.documentElement.dataset.effectsVisibilityPaused;};},[]);
   useEffect(()=>{const show=(event:KeyboardEvent)=>{if(event.key!=="Alt")return;const selected=project.elements.filter((item)=>project.selectedIds.includes(item.id)&&!item.hidden),bounds=boundsForElements(selected);if(bounds)setMeasurements(inspectDistances(bounds,project.elements,new Set(selected.map((item)=>item.id)),zoom));};const hide=(event:KeyboardEvent)=>{if(event.key==="Alt")setMeasurements([]);};window.addEventListener("keydown",show);window.addEventListener("keyup",hide);return()=>{window.removeEventListener("keydown",show);window.removeEventListener("keyup",hide);};},[project.elements,project.selectedIds,zoom]);
 
   const startPan=(event:React.PointerEvent)=>{if(!(event.button===1||spacePressed.current))return false;event.preventDefault();const start={x:event.clientX,y:event.clientY,pan};setPanning(true);const move=(next:PointerEvent)=>setPan({x:start.pan.x+next.clientX-start.x,y:start.pan.y+next.clientY-start.y});const up=()=>{setPanning(false);window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);};window.addEventListener("pointermove",move);window.addEventListener("pointerup",up,{once:true});return true;};

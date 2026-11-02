@@ -147,3 +147,4 @@ export function resolveCaptionGeometry(element:EditorElement,elements:EditorElem
 
 /** Backwards-compatible name retained for consumers while the canonical implementation is geometry-first. */
 export function resolveTextRotation(element:EditorElement,elements:EditorElement[]){return resolveCaptionGeometry(element,elements);}
+export function resolveCanvasTextRotation(element:EditorElement,elements:EditorElement[]){if(element.type!=="text"&&element.type!=="button")return{visualRotationSource:"object-transform" as const};return resolveCaptionGeometry(element,elements);}

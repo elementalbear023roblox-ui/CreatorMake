@@ -84,6 +84,7 @@ export function useEditor() {
     flushTransient();
     if(transactionRef.current)return;
     transientBlocked.current=false;transactionRef.current={label,before:projectRef.current};
+    if(typeof document!=="undefined")document.documentElement.dataset.editorInteracting="true";
   },[flushTransient]);
 
   const transient=useCallback((mutate:(draft:EditorProject)=>void,affectedIds?:Iterable<string>)=>{
@@ -96,12 +97,12 @@ export function useEditor() {
   },[applyTransientNow]);
 
   const finishGesture=useCallback(()=>{
-    flushTransient();const transaction=transactionRef.current;transactionRef.current=null;transientBlocked.current=false;if(!transaction)return;
+    flushTransient();const transaction=transactionRef.current;transactionRef.current=null;transientBlocked.current=false;if(typeof document!=="undefined")delete document.documentElement.dataset.editorInteracting;if(!transaction)return;
     const current=projectRef.current,next=mutableProject(current);synchronizeTextSizingMutation(transaction.before,next);applyAutoLayout(next);next.updatedAt=Date.now();projectRef.current=next;setProject(next);recordHistory(transaction.label,transaction.before,next);
   },[flushTransient,recordHistory]);
 
   const cancelHistoryTransaction=useCallback(()=>{
-    const active=Boolean(transactionRef.current||pendingTransient.current||transientFrame.current!==null);if(transientFrame.current!==null){cancelAnimationFrame(transientFrame.current);transientFrame.current=null;}pendingTransient.current=null;const transaction=transactionRef.current;transactionRef.current=null;transientBlocked.current=active;if(transaction){projectRef.current=transaction.before;setProject(transaction.before);}
+    const active=Boolean(transactionRef.current||pendingTransient.current||transientFrame.current!==null);if(transientFrame.current!==null){cancelAnimationFrame(transientFrame.current);transientFrame.current=null;}pendingTransient.current=null;const transaction=transactionRef.current;transactionRef.current=null;transientBlocked.current=active;if(typeof document!=="undefined")delete document.documentElement.dataset.editorInteracting;if(transaction){projectRef.current=transaction.before;setProject(transaction.before);}
   },[]);
 
   const commit = useCallback((mutate:(draft:EditorProject)=>void,label="Edit")=>{
@@ -120,7 +121,7 @@ export function useEditor() {
   const addGeometry = (kind:GeometryKind) => commit((draft)=>{const element=createVectorElement(kind,draft.elements.length);draft.elements.push(element);draft.selectedIds=[element.id];});
   const select = (id: string | null, additive = false) => setProject((current) => ({ ...current, selectedIds: id ? (additive ? (current.selectedIds.includes(id) ? current.selectedIds.filter((item) => item !== id) : [...current.selectedIds, id]) : [id]) : [] }));
   const setSelection = (ids: string[], mode: "replace" | "toggle" = "replace") => setProject((current) => ({ ...current, selectedIds: mode === "replace" ? [...new Set(ids)] : [...new Set([...current.selectedIds.filter((id) => !ids.includes(id)),...ids.filter((id) => !current.selectedIds.includes(id))])] }));
-  const updateSelected = (patch: Partial<EditorElement>) => commit((draft) => { const resolvedPatch=patch.fontFamily?{...patch,fontId:patch.fontFamily.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")}:patch;applySharedPerspective(draft,resolvedPatch);draft.elements = draft.elements.map((el) => draft.selectedIds.includes(el.id) ? { ...el, ...resolvedPatch } : el); },propertyLabel(patch,projectRef.current));
+  const updateSelected = (patch: Partial<EditorElement>) => {const mutate=(draft:EditorProject)=>{const resolvedPatch=patch.fontFamily?{...patch,fontId:patch.fontFamily.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")}:patch;applySharedPerspective(draft,resolvedPatch);draft.elements=draft.elements.map((el)=>draft.selectedIds.includes(el.id)?{...el,...resolvedPatch}:el);};if(transactionRef.current)transient(mutate,projectRef.current.selectedIds);else commit(mutate,propertyLabel(patch,projectRef.current));};
   const deleteSelected = () => commit((draft) => { const ids=descendantIds(draft.elements,draft.selectedIds);draft.elements = draft.elements.filter((el) => !ids.has(el.id)); draft.selectedIds = []; });
   const duplicateSelected = () => commit((draft) => {
     const offset=duplicateTransform.current,sourceIds=descendantIds(draft.elements,draft.selectedIds),sources=draft.elements.filter((el)=>sourceIds.has(el.id)),idMap=new Map(sources.map((el)=>[el.id,`${el.type}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`]));const clones=sources.map((el)=>({...structuredClone(el),id:idMap.get(el.id)!,parentId:el.parentId?(idMap.get(el.parentId)??el.parentId):null,name:draft.selectedIds.includes(el.id)?`${el.name} Copy`:el.name,x:el.x+offset.x,y:el.y+offset.y}));

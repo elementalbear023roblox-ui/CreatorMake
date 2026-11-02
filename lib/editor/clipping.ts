@@ -1,9 +1,11 @@
 import type { EditorElement } from "./types";
 
 export type ContentClipBounds={left:number;top:number;right:number;bottom:number};
+const elementIndexCache=new WeakMap<EditorElement[],Map<string,EditorElement>>();
+const elementIndex=(elements:EditorElement[])=>{const cached=elementIndexCache.get(elements);if(cached)return cached;const created=new Map(elements.map((item)=>[item.id,item]));elementIndexCache.set(elements,created);return created;};
 
 export function contentClipBounds(element:EditorElement,elements:EditorElement[]):ContentClipBounds|null{
-  const byId=new Map(elements.map((item)=>[item.id,item]));
+  const byId=elementIndex(elements);
   let parentId=element.parentId,bounds:ContentClipBounds|null=null,guard=0;
   while(parentId&&guard<64){
     const parent=byId.get(parentId);if(!parent)break;

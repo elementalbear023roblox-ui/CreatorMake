@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { EditorElement } from "./types";
 import { designFontSize, textPadding } from "./text-sizing.ts";
 import { composeVisualEffects } from "../effects/render.ts";
+import type { EffectPresentation } from "../effects/render.ts";
 
 const alpha = (hex: string, opacity: number) => {
   if (!hex.startsWith("#") || hex.length !== 7) return hex;
@@ -38,8 +39,8 @@ export function elementStyle(element: EditorElement): CSSProperties {
   };
 }
 
-export function elementSurfaceStyle(element: EditorElement): CSSProperties {
-  const effects=composeVisualEffects(element),boxShadow=[element.shadow,...effects.boxShadows].filter((value)=>value&&value!=="none").join(", ")||undefined;
+export function elementSurfaceStyle(element: EditorElement,effects:EffectPresentation=composeVisualEffects(element)): CSSProperties {
+  const boxShadow=[element.shadow,...effects.boxShadows].filter((value)=>value&&value!=="none").join(", ")||undefined;
   const clipPath = element.type === "ellipse" ? "ellipse(50% 50% at 50% 50%)" : element.type === "polygon" ? "polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%)" : element.type === "star" ? "polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 94%,50% 72%,21% 94%,32% 57%,2% 35%,39% 35%)" : undefined;
   const alignItems=element.type === "button" || element.type === "text" ? element.verticalAlign === "top" ? "flex-start" : element.verticalAlign === "bottom" ? "flex-end" : "center" : "flex-start";
   const padding=element.type==="text"||element.type==="button"?textPadding(element):element.padding;
