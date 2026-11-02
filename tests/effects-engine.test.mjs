@@ -23,10 +23,12 @@ test("effect composition preserves stack order and computes export-safe glow bou
 });
 
 test("effects compositor stays inside its GPU performance budget",()=>{
-  const element=createElement("frame"),glow=createVisualEffect("neon-glow");
+  const element=createElement("text"),glow=createVisualEffect("neon-glow");
   glow.parameters.layers=8;element.effects=[glow];
   const optimized=composeVisualEffects(element),passes=(optimized.filter?.match(/drop-shadow/g)??[]).length;
-  assert.equal(passes,4,"high-layer glows should preserve their look without creating unbounded filter passes");
+  assert.equal(passes,2,"high-layer text glows should preserve their look without creating unbounded filter passes");
+  const frame=createElement("frame");frame.effects=[glow];const framePresentation=composeVisualEffects(frame);
+  assert.equal(framePresentation.filter,undefined,"rectangular GUI glows should use cheaper box shadows");assert.equal(framePresentation.boxShadows.length,2);
   assert.equal(optimized.animated,false);
   const scanlines=createVisualEffect("scanlines");element.effects=[scanlines];
   assert.doesNotMatch(composeVisualEffects(element).overlays[0].className,/effect-is-animated/);
@@ -62,6 +64,11 @@ test("effects inspector exposes the complete stack workflow",async()=>{
   assert.match(inspectorSource,/querySelectorAll<HTMLDetailsElement>\(\":scope > details\"\)/,"nested animation disclosures must not be persisted as top-level inspector sections");
   const surfaceSource=await readFile(new URL("../components/editor/ElementSurface.tsx",import.meta.url),"utf8");
   assert.doesNotMatch(surfaceSource,/composeVisualEffects\(element\)\.overlays/,"an element must reuse one composed effect presentation");
+  assert.match(surfaceSource,/memo\(ElementSurfaceView/,"unchanged canvas surfaces should not recompute their effect stack");
   const editorSource=await readFile(new URL("../hooks/use-editor.ts",import.meta.url),"utf8");
   assert.match(editorSource,/if\(transactionRef\.current\)transient\(mutate,projectRef\.current\.selectedIds\)/,"continuous property edits should be frame-batched instead of deep-cloning every input event");
+  assert.match(editorSource,/editorLowFidelity/,"canvas transforms should temporarily suspend expensive visual effects");
+  const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+  assert.match(css,/@keyframes cm-effect-spectrum\{from\{transform:/,"spectrum animation should stay on the compositor");
+  assert.doesNotMatch(css,/@keyframes cm-effect-spectrum[^@]*background-position/,"spectrum animation must not repaint its background every frame");
 });

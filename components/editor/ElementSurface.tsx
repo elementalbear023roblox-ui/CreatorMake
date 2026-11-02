@@ -5,7 +5,7 @@ import { geometryPresentation, openGeometryStrokeWidth, usesVectorSurface } from
 import { resolveCaptionGeometry } from "@/lib/editor/visual-transform";
 import { composeVisualEffects } from "@/lib/effects/render";
 import type { EffectPresentation } from "@/lib/effects/render";
-import type { CSSProperties } from "react";
+import { memo, type CSSProperties } from "react";
 import type { EditorAsset, EditorElement } from "@/lib/editor/types";
 
 const shadowFilter=(shadow:string)=>{
@@ -32,7 +32,12 @@ function ImageSurface({element,asset}:{element:EditorElement;asset?:EditorAsset}
   </span>;
 }
 
-export function ElementSurface({element,asset,elements=[element]}:{element:EditorElement;asset?:EditorAsset;elements?:EditorElement[]}){
+type ElementSurfaceProps={element:EditorElement;asset?:EditorAsset;elements?:EditorElement[]};
+const elementIndexCache=new WeakMap<EditorElement[],Map<string,EditorElement>>();
+const elementIndex=(elements:EditorElement[])=>{const cached=elementIndexCache.get(elements);if(cached)return cached;const created=new Map(elements.map((item)=>[item.id,item]));elementIndexCache.set(elements,created);return created;};
+const textDependenciesStable=(element:EditorElement,previous:EditorElement[],next:EditorElement[])=>{const previousIndex=elementIndex(previous),nextIndex=elementIndex(next);let parentId=element.parentId,guard=0;while(parentId&&guard<64){const before=previousIndex.get(parentId),after=nextIndex.get(parentId);if(before!==after)return false;parentId=before?.parentId??null;guard+=1;}if(element.sharedCaptionSize){const group=element.sharedCaptionGroup,previousGroup=previous.filter((item)=>(item.type==="text"||item.type==="button")&&item.sharedCaptionSize&&item.sharedCaptionGroup===group),nextGroup=next.filter((item)=>(item.type==="text"||item.type==="button")&&item.sharedCaptionSize&&item.sharedCaptionGroup===group);if(previousGroup.length!==nextGroup.length||previousGroup.some((item)=>nextIndex.get(item.id)!==item))return false;}return true;};
+
+function ElementSurfaceView({element,asset,elements=[element]}:ElementSurfaceProps){
   if(element.type==="image"||element.type==="image-button")return <ImageSurface element={element} asset={asset}/>;
   const effects=composeVisualEffects(element),textBearing=element.type==="text"||element.type==="button",caption=textBearing?resolveCaptionGeometry(element,elements):null,vertical=element.verticalAlign==="top"?"flex-start":element.verticalAlign==="bottom"?"flex-end":"center",horizontal=element.textAlign==="left"?"flex-start":element.textAlign==="right"?"flex-end":"center";
   const captionStyle:CSSProperties|undefined=caption?caption.captionGeometry.cssTransform?{left:0,top:0,width:caption.captionSize.width,height:caption.captionSize.height,fontSize:caption.resolvedTextSize,alignItems:vertical,justifyContent:horizontal,transform:caption.captionGeometry.cssTransform,transformOrigin:"0 0"}:{left:caption.captionCenter.x,top:caption.captionCenter.y,width:caption.captionSize.width,height:caption.captionSize.height,fontSize:caption.resolvedTextSize,alignItems:vertical,justifyContent:horizontal,transform:`translate(-50%,-50%) rotate(${caption.editorTextLocalRotation}deg)`}:undefined;
@@ -51,3 +56,5 @@ export function ElementSurface({element,asset,elements=[element]}:{element:Edito
     {text}<EffectOverlays effects={effects}/>{debug}
   </span>;
 }
+
+export const ElementSurface=memo(ElementSurfaceView,(previous,next)=>{if(previous.element!==next.element||previous.asset!==next.asset)return false;if(previous.element.type!=="text"&&previous.element.type!=="button")return true;return textDependenciesStable(previous.element,previous.elements??[previous.element],next.elements??[next.element]);});

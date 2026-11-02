@@ -37,11 +37,16 @@ preference. Custom preset and clipboard records contain only effect definitions
 and never modify the source geometry, text, image, gradient, or vector path.
 
 The live editor keeps effects responsive by composing each stack once per
-object, bounding expensive glow and extrusion passes, allocating GPU layers only
-for active animation, pausing motion during direct manipulation or while the tab
-is hidden, and batching continuous property edits to one update per animation
-frame. Long inspector and asset lists use browser rendering containment so
-off-screen cards do not consume paint time.
+object, memoizing unchanged canvas surfaces, routing rectangular glows through
+box shadows, and bounding expensive glow and extrusion passes. Animated
+gradients, spectra, scanlines, and light sweeps use compositor-only transforms
+instead of repainting filters or background positions every frame. GPU layers
+exist only for active animation; motion pauses during direct manipulation or
+while the tab is hidden, and expensive effect rendering is temporarily
+simplified during canvas drags before returning at full quality on release.
+Continuous property edits are batched to one update per animation frame. Long
+inspector and asset lists use browser rendering containment so off-screen cards
+do not consume paint time.
 
 Roblox Adaptive export classifies effect-bearing objects explicitly. Exact
 native representations stay native; interactive controls use a hybrid native

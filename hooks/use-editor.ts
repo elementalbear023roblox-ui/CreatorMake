@@ -84,7 +84,7 @@ export function useEditor() {
     flushTransient();
     if(transactionRef.current)return;
     transientBlocked.current=false;transactionRef.current={label,before:projectRef.current};
-    if(typeof document!=="undefined")document.documentElement.dataset.editorInteracting="true";
+    if(typeof document!=="undefined"){document.documentElement.dataset.editorInteracting="true";if(/^(move|resize|rotate|scale|skew|perspective)/i.test(label))document.documentElement.dataset.editorLowFidelity="true";}
   },[flushTransient]);
 
   const transient=useCallback((mutate:(draft:EditorProject)=>void,affectedIds?:Iterable<string>)=>{
@@ -97,12 +97,12 @@ export function useEditor() {
   },[applyTransientNow]);
 
   const finishGesture=useCallback(()=>{
-    flushTransient();const transaction=transactionRef.current;transactionRef.current=null;transientBlocked.current=false;if(typeof document!=="undefined")delete document.documentElement.dataset.editorInteracting;if(!transaction)return;
+    flushTransient();const transaction=transactionRef.current;transactionRef.current=null;transientBlocked.current=false;if(typeof document!=="undefined"){delete document.documentElement.dataset.editorInteracting;delete document.documentElement.dataset.editorLowFidelity;}if(!transaction)return;
     const current=projectRef.current,next=mutableProject(current);synchronizeTextSizingMutation(transaction.before,next);applyAutoLayout(next);next.updatedAt=Date.now();projectRef.current=next;setProject(next);recordHistory(transaction.label,transaction.before,next);
   },[flushTransient,recordHistory]);
 
   const cancelHistoryTransaction=useCallback(()=>{
-    const active=Boolean(transactionRef.current||pendingTransient.current||transientFrame.current!==null);if(transientFrame.current!==null){cancelAnimationFrame(transientFrame.current);transientFrame.current=null;}pendingTransient.current=null;const transaction=transactionRef.current;transactionRef.current=null;transientBlocked.current=active;if(typeof document!=="undefined")delete document.documentElement.dataset.editorInteracting;if(transaction){projectRef.current=transaction.before;setProject(transaction.before);}
+    const active=Boolean(transactionRef.current||pendingTransient.current||transientFrame.current!==null);if(transientFrame.current!==null){cancelAnimationFrame(transientFrame.current);transientFrame.current=null;}pendingTransient.current=null;const transaction=transactionRef.current;transactionRef.current=null;transientBlocked.current=active;if(typeof document!=="undefined"){delete document.documentElement.dataset.editorInteracting;delete document.documentElement.dataset.editorLowFidelity;}if(transaction){projectRef.current=transaction.before;setProject(transaction.before);}
   },[]);
 
   const commit = useCallback((mutate:(draft:EditorProject)=>void,label="Edit")=>{
