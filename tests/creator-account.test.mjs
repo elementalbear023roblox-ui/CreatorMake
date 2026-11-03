@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createCreatorMakeCredentialRecord, validateCreatorMakeAccountInput, verifyCreatorMakePassword } from "../lib/accounts/creator-account.ts";
+import { createCreatorMakeAccountKey, createCreatorMakeCredentialRecord, parseCreatorMakeAccountKey, validateCreatorMakeAccountInput, verifyCreatorMakePassword } from "../lib/accounts/creator-account.ts";
 
 test("CreatorMake accounts validate normalized identity without accepting weak passwords",()=>{
   assert.deepEqual(validateCreatorMakeAccountInput({displayName:"  Barrett  ",email:"  USER@Example.COM ",password:"correct horse"}),{displayName:"Barrett",email:"user@example.com",password:"correct horse"});
@@ -20,10 +20,20 @@ test("CreatorMake account credentials use salted PBKDF2 and never retain plainte
   assert.ok(first.iterations>=200_000);
 });
 
+test("portable account keys verify the same password on another device without plaintext",async()=>{
+  const password="portable but still secret",record=await createCreatorMakeCredentialRecord({displayName:"Portable Creator",email:"portable@example.com",password}),serialized=JSON.stringify(createCreatorMakeAccountKey(record)),restored=parseCreatorMakeAccountKey(serialized);
+  assert.equal(await verifyCreatorMakePassword(restored,password),true);
+  assert.doesNotMatch(serialized,new RegExp(password));
+  assert.throws(()=>parseCreatorMakeAccountKey('{"format":"unknown"}'),/Choose a CreatorMake account key/);
+});
+
 test("customer account dialog never exposes OAuth administrator configuration",async()=>{
   const source=await readFile(new URL("../components/editor/AccountDialog.tsx",import.meta.url),"utf8");
   assert.match(source,/Continue with Google/);
   assert.match(source,/Create CreatorMake account/);
   assert.match(source,/Sign in to CreatorMake/);
+  assert.match(source,/Show password/);
+  assert.match(source,/Import account key/);
+  assert.match(source,/never stores a readable password/);
   assert.doesNotMatch(source,/OAuth web client ID|Configure this browser|administrator setting/);
 });
