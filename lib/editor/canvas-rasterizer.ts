@@ -190,8 +190,9 @@ export async function rasterizeWithCreatorMakeRenderer(element:EditorElement,req
     const exportNode=stage.querySelector<HTMLElement>("[data-creatormake-export-element]");if(!exportNode)throw new Error("CreatorMake could not mount the isolated canvas renderer.");
     if(element.type==="three-d"){
       const source=exportNode.querySelector<HTMLCanvasElement>("canvas");if(!source)throw new Error("CreatorMake could not mount the 3D export surface.");
-      for(let frame=0;frame<12&&!source.dataset.renderReady;frame+=1){throwIfAborted(signal);await waitForPaint();}
-      if(!source.dataset.renderReady)throw new Error("CreatorMake 3D rendering did not become ready for export.");
+      for(let frame=0;frame<12&&!source.dataset.renderReady&&!source.dataset.renderError;frame+=1){throwIfAborted(signal);await waitForPaint();}
+      if(source.dataset.renderError)throw new Error(`CreatorMake 3D export stopped because ${source.dataset.renderError.replaceAll("-"," ")}. The editable source remains unchanged.`);
+      if(!source.dataset.renderReady)throw new Error("CreatorMake 3D rendering did not become ready for export. The editable source remains unchanged.");
       const canvas=document.createElement("canvas"),scale=Math.min(source.width/Math.max(1,element.width),source.height/Math.max(1,element.height));canvas.width=source.width;canvas.height=source.height;const context=canvas.getContext("2d",{alpha:true,willReadFrequently:true});if(!context)throw new Error("Canvas 2D export is unavailable.");context.drawImage(source,0,0);const captured=await alphaCrop(canvas,{x:0,y:0,width:element.width,height:element.height},scale,signal),fidelity:CanvasRendererFidelity={matchPercent:100,thresholdPercent:FIDELITY_THRESHOLD,passed:true,boundsMatch:true,aspectRatioMatch:true,transformMatch:true,alphaEdgeSafety:true,source:"isolated-canvas-renderer"};return{dataUrl:captured.dataUrl,sourceDataUrl:captured.dataUrl,differenceDataUrl:"",width:captured.canvas.width,height:captured.canvas.height,renderPixelWidth:captured.canvas.width,renderPixelHeight:captured.canvas.height,scale:captured.scale,visualBounds:captured.bounds,fidelity,canvas:captured.canvas};
     }
     const exported=await captureNode(exportNode,stage,requestedScale,margin,fontFaceCss,signal),live=findLiveCanvasElement(element.id);

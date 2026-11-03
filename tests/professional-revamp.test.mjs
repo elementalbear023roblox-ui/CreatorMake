@@ -17,12 +17,12 @@ test("3D objects are real saved editor elements with safe Roblox image fallback"
   assert.match(classification.resolvedLabel,/Premium|Image/);
 });
 
-test("schema 16 migrates older projects without losing editable geometry",()=>{
+test("schema 17 migrates older projects without losing editable geometry",()=>{
   const project=createProject("Migration"),frame=createElement("frame");
   project.elements=[frame];
   const legacy=structuredClone(project);legacy.schemaVersion=15;delete legacy.elements[0].threeD;
   const restored=normalizeProject(legacy);
-  assert.equal(restored.schemaVersion,16);
+  assert.equal(restored.schemaVersion,17);
   assert.equal(restored.elements[0].geometry.kind,"rectangle");
   assert.equal(restored.elements[0].threeD.primitive,"cube");
 });
@@ -40,5 +40,5 @@ test("professional navigation and GPU renderer are wired into the real editor",a
   const [layers,inspector,surface]=await Promise.all([readFile(new URL("../components/editor/LayersPanel.tsx",import.meta.url),"utf8"),readFile(new URL("../components/editor/Inspector.tsx",import.meta.url),"utf8"),readFile(new URL("../components/editor/ThreeDObjectSurface.tsx",import.meta.url),"utf8")]);
   for(const label of ["Layers","Insert","Assets","Templates"])assert.match(layers,new RegExp(`\\"${label}\\"`));
   assert.match(inspector,/Text Type/);assert.match(inspector,/Convert to 3D/);assert.match(inspector,/3D Geometry/);
-  assert.match(surface,/WebGLRenderer/);assert.match(surface,/disposeResources/);assert.match(surface,/PCFSoftShadowMap/);
+  assert.match(surface,/WebGLRenderer/);assert.match(surface,/webglcontextlost/);assert.doesNotMatch(surface,/forceContextLoss/);assert.match(surface,/PCFSoftShadowMap/);
 });

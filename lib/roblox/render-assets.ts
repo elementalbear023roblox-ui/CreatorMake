@@ -14,7 +14,7 @@ import type { RobloxExportOptions, RobloxRasterPart, RobloxRenderAsset, RobloxRe
 export type RobloxAssetMappings = Record<string,string>;
 // Bump whenever canonical geometry interpretation changes so IndexedDB cannot
 // reuse a pre-fidelity rectangular raster for an unchanged custom path.
-const RENDERER_VERSION=18;
+const RENDERER_VERSION=19;
 export const ROBLOX_IMAGE_MAX_DIMENSION=ROBLOX_IMAGE_CAPABILITIES.delivery.maxDimension;
 const SAMPLE_POINTS=[
   {label:"10%,10%",normalizedX:.1,normalizedY:.1},

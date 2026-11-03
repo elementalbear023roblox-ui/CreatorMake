@@ -79,7 +79,7 @@ export type ScrollingDirection = "X" | "Y" | "XY";
 export type ElasticBehavior = "WhenScrollable" | "Always" | "Never";
 export type VerticalScrollBarPosition = "Left" | "Right";
 export type ScrollBarInset = "None" | "ScrollBar" | "Always";
-export type ThreeDPrimitive = "cube" | "sphere" | "cylinder" | "cone" | "torus" | "capsule" | "pyramid" | "extruded-shape";
+export type ThreeDPrimitive = "cube" | "sphere" | "cylinder" | "cone" | "torus" | "capsule" | "pyramid" | "rounded-box" | "plane" | "extruded-shape";
 export type ThreeDMaterial = "matte" | "plastic" | "metal" | "chrome" | "glass" | "emissive" | "neon";
 export type ThreeDSettings = {
   primitive:ThreeDPrimitive;
@@ -100,11 +100,25 @@ export type ThreeDSettings = {
   cameraFov:number;
   cameraProjection:"perspective"|"orthographic";
   cameraZ:number;
+  cameraYaw:number;
+  cameraPitch:number;
   rotationX:number;
   rotationY:number;
   rotationZ:number;
   positionZ:number;
   scale:number;
+  scaleX:number;
+  scaleY:number;
+  scaleZ:number;
+  pivotX:number;
+  pivotY:number;
+  pivotZ:number;
+  transformSpace:"world"|"local";
+  segments:number;
+  cornerRadius:number;
+  lightColor:string;
+  shadows:boolean;
+  previewQuality:"PERFORMANCE"|"BALANCED"|"HIGH";
   sourceType:Exclude<ElementType,"three-d">|null;
   exportStrategy:"AUTO"|"IMAGE"|"VIEWPORT_FRAME";
 };
@@ -306,7 +320,7 @@ export type ProjectExportOptions = {
 };
 
 export type EditorProject = {
-  schemaVersion: 16;
+  schemaVersion: 17;
   id: string;
   name: string;
   createdAt: number;
