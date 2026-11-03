@@ -1,3 +1,5 @@
+import { exportProjectLibrary, mergeProjectLibrary, type CreatorMakeLibraryMergeResult, type CreatorMakeLibraryPackage } from "../editor/project.ts";
+
 const ACCOUNTS_KEY="creatormake:accounts:v1";
 const SESSION_KEY="creatormake:account-session:v1";
 const PBKDF2_ITERATIONS=210_000;
@@ -6,7 +8,8 @@ const EMAIL_PATTERN=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export type CreatorMakeProfile={id:string;displayName:string;email:string;createdAt:number;provider:"creatormake"};
 export type CreatorMakeCredentialRecord={profile:CreatorMakeProfile;salt:string;passwordHash:string;iterations:number};
 export type CreatorMakeAccountInput={displayName:string;email:string;password:string};
-export type CreatorMakeAccountKey={format:"creatormake-account-key";formatVersion:1;exportedAt:string;account:CreatorMakeCredentialRecord};
+export type CreatorMakeAccountKey={format:"creatormake-account-key";formatVersion:1|2;exportedAt:string;account:CreatorMakeCredentialRecord;projectLibrary?:CreatorMakeLibraryPackage};
+export type CreatorMakeAccountImportResult={profile:CreatorMakeProfile;projectsInBundle:number;merge:CreatorMakeLibraryMergeResult|null};
 
 const localStorageSafe=()=>typeof window!=="undefined"?window.localStorage:null;
 const normalizeEmail=(value:string)=>value.trim().toLowerCase();
@@ -53,13 +56,18 @@ function validatedCredentialRecord(value:unknown){
   return structuredClone(record) as CreatorMakeCredentialRecord;
 }
 
-export function createCreatorMakeAccountKey(record:CreatorMakeCredentialRecord):CreatorMakeAccountKey{return{format:"creatormake-account-key",formatVersion:1,exportedAt:new Date().toISOString(),account:validatedCredentialRecord(record)};}
+const isProjectLibrary=(value:unknown):value is CreatorMakeLibraryPackage=>{const library=value as Partial<CreatorMakeLibraryPackage>|null;return Boolean(library&&library.format==="creatormake-cloud-library"&&library.formatVersion===1&&Array.isArray(library.projects)&&Array.isArray(library.recoveries));};
 
-export function parseCreatorMakeAccountKey(value:unknown){
-  let parsed=value;try{if(typeof value==="string")parsed=JSON.parse(value);}catch{throw new Error("CreatorMake could not read this account key file.");}
-  const key=parsed as Partial<CreatorMakeAccountKey>|null;if(!key||key.format!=="creatormake-account-key"||key.formatVersion!==1)throw new Error("Choose a CreatorMake account key file.");
-  return validatedCredentialRecord(key.account);
+export function createCreatorMakeAccountKey(record:CreatorMakeCredentialRecord,projectLibrary?:CreatorMakeLibraryPackage):CreatorMakeAccountKey{return{format:"creatormake-account-key",formatVersion:projectLibrary?2:1,exportedAt:new Date().toISOString(),account:validatedCredentialRecord(record),...(projectLibrary?{projectLibrary:structuredClone(projectLibrary)}:{})};}
+
+export function parseCreatorMakeAccountBundle(value:unknown){
+  let parsed=value;try{if(typeof value==="string")parsed=JSON.parse(value);}catch{throw new Error("CreatorMake could not read this account file.");}
+  const key=parsed as Partial<CreatorMakeAccountKey>|null;if(!key||key.format!=="creatormake-account-key"||![1,2].includes(Number(key.formatVersion)))throw new Error("Choose a CreatorMake account file.");
+  if(key.formatVersion===2&&!isProjectLibrary(key.projectLibrary))throw new Error("This CreatorMake account file is missing its project library.");
+  return{account:validatedCredentialRecord(key.account),projectLibrary:isProjectLibrary(key.projectLibrary)?structuredClone(key.projectLibrary):null};
 }
+
+export function parseCreatorMakeAccountKey(value:unknown){return parseCreatorMakeAccountBundle(value).account;}
 
 const readAccounts=()=>{try{const raw=localStorageSafe()?.getItem(ACCOUNTS_KEY);if(!raw)return[];const records=JSON.parse(raw) as CreatorMakeCredentialRecord[];return Array.isArray(records)?records.filter((record)=>record?.profile?.provider==="creatormake"&&record.salt&&record.passwordHash):[];}catch{return[];}};
 const writeAccounts=(records:CreatorMakeCredentialRecord[])=>localStorageSafe()?.setItem(ACCOUNTS_KEY,JSON.stringify(records));
@@ -79,8 +87,8 @@ export async function signInCreatorMakeAccount(email:string,password:string){
   writeSession(record.profile);return record.profile;
 }
 
-export function exportCreatorMakeAccountKey(profileId:string){const record=readAccounts().find((candidate)=>candidate.profile.id===profileId);if(!record)throw new Error("This CreatorMake account is not available on this device.");return createCreatorMakeAccountKey(record);}
+export async function exportCreatorMakeAccountKey(profileId:string){const record=readAccounts().find((candidate)=>candidate.profile.id===profileId);if(!record)throw new Error("This CreatorMake account is not available on this device.");return createCreatorMakeAccountKey(record,await exportProjectLibrary());}
 
-export function importCreatorMakeAccountKey(value:unknown){const incoming=parseCreatorMakeAccountKey(value),records=readAccounts(),same=records.find((record)=>record.profile.email===incoming.profile.email);if(same){if(same.profile.id===incoming.profile.id&&same.passwordHash===incoming.passwordHash)return same.profile;throw new Error("A different CreatorMake account already uses this email on this device.");}writeAccounts([...records,incoming]);return incoming.profile;}
+export async function importCreatorMakeAccountKey(value:unknown):Promise<CreatorMakeAccountImportResult>{const bundle=parseCreatorMakeAccountBundle(value),incoming=bundle.account,records=readAccounts(),same=records.find((record)=>record.profile.email===incoming.profile.email);if(same){if(same.profile.id!==incoming.profile.id||same.passwordHash!==incoming.passwordHash)throw new Error("A different CreatorMake account already uses this email on this device.");}else writeAccounts([...records,incoming]);const merge=bundle.projectLibrary?await mergeProjectLibrary(bundle.projectLibrary):null;return{profile:same?.profile??incoming.profile,projectsInBundle:bundle.projectLibrary?.projects.length??0,merge};}
 
 export function signOutCreatorMakeAccount(){localStorageSafe()?.removeItem(SESSION_KEY);}
