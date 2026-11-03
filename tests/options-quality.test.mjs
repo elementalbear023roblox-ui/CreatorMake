@@ -6,9 +6,9 @@ import { applyProjectOptionPreset, DEFAULT_PROJECT_EXPORT_OPTIONS, resolveProjec
 import { maximumSafeInternalScale, planPixelAccurateAssets } from "../lib/roblox/render-assets.ts";
 import { CREATORMAKE_MASTER_CAPABILITIES, ROBLOX_IMAGE_CAPABILITIES, planMasterRender } from "../lib/roblox/image-capabilities.ts";
 
-test("project export options persist in schema 15 while editor options remain outside the project",()=>{
+test("project export options persist in schema 16 while editor options remain outside the project",()=>{
   const project=createProject("Options");project.exportOptions={...project.exportOptions,renderedVisualQuality:"ULTRA",incrementalSync:false};
-  const restored=normalizeProject(structuredClone(project));assert.equal(restored.schemaVersion,15);assert.equal(restored.exportOptions.defaultRobloxExportMode,"AUTO");assert.equal(restored.exportOptions.exportQuality,"FINAL");assert.equal(restored.exportOptions.renderedVisualQuality,"ULTRA");assert.equal(restored.exportOptions.incrementalSync,false);assert.equal("previewQuality" in restored.exportOptions,false);
+  const restored=normalizeProject(structuredClone(project));assert.equal(restored.schemaVersion,16);assert.equal(restored.exportOptions.defaultRobloxExportMode,"AUTO");assert.equal(restored.exportOptions.exportQuality,"FINAL");assert.equal(restored.exportOptions.renderedVisualQuality,"ULTRA");assert.equal(restored.exportOptions.incrementalSync,false);assert.equal("previewQuality" in restored.exportOptions,false);
   const legacy=structuredClone(project);delete legacy.exportOptions;legacy.schemaVersion=13;assert.deepEqual(normalizeProject(legacy).exportOptions,DEFAULT_PROJECT_EXPORT_OPTIONS);
   const commission=createProject("Commission","commission");assert.equal(commission.exportOptions.defaultRobloxExportMode,"AUTO");assert.equal(commission.exportOptions.exportQuality,"FINAL");assert.equal(commission.exportOptions.robloxImages,"PUBLISHABLE");assert.equal(commission.exportOptions.hierarchyExport,"PRESERVE");assert.equal(commission.exportOptions.multiplayerSafeAssets,"REQUIRE");
 });
@@ -60,6 +60,6 @@ test("properties alignment uses one tokenized grid and exposes the simplified ex
   for(const token of ["--property-label-width","--control-height","--section-padding","--panel-gap","--field-gap","--section-icon-size"])assert.match(css,new RegExp(token));
   assert.ok(inspector.indexOf("Roblox Export")<inspector.indexOf("<summary>Options</summary>"));assert.match(inspector,/Export As/);assert.match(inspector,/AUTO/);assert.match(inspector,/ORIGINAL/);assert.match(inspector,/IMAGE/);assert.match(inspector,/Render the complete button, including its text/);assert.match(inspector,/Runtime text changes require Auto\/Original export/);
   assert.match(options,/PROJECT EXPORT/);assert.match(options,/Default Export/);assert.match(options,/PREVIEW/);assert.match(options,/FINAL/);assert.match(options,/ADVANCED EXPORT/);assert.match(options,/Search advanced options/);assert.doesNotMatch(options,/MAX QUALITY EXPORT/);assert.doesNotMatch(options,/Internal Render Scale/);
-  assert.match(toolbar,/\+ Create/);assert.match(toolbar,/>Import</);assert.match(toolbar,/Roblox Check/);assert.match(toolbar,/SYNC/);assert.match(toolbar,/Export to Roblox/);assert.doesNotMatch(toolbar,/QUICK BUILD/);
+  assert.match(toolbar,/aria-label="Create frame"/);assert.match(toolbar,/aria-label="Create text"/);assert.match(toolbar,/aria-label="Create 3D object"/);assert.match(toolbar,/>Import</);assert.match(toolbar,/Roblox Check/);assert.match(toolbar,/SYNC/);assert.match(toolbar,/Export to Roblox/);assert.doesNotMatch(toolbar,/QUICK BUILD/);
   assert.match(robloxDialog,/SYNC TO STUDIO · AUTO PREPARE FOR ALL PLAYERS/);assert.match(robloxDialog,/mode:"auto-prepare-for-all-players"/);assert.match(robloxDialog,/needs a Roblox publishing account/);assert.match(robloxDialog,/asset-permissions:write/);assert.match(robloxDialog,/FAST PREVIEW · CURRENT PLAYER ONLY/);
 });

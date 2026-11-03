@@ -1,4 +1,4 @@
-export type ElementType = "frame" | "container" | "scrolling-frame" | "text" | "rectangle" | "roundRect" | "ellipse" | "line" | "polygon" | "star" | "button" | "image" | "image-button" | "vector";
+export type ElementType = "frame" | "container" | "scrolling-frame" | "text" | "rectangle" | "roundRect" | "ellipse" | "line" | "polygon" | "star" | "button" | "image" | "image-button" | "vector" | "three-d";
 
 export type ImageFitMode = "fit" | "fill" | "stretch" | "original" | "tile";
 export type ImageState = "default" | "hover" | "pressed" | "disabled" | "selected";
@@ -79,6 +79,35 @@ export type ScrollingDirection = "X" | "Y" | "XY";
 export type ElasticBehavior = "WhenScrollable" | "Always" | "Never";
 export type VerticalScrollBarPosition = "Left" | "Right";
 export type ScrollBarInset = "None" | "ScrollBar" | "Always";
+export type ThreeDPrimitive = "cube" | "sphere" | "cylinder" | "cone" | "torus" | "capsule" | "pyramid" | "extruded-shape";
+export type ThreeDMaterial = "matte" | "plastic" | "metal" | "chrome" | "glass" | "emissive" | "neon";
+export type ThreeDSettings = {
+  primitive:ThreeDPrimitive;
+  depth:number;
+  bevel:number;
+  bevelSegments:number;
+  material:ThreeDMaterial;
+  color:string;
+  sideColor:string;
+  metalness:number;
+  roughness:number;
+  emissiveColor:string;
+  emissiveIntensity:number;
+  transparent:boolean;
+  opacity:number;
+  lightIntensity:number;
+  ambientIntensity:number;
+  cameraFov:number;
+  cameraProjection:"perspective"|"orthographic";
+  cameraZ:number;
+  rotationX:number;
+  rotationY:number;
+  rotationZ:number;
+  positionZ:number;
+  scale:number;
+  sourceType:Exclude<ElementType,"three-d">|null;
+  exportStrategy:"AUTO"|"IMAGE"|"VIEWPORT_FRAME";
+};
 
 export type EditorElement = {
   id: string;
@@ -196,6 +225,7 @@ export type EditorElement = {
   translateZ: number;
   skewX: number;
   skewY: number;
+  threeD: ThreeDSettings;
   locked: boolean;
   hidden: boolean;
   imageAssetId: string | null;
@@ -276,7 +306,7 @@ export type ProjectExportOptions = {
 };
 
 export type EditorProject = {
-  schemaVersion: 15;
+  schemaVersion: 16;
   id: string;
   name: string;
   createdAt: number;

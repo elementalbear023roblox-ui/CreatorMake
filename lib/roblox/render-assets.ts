@@ -14,7 +14,7 @@ import type { RobloxExportOptions, RobloxRasterPart, RobloxRenderAsset, RobloxRe
 export type RobloxAssetMappings = Record<string,string>;
 // Bump whenever canonical geometry interpretation changes so IndexedDB cannot
 // reuse a pre-fidelity rectangular raster for an unchanged custom path.
-const RENDERER_VERSION=17;
+const RENDERER_VERSION=18;
 export const ROBLOX_IMAGE_MAX_DIMENSION=ROBLOX_IMAGE_CAPABILITIES.delivery.maxDimension;
 const SAMPLE_POINTS=[
   {label:"10%,10%",normalizedX:.1,normalizedY:.1},
@@ -52,7 +52,7 @@ export function visualStateForElement(element:EditorElement,visualPart:RobloxRas
     fill:element.fill,borderColor:element.borderColor,borderWidth:element.borderWidth,cornerRadius:element.cornerRadius,corners:element.corners,cornerTypes:element.cornerTypes,
     geometry:element.geometry,booleanOperation:element.booleanOperation,booleanOperands:element.booleanOperands,
     gradientType:element.gradientType,gradientAngle:element.gradientAngle,gradientStops:element.gradientStops,gradientPoints:element.gradientPoints,fourCornerColors:element.fourCornerColors,
-    blendMode:element.blendMode,shadow:element.shadow,padding:element.padding,clipContent:element.clipContent,advancedTransform,
+    blendMode:element.blendMode,shadow:element.shadow,padding:element.padding,clipContent:element.clipContent,advancedTransform,threeD:element.threeD,
     image:{assetId:element.imageAssetId,fit:element.imageFit,crop:element.imageCrop,offsetX:element.imageOffsetX,offsetY:element.imageOffsetY,scale:element.imageScale,scaleX:element.imageScaleX,scaleY:element.imageScaleY,rotation:element.imageRotation,opacity:element.imageOpacity,flipX:element.imageFlipX,flipY:element.imageFlipY,tileWidth:element.imageTileWidth,tileHeight:element.imageTileHeight,brightness:element.imageBrightness,contrast:element.imageContrast,saturation:element.imageSaturation,hue:element.imageHue,blur:element.imageBlur,tint:element.imageTint,tintOpacity:element.imageTintOpacity,sliceCenter:element.sliceCenter},
   };
   if(visualPart==="background")return{...surface,visualPart};

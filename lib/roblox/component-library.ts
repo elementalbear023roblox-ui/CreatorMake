@@ -7,6 +7,8 @@ export type RobloxElementKind =
   | "scrolling-frame"
   | "text-label"
   | "text-button"
+  | "image-text-label"
+  | "image-text-button"
   | "text-box"
   | "image-label"
   | "image-button"
@@ -29,6 +31,8 @@ export const ROBLOX_ELEMENTS: Array<{kind:RobloxElementKind;name:string;nativeCl
   {kind:"scrolling-frame",name:"Scrolling Frame",nativeClass:"ScrollingFrame",description:"Scrollable native container with automatic canvas sizing."},
   {kind:"text-label",name:"Text Label",nativeClass:"TextLabel",description:"Editable Roblox-native text whenever the selected font is compatible."},
   {kind:"text-button",name:"Text Button",nativeClass:"TextButton",description:"Interactive native button with editable text and visual states."},
+  {kind:"image-text-label",name:"Image Text Label",nativeClass:"ImageLabel",description:"Editable CreatorMake text rendered as a premium transparent Roblox image."},
+  {kind:"image-text-button",name:"Image Text Button",nativeClass:"ImageButton",description:"Editable image typography with a native Roblox button hit target."},
   {kind:"text-box",name:"Text Box",nativeClass:"TextBox",description:"Editable text-input control for Roblox experiences."},
   {kind:"image-label",name:"Image Label",nativeClass:"ImageLabel",description:"Image surface that preserves crop, fit, and nine-slice settings."},
   {kind:"image-button",name:"Image Button",nativeClass:"ImageButton",description:"Interactive image control with default, hover, pressed, and disabled assets."},
@@ -55,11 +59,12 @@ const child=(element:EditorElement,parent:EditorElement,x:number,y:number)=>{ele
 
 export function createRobloxElement(kind:RobloxElementKind,index=0):EditorElement[]{
   const origin=offsetFor(index);
-  const type:ElementType=kind==="text-label"?"text":kind==="text-button"||kind==="text-box"?"button":kind==="image-label"?"image":kind==="image-button"?"image-button":kind==="scrolling-frame"?"scrolling-frame":kind==="list-layout"||kind==="grid-layout"?"container":"frame";
+  const type:ElementType=kind==="text-label"||kind==="image-text-label"?"text":kind==="text-button"||kind==="image-text-button"||kind==="text-box"?"button":kind==="image-label"?"image":kind==="image-button"?"image-button":kind==="scrolling-frame"?"scrolling-frame":kind==="list-layout"||kind==="grid-layout"?"container":"frame";
   const element=name(createElement(type,index),ROBLOX_ELEMENTS.find((item)=>item.kind===kind)?.name??"Roblox UI");
   element.x=origin.x;element.y=origin.y;
   if(kind==="text-label"){element.text="TEXT LABEL";element.fill="transparent";element.borderColor="transparent";element.textAlign="center";element.width=240;}
   if(kind==="text-button"){element.text="BUTTON";element.textAlign="center";element.cornerRadius=8;element.corners={tl:8,tr:8,br:8,bl:8};}
+  if(kind==="image-text-label"||kind==="image-text-button"){element.text=kind==="image-text-button"?"IMAGE ACTION":"DECORATIVE TITLE";element.textAlign="center";element.fill=kind==="image-text-button"?"#23183f":"transparent";element.borderColor=kind==="image-text-button"?"#ff56dc":"transparent";element.width=kind==="image-text-button"?240:360;element.height=kind==="image-text-button"?64:96;element.fontSize=kind==="image-text-button"?24:42;element.fontWeight=800;element.fontFamily="Orbitron";element.fontId="orbitron";element.textRobloxExportMode="PIXEL_ACCURATE";element.robloxExportMode="IMAGE";element.dynamicText=false;const glow=createVisualEffect("neon-glow");glow.parameters={...glow.parameters,color:"#ff56dc",radius:12,layers:2,intensity:70};element.effects=[glow];}
   if(kind==="text-box"){element.text="TYPE HERE";element.textInput=true;element.textAlign="left";element.fill="#171a24";element.borderColor="#596077";}
   if(kind==="image-label"||kind==="image-button"){element.width=180;element.height=120;element.fill="#202432";element.text=kind==="image-button"?"IMAGE BUTTON":"";}
   if(kind==="scrolling-frame"){element.width=360;element.height=280;element.automaticCanvasSize="Y";element.canvasSizeY=560;element.frameType="content";}

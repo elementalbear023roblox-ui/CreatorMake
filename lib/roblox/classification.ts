@@ -47,6 +47,7 @@ type AutomaticClassification=Omit<RobloxElementClassification,"requestedMode"|"r
 
 function automaticClassification(element:EditorElement):AutomaticClassification{
   const activeEffects=(element.effects??[]).filter((effect)=>effect.enabled),effectReason=activeEffects.length?`effect stack: ${activeEffects.map((effect)=>effect.name).join(", ")}`:"";
+  if(element.type==="three-d")return{classification:"RASTERIZED",rasterPart:"full",intendedRobloxClass:"ImageLabel",interactionEnabled:false,nativeText:false,reasons:["editable GPU 3D geometry uses a transparent high-quality Roblox image fallback"]};
   if(element.type==="image"||element.type==="image-button"){
     const native=simpleImage(element)&&!activeEffects.length,reasons=native?[]:[effectReason||(!/^rbxassetid:\/\/\d+$/.test(element.roblox?.imageAssetId??"")?"image needs a published Roblox asset ID":"image crop or adjustments need exact pixel rendering")];
     return{classification:native?"NATIVE":"RASTERIZED",rasterPart:native?undefined:"full",intendedRobloxClass:element.type==="image-button"?"ImageButton":"ImageLabel",interactionEnabled:element.type==="image-button",nativeText:false,reasons};
@@ -76,6 +77,7 @@ const nativeClass=(element:EditorElement,automatic:AutomaticClassification)=>ele
 
 export function classifyRobloxElement(element:EditorElement,projectDefault:RobloxObjectExportMode="AUTO"):RobloxElementClassification{
   const requestedMode=resolveRobloxExportMode(element,projectDefault),automatic=automaticClassification(element);
+  if(element.type==="three-d"&&requestedMode==="ORIGINAL")return{...automatic,requestedMode,resolvedLabel:"Premium 3D Image",nativeLimitations:["Roblox GUI has no direct native mesh element; CreatorMake preserves the editable 3D source and exports a transparent ImageLabel"]};
   if(requestedMode==="ORIGINAL"){
     const intendedRobloxClass=nativeClass(element,automatic),nativeLimitations=automatic.classification==="NATIVE"?[]:[...new Set(automatic.reasons.length?automatic.reasons:["this visual has no exact native Roblox representation"])];
     return{classification:"NATIVE",intendedRobloxClass,interactionEnabled:automatic.interactionEnabled,nativeText:element.type==="text"||element.type==="button",reasons:nativeLimitations,requestedMode,resolvedLabel:`Native ${intendedRobloxClass}`,nativeLimitations};

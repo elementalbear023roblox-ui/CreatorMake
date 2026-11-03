@@ -17,7 +17,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern site",
     "plugin:build": "node --experimental-strip-types scripts/generate-studio-plugin.mjs",
     "test:options": "node --experimental-strip-types --test tests/options-quality.test.mjs",
-    "test:core": "node --experimental-strip-types --test tests/geometry-precision.test.mjs tests/intent.test.mjs tests/layout.test.mjs tests/snapping.test.mjs tests/image-workflow.test.mjs tests/roblox.test.mjs tests/roblox-editor-overhaul.test.mjs tests/roblox-pixel-export.test.mjs tests/roblox-adaptive-export.test.mjs tests/roblox-text-export.test.mjs tests/roblox-text-scaling.test.mjs tests/roblox-font-registry.test.mjs tests/layer-reparent.test.mjs tests/commission-workflow.test.mjs tests/sync.test.mjs tests/studio-sync-server.test.mjs tests/roblox-open-cloud.test.mjs tests/ai-agent.test.mjs tests/editor-stability.test.mjs tests/google-account.test.mjs tests/creator-account.test.mjs tests/effects-engine.test.mjs tests/fonts.test.mjs tests/geometry.test.mjs tests/boolean.test.mjs tests/interface-themes.test.mjs",
+    "test:core": "node --experimental-strip-types --test tests/geometry-precision.test.mjs tests/intent.test.mjs tests/layout.test.mjs tests/snapping.test.mjs tests/image-workflow.test.mjs tests/roblox.test.mjs tests/roblox-editor-overhaul.test.mjs tests/professional-revamp.test.mjs tests/roblox-pixel-export.test.mjs tests/roblox-adaptive-export.test.mjs tests/roblox-text-export.test.mjs tests/roblox-text-scaling.test.mjs tests/roblox-font-registry.test.mjs tests/layer-reparent.test.mjs tests/commission-workflow.test.mjs tests/sync.test.mjs tests/studio-sync-server.test.mjs tests/roblox-open-cloud.test.mjs tests/ai-agent.test.mjs tests/editor-stability.test.mjs tests/google-account.test.mjs tests/creator-account.test.mjs tests/effects-engine.test.mjs tests/fonts.test.mjs tests/geometry.test.mjs tests/boolean.test.mjs tests/interface-themes.test.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
@@ -45,6 +45,7 @@
     "sharp": "0.35.4",
     "sonner": "^2.0.8",
     "tailwind-merge": "3.6.0",
+    "three": "^0.187.0",
     "vaul": "^1.1.2",
     "zod": "^3.25.76"
   },
@@ -55,6 +56,7 @@
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/three": "^0.187.0",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",

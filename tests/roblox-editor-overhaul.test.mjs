@@ -6,7 +6,7 @@ import { diagnoseResponsivePreview, resolveResponsivePreview } from "../lib/edit
 import { ROBLOX_COMPONENTS, ROBLOX_ELEMENTS, createRobloxComponent, createRobloxElement } from "../lib/roblox/component-library.ts";
 
 test("Roblox library inserts real editable objects instead of placeholder tabs",async()=>{
-  assert.equal(ROBLOX_ELEMENTS.length,9);
+  assert.equal(ROBLOX_ELEMENTS.length,11);
   assert.ok(ROBLOX_COMPONENTS.length>=9);
   for(const definition of ROBLOX_ELEMENTS){const items=createRobloxElement(definition.kind,1);assert.equal(items.length,1);assert.ok(items[0].id);assert.ok(Number.isFinite(items[0].x));}
   for(const definition of ROBLOX_COMPONENTS){const items=createRobloxComponent(definition.kind,2),ids=new Set(items.map((item)=>item.id));assert.equal(ids.size,items.length,`${definition.name} ids must be unique`);assert.ok(items.every((item)=>Number.isFinite(item.x)&&Number.isFinite(item.y)&&item.width>0&&item.height>0));assert.ok(items.every((item)=>!item.parentId||ids.has(item.parentId)),`${definition.name} hierarchy must remain self-contained`);}

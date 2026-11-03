@@ -7,6 +7,7 @@ import { composeVisualEffects } from "@/lib/effects/render";
 import type { EffectPresentation } from "@/lib/effects/render";
 import { memo, type CSSProperties } from "react";
 import type { EditorAsset, EditorElement } from "@/lib/editor/types";
+import { ThreeDObjectSurface } from "./ThreeDObjectSurface";
 
 const shadowFilter=(shadow:string)=>{
   if(!shadow||shadow==="none")return undefined;
@@ -38,6 +39,7 @@ const elementIndex=(elements:EditorElement[])=>{const cached=elementIndexCache.g
 const textDependenciesStable=(element:EditorElement,previous:EditorElement[],next:EditorElement[])=>{const previousIndex=elementIndex(previous),nextIndex=elementIndex(next);let parentId=element.parentId,guard=0;while(parentId&&guard<64){const before=previousIndex.get(parentId),after=nextIndex.get(parentId);if(before!==after)return false;parentId=before?.parentId??null;guard+=1;}if(element.sharedCaptionSize){const group=element.sharedCaptionGroup,previousGroup=previous.filter((item)=>(item.type==="text"||item.type==="button")&&item.sharedCaptionSize&&item.sharedCaptionGroup===group),nextGroup=next.filter((item)=>(item.type==="text"||item.type==="button")&&item.sharedCaptionSize&&item.sharedCaptionGroup===group);if(previousGroup.length!==nextGroup.length||previousGroup.some((item)=>nextIndex.get(item.id)!==item))return false;}return true;};
 
 function ElementSurfaceView({element,asset,elements=[element]}:ElementSurfaceProps){
+  if(element.type==="three-d")return <ThreeDObjectSurface element={element}/>;
   if(element.type==="image"||element.type==="image-button")return <ImageSurface element={element} asset={asset}/>;
   const effects=composeVisualEffects(element),textBearing=element.type==="text"||element.type==="button",caption=textBearing?resolveCaptionGeometry(element,elements):null,vertical=element.verticalAlign==="top"?"flex-start":element.verticalAlign==="bottom"?"flex-end":"center",horizontal=element.textAlign==="left"?"flex-start":element.textAlign==="right"?"flex-end":"center";
   const captionStyle:CSSProperties|undefined=caption?caption.captionGeometry.cssTransform?{left:0,top:0,width:caption.captionSize.width,height:caption.captionSize.height,fontSize:caption.resolvedTextSize,alignItems:vertical,justifyContent:horizontal,transform:caption.captionGeometry.cssTransform,transformOrigin:"0 0"}:{left:caption.captionCenter.x,top:caption.captionCenter.y,width:caption.captionSize.width,height:caption.captionSize.height,fontSize:caption.resolvedTextSize,alignItems:vertical,justifyContent:horizontal,transform:`translate(-50%,-50%) rotate(${caption.editorTextLocalRotation}deg)`}:undefined;
