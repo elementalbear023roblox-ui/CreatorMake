@@ -38,7 +38,7 @@ export type CommissionBrief={
   notes:string;
 };
 
-export type GeometryKind = "rectangle" | "rounded-rectangle" | "ellipse" | "circle" | "line" | "triangle" | "polygon" | "star" | "diamond" | "trapezoid" | "parallelogram" | "chevron" | "arrow" | "capsule" | "ring" | "arc" | "pie" | "notched-rectangle" | "cut-corner-rectangle" | "ticket" | "bracket" | "tab" | "banner" | "plaque" | "ribbon" | "custom-path";
+export type GeometryKind = "rectangle" | "rounded-rectangle" | "ellipse" | "circle" | "line" | "triangle" | "polygon" | "star" | "diamond" | "trapezoid" | "parallelogram" | "chevron" | "arrow" | "capsule" | "ring" | "arc" | "pie" | "notched-rectangle" | "cut-corner-rectangle" | "ticket" | "bracket" | "tab" | "banner" | "plaque" | "ribbon" | "arcade-marquee" | "organic-panel" | "tech-panel" | "ornamental-frame" | "custom-path";
 export type CornerType = "square" | "round" | "chamfer" | "inset" | "notch" | "concave" | "scoop";
 export type CornerKey = "tl" | "tr" | "br" | "bl";
 export type PathNodeType = "corner" | "smooth" | "symmetric";
@@ -203,6 +203,9 @@ export type EditorElement = {
   opacity: number;
   borderColor: string;
   borderWidth: number;
+  strokeLineCap: "butt" | "round" | "square";
+  strokeLineJoin: "miter" | "round" | "bevel";
+  strokeDash: number[];
   cornerRadius: number;
   corners: { tl: number; tr: number; br: number; bl: number };
   cornerTypes: Record<CornerKey, CornerType>;
@@ -348,7 +351,7 @@ export type ProjectExportOptions = {
 };
 
 export type EditorProject = {
-  schemaVersion: 17;
+  schemaVersion: 18;
   id: string;
   name: string;
   createdAt: number;

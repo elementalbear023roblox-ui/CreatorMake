@@ -23,14 +23,14 @@ export type ProfessionalDesignAsset = {
 };
 
 export const PROFESSIONAL_DESIGN_ASSETS: ProfessionalDesignAsset[] = [
-  { id:"retro-show-panel",name:"Super Prize Panel",kit:"1990s Arcade",category:"Component",description:"Curved plastic marquee, layered borders, star details, and chunky actions.",objectCount:11,preview:"retro" },
-  { id:"modern-quest-card",name:"Adventure Quest Card",kit:"Modern Roblox",category:"Component",description:"Illustrated game card with a reward badge, progress rail, and dimensional CTA.",objectCount:12,preview:"modern" },
-  { id:"future-hud-module",name:"Holographic HUD",kit:"Futuristic",category:"Component",description:"Cut-corner telemetry panel, luminous rails, reticle, and a transparent 3D object.",objectCount:16,preview:"future" },
+  { id:"retro-show-panel",name:"Super Prize Panel",kit:"1990s Arcade",category:"Component",description:"Sculpted arcade marquee, compound trim, layered plastic, star hardware, and dimensional actions.",objectCount:15,preview:"retro" },
+  { id:"modern-quest-card",name:"Adventure Quest Card",kit:"Modern Roblox",category:"Component",description:"Asymmetric illustrated quest surface with landscape layers, progress, reward, and a 48px action.",objectCount:15,preview:"modern" },
+  { id:"future-hud-module",name:"Holographic HUD",kit:"Futuristic",category:"Component",description:"Asymmetric technical shell, compound reactor reticle, telemetry, status tabs, and live 3D.",objectCount:21,preview:"future" },
   { id:"cinematic-title-card",name:"Cinematic Chapter Card",kit:"Cinematic",category:"Component",description:"Wide atmospheric composition with restrained framing and display typography.",objectCount:8,preview:"cinematic" },
   { id:"minimal-settings-card",name:"Minimal Settings Card",kit:"Minimalist",category:"Component",description:"Typographic settings layout with measured spacing and quiet controls.",objectCount:13,preview:"minimal" },
-  { id:"demo-retro-game-show",name:"Demo · 90s Game Show",kit:"1990s Arcade",category:"Complete interface",description:"A complete candy-colored game-show menu built from editable layers.",objectCount:24,preview:"retro" },
-  { id:"demo-modern-roblox",name:"Demo · Modern Adventure",kit:"Modern Roblox",category:"Complete interface",description:"A complete Roblox adventure hub with navigation, quests, inventory, and currency.",objectCount:22,preview:"modern" },
-  { id:"demo-futuristic",name:"Demo · Orbital Command",kit:"Futuristic",category:"Complete interface",description:"A complete asymmetric command interface with holographic depth and live HUD modules.",objectCount:25,preview:"future" },
+  { id:"demo-retro-game-show",name:"Demo · 90s Game Show",kit:"1990s Arcade",category:"Complete interface",description:"A sculpted candy-plastic game-show menu with compound trim and editable marquee hardware.",objectCount:28,preview:"retro" },
+  { id:"demo-modern-roblox",name:"Demo · Modern Adventure",kit:"Modern Roblox",category:"Complete interface",description:"A full Roblox adventure hub with an asymmetric quest card, party rail, missions, inventory, and currency.",objectCount:31,preview:"modern" },
+  { id:"demo-futuristic",name:"Demo · Orbital Command",kit:"Futuristic",category:"Complete interface",description:"An asymmetric command deck with technical geometry, holographic depth, telemetry, and live 3D.",objectCount:34,preview:"future" },
 ];
 
 type Patch = Partial<EditorElement>;
@@ -66,46 +66,54 @@ function builder(index:number):Builder{
 
 function retroPanel(index:number){
   const b=builder(index),m=b.make;
-  const shadow=m("frame","Prize Panel Shadow",192,118,576,374,{fill:"#461c68",borderColor:"#160b2a",borderWidth:5,cornerRadius:56,corners:corners(56),shadow:"0 24px 0 #1b0b2f, 0 34px 48px rgba(0,0,0,.45)",rotation:-1});
-  const shell=m("frame","Prize Panel Shell",180,102,576,374,{fill:"#ff3d87",borderColor:"#fff06a",borderWidth:7,cornerRadius:56,corners:corners(56),shadow:"inset 0 8px 0 rgba(255,255,255,.45)",...gradient("#ff4c9c","#7c2bba",150,"#2739a8")},null);
-  const inset=m("frame","Prize Panel Inset",208,148,520,286,{fill:"#17104d",borderColor:"#77eeff",borderWidth:4,cornerRadius:34,corners:corners(34),shadow:"inset 0 10px 22px rgba(0,0,0,.45), 0 0 0 5px #3e1d78"},shell);
-  m("text","Prize Marquee",244,115,450,62,{...textPatch("SUPER PRIZE ROUND",32,900,"center"),fontFamily:"Bungee",fontId:"bungee",letterSpacing:1.5,textColor:"#fff36b",textStrokeColor:"#5e176e",textStrokeWidth:3,textShadows:["0 7px 0 #44105e"],effects:[effect("text-extrusion",{color:"#48105f",depth:7})]},shell);
-  [0,1,2,3].forEach((i)=>m("star",`Marquee Star ${i+1}`,204+i*166,122+(i%2)*10,28,28,{fill:i%2?"#5cf1ff":"#fff46c",borderColor:"#ffffff",borderWidth:2,rotation:i%2?16:-14,shadow:"0 4px 0 #5b1a73"},shell));
+  m("vector","Prize Panel Shadow",184,124,592,376,{fill:"#1a082c",borderColor:"#0b0418",borderWidth:2,opacity:82,geometry:{...createElement("vector").geometry,kind:"arcade-marquee",inset:22},shadow:"0 25px 34px rgba(0,0,0,.45)",rotation:-1});
+  const shell=m("vector","Prize Panel Shell",174,96,592,376,{fill:"#f43c92",borderColor:"#fff06a",borderWidth:6,geometry:{...createElement("vector").geometry,kind:"arcade-marquee",inset:22},shadow:"0 12px 0 #491660, inset 0 8px 0 rgba(255,255,255,.38)",...gradient("#ff5cab","#8b2bc4",145,"#253daa"),effects:[effect("bevel",{size:7,depth:92}),effect("light-sweep",{width:18,intensity:55,angle:118})]});
+  m("vector","Marquee Compound Trim",190,112,560,344,{fill:"#66edff",borderColor:"#fff8a1",borderWidth:2,geometry:{...createElement("vector").geometry,kind:"ornamental-frame",thickness:5},shadow:"0 0 16px rgba(87,232,255,.48)"},shell);
+  const inset=m("vector","Prize Panel Inset",207,143,526,286,{fill:"#160e4a",borderColor:"#69eaff",borderWidth:3,geometry:{...createElement("vector").geometry,kind:"organic-panel",inset:18},shadow:"inset 0 14px 28px rgba(0,0,0,.46), 0 0 0 4px #442076"},shell);
+  m("vector","Prize Title Plate",235,105,470,72,{fill:"#ffcf3d",borderColor:"#fff8b0",borderWidth:3,geometry:{...createElement("vector").geometry,kind:"ribbon",inset:12,thickness:14},shadow:"0 7px 0 #a52d77",...gradient("#fff368","#ff7e39",180)},shell);
+  m("text","Prize Marquee",250,116,440,48,{...textPatch("SUPER PRIZE ROUND",29,900,"center"),fontFamily:"Bungee",fontId:"bungee",letterSpacing:1.3,textColor:"#fff9bd",textStrokeColor:"#6a176e",textStrokeWidth:3,textShadows:["0 5px 0 #59105c"],effects:[effect("text-extrusion",{color:"#48105f",depth:6})]},shell);
+  [0,1,2,3].forEach((i)=>m("star",`Marquee Star ${i+1}`,198+i*177,120+(i%2)*12,28,28,{fill:i%2?"#5cf1ff":"#fff46c",borderColor:"#ffffff",borderWidth:2,rotation:i%2?16:-14,shadow:"0 4px 0 #5b1a73"},shell));
   const labels=["PLAY!","PRIZES","HOW TO PLAY"];
-  labels.forEach((label,i)=>m("button",`Retro ${label}`,254,205+i*67,428,50,{text:label,textAlign:"center",fontFamily:"Bungee",fontId:"bungee",fontSize:19,fontSizeDesign:19,responsiveMaxTextSize:19,fontWeight:900,fill:i===0?"#ffcf36":i===1?"#3fe1f2":"#ff5aa5",borderColor:"#ffffff",borderWidth:4,cornerRadius:25,corners:corners(25),shadow:`0 8px 0 ${i===0?"#d95c2a":i===1?"#146eaa":"#8d286e"}, 0 12px 22px rgba(0,0,0,.28)`,...gradient(i===0?"#fff36b":i===1?"#75f6ff":"#ff92c8",i===0?"#ff8e27":i===1?"#2193d7":"#d53393",180)},inset));
-  void shadow;
+  labels.forEach((label,i)=>m("button",`Retro ${label}`,254,202+i*68,430,52,{text:label,textAlign:"center",fontFamily:"Bungee",fontId:"bungee",fontSize:18,fontSizeDesign:18,responsiveMaxTextSize:18,fontWeight:900,fill:i===0?"#ffcf36":i===1?"#3fe1f2":"#ff5aa5",textColor:i===0?"#4a2051":"#ffffff",borderColor:"#ffffff",borderWidth:3,geometry:{...createElement("button").geometry,kind:i===1?"tech-panel":"plaque",inset:i===1?8:11},shadow:`0 8px 0 ${i===0?"#d95c2a":i===1?"#146eaa":"#8d286e"}, 0 12px 22px rgba(0,0,0,.28)`,...gradient(i===0?"#fff36b":i===1?"#75f6ff":"#ff92c8",i===0?"#ff8e27":i===1?"#2193d7":"#d53393",180),effects:[effect("bevel",{size:4,depth:78})]},inset));
+  m("ellipse","Left Marquee Bulb",185,276,22,22,{fill:"#fff36b",borderColor:"#ffffff",borderWidth:2,shadow:"0 0 16px #fff36b"},shell);
+  m("ellipse","Right Marquee Bulb",733,276,22,22,{fill:"#5cf1ff",borderColor:"#ffffff",borderWidth:2,shadow:"0 0 16px #5cf1ff"},shell);
   return b.elements;
 }
 
 function modernCard(index:number){
   const b=builder(index),m=b.make;
-  const card=m("frame","Adventure Quest Card",202,126,556,340,{fill:"#17243b",borderColor:"#7cb6ff",borderWidth:2,cornerRadius:28,corners:corners(28),shadow:"0 26px 60px rgba(5,16,35,.5)",...gradient("#203b63","#111a32",145)});
-  m("frame","Quest Art Field",224,148,220,296,{fill:"#2f8e68",borderColor:"#b9f7d3",borderWidth:2,cornerRadius:22,corners:{tl:22,tr:8,br:8,bl:22},...gradient("#8be28d","#2f6c83",150,"#27345e")},card);
-  m("ellipse","Quest Sun",248,174,76,76,{fill:"#fff08c",borderColor:"#fff8ca",borderWidth:4,shadow:"0 0 28px rgba(255,234,113,.6)"},card);
-  m("vector","Quest Mountain",252,252,170,142,{fill:"#213c66",borderColor:"#6bd1c7",borderWidth:2,geometry:{...createElement("vector").geometry,kind:"triangle"}},card);
-  m("text","Quest Eyebrow",476,164,236,28,{...textPatch("WEEKLY ADVENTURE",13,800),letterSpacing:2,textColor:"#72e6be"},card);
-  m("text","Quest Title",476,195,238,75,{...textPatch("SKY ISLAND\nEXPEDITION",27,850),fontFamily:"Nunito",fontId:"nunito",lineHeight:1.02,textColor:"#ffffff"},card);
-  m("text","Quest Description",476,278,238,48,{...textPatch("Collect 8 cloud crystals and unlock the summit portal.",14,550),lineHeight:1.35,textColor:"#aebed7"},card);
-  const rail=m("frame","Quest Progress Track",476,345,238,15,{fill:"#0c1426",borderColor:"#38506f",borderWidth:1,cornerRadius:8,corners:corners(8),shadow:"inset 0 2px 4px rgba(0,0,0,.5)"},card);
-  m("frame","Quest Progress Fill",479,348,154,9,{fill:"#67e6ab",borderColor:"transparent",borderWidth:0,cornerRadius:5,corners:corners(5),...gradient("#8df2ae","#35c9bb",90)},rail);
-  m("button","Quest Continue",476,380,166,48,{text:"CONTINUE",textAlign:"center",fontSize:15,fontSizeDesign:15,responsiveMaxTextSize:15,fontWeight:850,fill:"#ffcf4b",textColor:"#2a2412",borderColor:"#fff3aa",borderWidth:2,cornerRadius:15,corners:corners(15),shadow:"0 7px 0 #b77721, 0 13px 20px rgba(0,0,0,.24)",...gradient("#fff07b","#ffb52f",180)},card);
-  m("frame","Quest Reward Badge",654,374,60,55,{fill:"#6c5ce7",borderColor:"#cfc8ff",borderWidth:2,cornerRadius:18,corners:corners(18),rotation:3,shadow:"0 6px 0 #3a2e91",...gradient("#9a86ff","#5b45d0",145)},card);
-  m("text","Quest Reward",659,380,50,42,{...textPatch("+250\nXP",14,900,"center"),lineHeight:1,textColor:"#ffffff"},card);
+  m("vector","Adventure Card Shadow",194,137,574,350,{fill:"#071426",borderColor:"transparent",borderWidth:0,opacity:74,geometry:{...createElement("vector").geometry,kind:"organic-panel",inset:16},shadow:"0 24px 54px rgba(3,12,27,.55)"});
+  const card=m("vector","Adventure Quest Card",188,122,574,350,{fill:"#17243b",borderColor:"#78bfff",borderWidth:2,geometry:{...createElement("vector").geometry,kind:"organic-panel",inset:16},shadow:"inset 0 1px 0 rgba(255,255,255,.15)",...gradient("#24466d","#111a32",145),effects:[effect("glass",{blur:7,opacity:10})]});
+  m("vector","Quest Art Field",208,144,232,306,{fill:"#2f8e68",borderColor:"#b9f7d3",borderWidth:2,geometry:{...createElement("vector").geometry,kind:"tech-panel",inset:14},...gradient("#84dda0","#2f7186",150,"#26345f")},card);
+  m("ellipse","Quest Sun",232,168,74,74,{fill:"#fff08c",borderColor:"#fff8ca",borderWidth:3,shadow:"0 0 28px rgba(255,234,113,.6)"},card);
+  m("vector","Quest Mountain Back",232,248,184,154,{fill:"#37638a",borderColor:"#7de0d1",borderWidth:1,geometry:{...createElement("vector").geometry,kind:"triangle"},rotation:-3},card);
+  m("vector","Quest Mountain Front",266,282,154,121,{fill:"#183b5c",borderColor:"#9bd9d0",borderWidth:2,geometry:{...createElement("vector").geometry,kind:"triangle"},rotation:4},card);
+  m("ellipse","Quest Cloud",216,352,112,38,{fill:"#d9fff4",opacity:74,borderColor:"#ffffff",borderWidth:1,shadow:"0 8px 18px rgba(17,63,82,.2)"},card);
+  m("text","Quest Eyebrow",466,154,248,26,{...textPatch("WEEKLY ADVENTURE",12,850),letterSpacing:2.2,textColor:"#72e6be"},card);
+  m("text","Quest Title",466,188,250,76,{...textPatch("SKY ISLAND\nEXPEDITION",28,900),fontFamily:"Nunito",fontId:"nunito",lineHeight:1.02,textColor:"#ffffff"},card);
+  m("text","Quest Description",466,271,248,46,{...textPatch("Collect 8 cloud crystals and unlock the summit portal.",14,600),lineHeight:1.32,textColor:"#b9c9de"},card);
+  const rail=m("frame","Quest Progress Track",466,334,248,16,{fill:"#091426",borderColor:"#3a5878",borderWidth:1,cornerRadius:8,corners:corners(8),shadow:"inset 0 2px 5px rgba(0,0,0,.55)"},card);
+  m("frame","Quest Progress Fill",469,337,166,10,{fill:"#67e6ab",borderColor:"transparent",borderWidth:0,cornerRadius:5,corners:corners(5),...gradient("#a2f6b6","#35c9bb",90)},rail);
+  m("button","Quest Continue",466,376,174,50,{text:"CONTINUE",textAlign:"center",fontSize:15,fontSizeDesign:15,responsiveMaxTextSize:15,fontWeight:900,fill:"#ffcf4b",textColor:"#2a2412",borderColor:"#fff3aa",borderWidth:2,geometry:{...createElement("button").geometry,kind:"tech-panel",inset:8},shadow:"0 7px 0 #a96b1d, 0 14px 22px rgba(0,0,0,.24)",...gradient("#fff27e","#ffb52f",180),effects:[effect("bevel",{size:4,depth:74})]},card);
+  m("vector","Quest Reward Badge",654,370,70,62,{fill:"#7661ed",borderColor:"#d8d2ff",borderWidth:2,geometry:{...createElement("vector").geometry,kind:"plaque",inset:16},rotation:3,shadow:"0 6px 0 #35298e",...gradient("#a993ff","#5841cc",145)},card);
+  m("text","Quest Reward",662,380,54,38,{...textPatch("+250\nXP",14,900,"center"),lineHeight:1,textColor:"#ffffff"},card);
   return b.elements;
 }
 
 function futureHud(index:number){
   const b=builder(index),m=b.make;
-  const panel=m("vector","Holographic Command Module",170,116,620,358,{fill:"#071827",opacity:88,borderColor:"#57eaff",borderWidth:2,geometry:{...createElement("vector").geometry,kind:"cut-corner-rectangle",inset:24},shadow:"0 0 45px rgba(36,218,255,.18), inset 0 0 40px rgba(29,170,207,.1)",effects:[effect("gradient-border",{colorA:"#55efff",colorB:"#5576ff",colorC:"#cb5cff",width:2}),effect("glass",{blur:8,opacity:12})]});
-  m("line","HUD Top Rail",204,146,552,3,{fill:"#58efff",borderColor:"transparent",shadow:"0 0 12px #36dcff"},panel);
-  m("text","HUD Kicker",204,162,270,26,{...textPatch("ORBITAL COMMAND / NODE 07",12,750),fontFamily:"Orbitron",fontId:"orbitron",letterSpacing:1.8,textColor:"#77edff"},panel);
-  m("text","HUD Title",204,194,330,58,{...textPatch("SYSTEMS NOMINAL",28,700),fontFamily:"Orbitron",fontId:"orbitron",textColor:"#f0fbff",effects:[effect("text-outline-glow",{color:"#51e8ff",width:1,glow:7})]},panel);
-  const cube=m("three-d","Holographic Reactor",548,174,194,176,{threeD:{...createElement("three-d").threeD,primitive:"rounded-box",material:"holographic",color:"#57eaff",sideColor:"#5f62ff",rotationX:-18,rotationY:28,rotationZ:8,bevel:12,ambientIntensity:1.4,transparent:true,opacity:82},robloxExportMode:"IMAGE"},panel);
-  m("ellipse","Reactor Reticle Outer",574,202,140,140,{fill:"transparent",borderColor:"#5cecff",borderWidth:2,shadow:"0 0 18px rgba(63,229,255,.55)"},panel);
-  m("ellipse","Reactor Reticle Inner",599,227,90,90,{fill:"transparent",borderColor:"#8b78ff",borderWidth:1,shadow:"0 0 12px rgba(132,105,255,.45)"},panel);
+  m("vector","Command Module Shadow",162,126,636,362,{fill:"#020711",opacity:80,borderColor:"transparent",borderWidth:0,geometry:{...createElement("vector").geometry,kind:"tech-panel",inset:18},shadow:"0 24px 58px rgba(0,0,0,.62)"});
+  const panel=m("vector","Holographic Command Module",154,106,636,362,{fill:"#061827",opacity:94,borderColor:"#57eaff",borderWidth:2,geometry:{...createElement("vector").geometry,kind:"tech-panel",inset:18},shadow:"0 0 45px rgba(36,218,255,.2), inset 0 0 46px rgba(29,170,207,.12)",effects:[effect("gradient-border",{colorA:"#55efff",colorB:"#5576ff",colorC:"#cb5cff",width:2}),effect("glass",{blur:8,opacity:12})]});
+  m("vector","HUD Inner Rail",170,122,604,330,{fill:"transparent",borderColor:"#1d5870",borderWidth:1,geometry:{...createElement("vector").geometry,kind:"tech-panel",inset:14},opacity:72},panel);
+  m("line","HUD Top Rail",190,144,548,3,{fill:"#58efff",borderColor:"transparent",shadow:"0 0 12px #36dcff"},panel);
+  m("text","HUD Kicker",190,158,286,26,{...textPatch("ORBITAL COMMAND / NODE 07",12,750),fontFamily:"Orbitron",fontId:"orbitron",letterSpacing:1.8,textColor:"#77edff"},panel);
+  m("text","HUD Title",190,190,342,58,{...textPatch("SYSTEMS NOMINAL",28,700),fontFamily:"Orbitron",fontId:"orbitron",textColor:"#f0fbff",effects:[effect("text-outline-glow",{color:"#51e8ff",width:1,glow:7})]},panel);
+  m("three-d","Holographic Reactor",548,166,194,184,{threeD:{...createElement("three-d").threeD,primitive:"rounded-box",material:"holographic",color:"#57eaff",sideColor:"#5f62ff",rotationX:-18,rotationY:28,rotationZ:8,bevel:12,ambientIntensity:1.4,transparent:true,opacity:82},robloxExportMode:"IMAGE"},panel);
+  m("vector","Reactor Compound Reticle",565,181,160,160,{fill:"#59eaff",borderColor:"#b694ff",borderWidth:1,geometry:{...createElement("vector").geometry,kind:"ornamental-frame",thickness:5},shadow:"0 0 20px rgba(63,229,255,.58)"},panel);
+  m("ellipse","Reactor Reticle Inner",600,216,90,90,{fill:"transparent",borderColor:"#8b78ff",borderWidth:1,shadow:"0 0 12px rgba(132,105,255,.45)"},panel);
   const stats=[{label:"POWER",value:"98.4%",color:"#62f7c5"},{label:"VECTOR",value:"042.7°",color:"#6fe5ff"},{label:"RANGE",value:"12.8 AU",color:"#c89aff"}];
-  stats.forEach((stat,i)=>{m("text",`${stat.label} Label`,206,284+i*48,104,20,{...textPatch(stat.label,10,700),letterSpacing:1.5,textColor:"#708fa4"},panel);m("text",`${stat.label} Value`,314,278+i*48,166,30,{...textPatch(stat.value,20,750,"right"),fontFamily:"Orbitron",fontId:"orbitron",textColor:stat.color},panel);m("line",`${stat.label} Divider`,204,310+i*48,278,1,{fill:"#16394b",borderColor:"transparent"},panel);});
-  void cube;
+  stats.forEach((stat,i)=>{m("text",`${stat.label} Label`,190,276+i*48,104,20,{...textPatch(stat.label,10,700),letterSpacing:1.5,textColor:"#708fa4"},panel);m("text",`${stat.label} Value`,300,270+i*48,174,30,{...textPatch(stat.value,20,750,"right"),fontFamily:"Orbitron",fontId:"orbitron",textColor:stat.color},panel);m("line",`${stat.label} Divider`,188,302+i*48,290,1,{fill:"#16394b",borderColor:"transparent"},panel);});
+  ["CORE","NAV","COMMS"].forEach((label,i)=>m("button",`HUD ${label} Tab`,518+i*76,384,70,44,{text:label,textAlign:"center",fontFamily:"Orbitron",fontId:"orbitron",fontSize:8,fontSizeDesign:8,responsiveMaxTextSize:8,fontWeight:750,letterSpacing:.8,fill:i===0?"#173f4c":"#0b1e2d",textColor:i===0?"#78f5df":"#718ca0",borderColor:i===0?"#56eac5":"#24485c",borderWidth:1,geometry:{...createElement("button").geometry,kind:"tech-panel",inset:8},shadow:i===0?"0 0 14px rgba(80,232,197,.3)":"none"},panel));
   return b.elements;
 }
 
@@ -134,7 +142,9 @@ function minimalCard(index:number){
 }
 
 function decorateDemo(elements:EditorElement[],kind:"retro"|"modern"|"future",index:number){
-  const b=builder(index+elements.length),m=b.make;
+  // The backdrop and the component share one insertion offset so complete
+  // interfaces stay registered as one coherent composition.
+  const b=builder(index),m=b.make;
   if(kind==="retro"){
     const bg=m("frame","Game Show Backdrop",0,0,960,600,{fill:"#26125a",borderColor:"transparent",borderWidth:0,cornerRadius:0,corners:corners(0),...gradient("#44208a","#1a0f51",135,"#0c2c74"),effects:[effect("halftone",{size:16,dotSize:2,opacity:18,color:"#f75ac5"})]});
     m("ellipse","Backdrop Bubble Left",28,72,180,180,{fill:"#ff4f9a",opacity:22,borderColor:"#ff8fc5",borderWidth:3},bg);
@@ -149,13 +159,17 @@ function decorateDemo(elements:EditorElement[],kind:"retro"|"modern"|"future",in
   }
   if(kind==="modern"){
     const bg=m("frame","Adventure Hub Backdrop",0,0,960,600,{fill:"#10233a",borderColor:"transparent",borderWidth:0,cornerRadius:0,corners:corners(0),...gradient("#2f7f76","#132d4f",145,"#17213a")});
-    m("frame","Top Navigation",28,22,904,64,{fill:"#101a2b",opacity:90,borderColor:"#5f8db7",borderWidth:1,cornerRadius:20,corners:corners(20),shadow:"0 14px 32px rgba(5,16,30,.32)"},bg);
+    m("vector","Top Navigation",28,22,904,68,{fill:"#101a2b",opacity:94,borderColor:"#5f8db7",borderWidth:1,geometry:{...createElement("vector").geometry,kind:"tech-panel",inset:8},shadow:"0 14px 32px rgba(5,16,30,.32)"},bg);
     m("text","Game Brand",58,34,260,40,{...textPatch("WILDSCAPE",22,900),fontFamily:"Nunito",fontId:"nunito",letterSpacing:1.2,textColor:"#ffffff"},bg);
-    ["PLAY","QUESTS","PACK"].forEach((label,i)=>m("button",`Nav ${label}`,472+i*104,36,92,36,{text:label,textAlign:"center",fontSize:11,fontSizeDesign:11,responsiveMaxTextSize:11,fontWeight:800,fill:i===1?"#62d4a5":"transparent",textColor:i===1?"#10251e":"#b6c9d9",borderColor:i===1?"#aaf1d0":"transparent",borderWidth:1,cornerRadius:12,corners:corners(12),shadow:i===1?"0 5px 0 #27795c":"none"},bg));
-    m("frame","Currency Chip",802,34,100,40,{fill:"#233652",borderColor:"#f9d976",borderWidth:1,cornerRadius:20,corners:corners(20),shadow:"none"},bg);
-    m("text","Currency Value",812,41,80,26,{...textPatch("◆  2,480",13,850,"center"),textColor:"#ffe281"},bg);
+    ["PLAY","QUESTS","PACK"].forEach((label,i)=>m("button",`Nav ${label}`,456+i*108,32,98,46,{text:label,textAlign:"center",fontSize:11,fontSizeDesign:11,responsiveMaxTextSize:11,fontWeight:850,fill:i===1?"#62d4a5":"transparent",textColor:i===1?"#10251e":"#b6c9d9",borderColor:i===1?"#aaf1d0":"transparent",borderWidth:1,geometry:{...createElement("button").geometry,kind:i===1?"plaque":"tech-panel",inset:8},shadow:i===1?"0 5px 0 #27795c":"none"},bg));
+    m("vector","Currency Chip",790,31,118,46,{fill:"#233652",borderColor:"#f9d976",borderWidth:1,geometry:{...createElement("vector").geometry,kind:"plaque",inset:12},shadow:"none"},bg);
+    m("text","Currency Value",804,41,90,26,{...textPatch("◆  2,480",13,850,"center"),textColor:"#ffe281"},bg);
     m("ellipse","Player Avatar",868,102,48,48,{fill:"#78dba3",borderColor:"#d9ffe8",borderWidth:3,shadow:"0 7px 16px rgba(0,0,0,.25)",...gradient("#a7ef9b","#3e96ae",145)},bg);
     m("text","Player Level",816,156,100,28,{...textPatch("LV. 27",11,850,"right"),letterSpacing:1,textColor:"#bce7d1"},bg);
+    const rail=m("vector","Mission Rail",24,128,140,390,{fill:"#122a43",borderColor:"#61a8bd",borderWidth:1,geometry:{...createElement("vector").geometry,kind:"tech-panel",inset:12},shadow:"0 18px 38px rgba(3,14,28,.35)",...gradient("#173f4e","#111d35",165)},bg);
+    m("text","Mission Rail Title",42,152,104,38,{...textPatch("TODAY",14,900,"center"),fontFamily:"Nunito",fontId:"nunito",letterSpacing:2,textColor:"#a8f0d0"},rail);
+    ["DAILY RUN","SKY KEYS","BOSS RAID"].forEach((label,i)=>m("button",`Mission ${label}`,38,208+i*78,112,54,{text:label,textAlign:"center",fontFamily:"Nunito",fontId:"nunito",fontSize:10,fontSizeDesign:10,responsiveMaxTextSize:10,fontWeight:850,fill:i===0?"#2d6b69":"#182b42",textColor:i===0?"#d9fff0":"#a9bfd0",borderColor:i===0?"#6de0b1":"#36566d",borderWidth:1,geometry:{...createElement("button").geometry,kind:i===1?"organic-panel":"tech-panel",inset:10},shadow:i===0?"0 5px 0 #17443c":"none"},rail));
+    m("vector","Party Ready Chip",38,458,112,42,{fill:"#684bd8",borderColor:"#bdb1ff",borderWidth:1,geometry:{...createElement("vector").geometry,kind:"plaque",inset:14},shadow:"0 5px 0 #34237f",...gradient("#8f76f4","#553cc1",145)},rail);
     elements.forEach((item)=>{item.y+=62;item.zIndex+=b.elements.length;});
     return [...b.elements,...elements];
   }
@@ -163,6 +177,8 @@ function decorateDemo(elements:EditorElement[],kind:"retro"|"modern"|"future",in
   for(let i=0;i<6;i+=1)m("line",`Data Line ${i+1}`,28,110+i*78,904,1,{fill:i%2?"#0d2734":"#10203e",borderColor:"transparent",opacity:72},bg);
   m("text","Command Header",38,28,560,46,{...textPatch("ORBITAL / COMMAND",24,650),fontFamily:"Orbitron",fontId:"orbitron",letterSpacing:3,textColor:"#e8fbff"},bg);
   m("text","Command Status",694,34,220,32,{...textPatch("● LINK STABLE  07:42",11,650,"right"),fontFamily:"Orbitron",fontId:"orbitron",letterSpacing:1,textColor:"#63f3c2"},bg);
+  const commandRail=m("vector","Command Rail",22,112,112,430,{fill:"#061421",borderColor:"#1f6075",borderWidth:1,geometry:{...createElement("vector").geometry,kind:"tech-panel",inset:12},opacity:92,shadow:"0 0 26px rgba(41,204,235,.12)"},bg);
+  ["SYS","MAP","LOG"].forEach((label,i)=>m("button",`Command ${label}`,38,156+i*86,80,56,{text:label,textAlign:"center",fontFamily:"Orbitron",fontId:"orbitron",fontSize:10,fontSizeDesign:10,responsiveMaxTextSize:10,fontWeight:750,letterSpacing:1,fill:i===0?"#113e49":"#081b29",textColor:i===0?"#69f0d0":"#65879a",borderColor:i===0?"#4be3c1":"#224657",borderWidth:1,geometry:{...createElement("button").geometry,kind:"tech-panel",inset:10},shadow:i===0?"0 0 16px rgba(75,227,193,.28)":"none"},commandRail));
   elements.forEach((item)=>{item.y+=38;item.zIndex+=b.elements.length;});
   return [...b.elements,...elements];
 }
@@ -178,7 +194,7 @@ export function createProfessionalDesignAsset(id:ProfessionalDesignAssetId,index
   return{elements:decorateDemo(futureHud(index),"future",index),background:"#030912"};
 }
 
-export type CreativeTreatmentId="depth"|"gloss"|"border"|"highlight"|"retro"|"texture"|"glow";
+export type CreativeTreatmentId="depth"|"gloss"|"border"|"highlight"|"retro"|"texture"|"glow"|"chrome"|"holographic"|"cartoon-plastic"|"cinematic-metal";
 
 export function applyCreativeTreatment(element:EditorElement,treatment:CreativeTreatmentId){
   const without=(types:string[])=>element.effects.filter((item)=>!types.includes(item.type));
@@ -188,5 +204,9 @@ export function applyCreativeTreatment(element:EditorElement,treatment:CreativeT
   if(treatment==="highlight")return{effects:[...without(["light-sweep","shimmer"]),effect("light-sweep",{width:18,intensity:100,angle:118}),effect("shimmer",{width:16,opacity:52,angle:110})]} satisfies Patch;
   if(treatment==="retro")return{fontFamily:(element.type==="text"||element.type==="button")?"Bungee":element.fontFamily,fontId:(element.type==="text"||element.type==="button")?"bungee":element.fontId,fontWeight:Math.max(800,element.fontWeight),borderWidth:Math.max(4,element.borderWidth),cornerRadius:Math.max(16,element.cornerRadius),corners:corners(Math.max(16,element.cornerRadius)),shadow:"0 8px 0 #512065, 0 16px 28px rgba(0,0,0,.3)",effects:[...without(["halftone","bevel"]),effect("halftone",{size:9,dotSize:2,opacity:22,color:"#241038"}),effect("bevel",{size:5,depth:95})]} satisfies Patch;
   if(treatment==="texture")return{effects:[...without(["grain","vignette"]),effect("grain",{size:3,intensity:18}),effect("vignette",{amount:24,softness:72})]} satisfies Patch;
-  return{effects:[...without(["neon-glow","edge-glow"]),effect("neon-glow",{color:element.borderColor==="transparent"?"#63eaff":element.borderColor,radius:18,layers:3,intensity:115}),effect("edge-glow",{color:"#a48bff",radius:8,opacity:58})]} satisfies Patch;
+  if(treatment==="glow")return{effects:[...without(["neon-glow","edge-glow"]),effect("neon-glow",{color:element.borderColor==="transparent"?"#63eaff":element.borderColor,radius:18,layers:3,intensity:115}),effect("edge-glow",{color:"#a48bff",radius:8,opacity:58})]} satisfies Patch;
+  if(treatment==="chrome")return{fill:"#b9c7d4",borderColor:"#edf8ff",borderWidth:Math.max(2,element.borderWidth),gradientType:"linear",gradientAngle:180,gradientStops:stops("#f9fdff","#526273","#dfeaf1"),shadow:"0 10px 18px rgba(4,12,20,.32), inset 0 2px 0 rgba(255,255,255,.72)",effects:[...without(["bevel","light-sweep","grain"]),effect("bevel",{size:5,depth:88,softness:18}),effect("light-sweep",{width:14,intensity:92,angle:104}),effect("grain",{size:2,intensity:5})]} satisfies Patch;
+  if(treatment==="holographic")return{fill:"#5ae7f2",borderColor:"#d9fbff",borderWidth:Math.max(2,element.borderWidth),gradientType:"conic",gradientAngle:32,gradientStops:stops("#59f0df","#a56cff","#ff79bd"),blendMode:"screen",shadow:"0 0 26px rgba(77,224,255,.36), inset 0 0 18px rgba(255,255,255,.22)",effects:[...without(["holographic","edge-glow","shimmer"]),effect("holographic",{speed:.45,intensity:76}),effect("edge-glow",{color:"#65efff",radius:10,opacity:66}),effect("shimmer",{width:14,opacity:45,angle:116})]} satisfies Patch;
+  if(treatment==="cartoon-plastic")return{borderColor:"#ffffff",borderWidth:Math.max(3,element.borderWidth),gradientType:"linear",gradientAngle:180,gradientStops:stops(element.fill==="transparent"?"#72d9ff":element.fill,"#274b85"),shadow:"0 9px 0 #182849, 0 16px 24px rgba(8,13,30,.28), inset 0 4px 0 rgba(255,255,255,.5)",effects:[...without(["bevel","light-sweep","inner-shadow"]),effect("bevel",{size:6,depth:96,softness:16}),effect("light-sweep",{width:24,intensity:62,angle:108}),effect("inner-shadow",{y:4,blur:7,opacity:22})]} satisfies Patch;
+  return{fill:"#303844",borderColor:"#9ca9b8",borderWidth:Math.max(1,element.borderWidth),gradientType:"linear",gradientAngle:112,gradientStops:stops("#65717e","#171d25","#424d59"),shadow:"0 16px 32px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.18)",effects:[...without(["bevel","grain","vignette"]),effect("bevel",{size:3,depth:54,softness:34}),effect("grain",{size:2,intensity:12}),effect("vignette",{amount:20,softness:70})]} satisfies Patch;
 }

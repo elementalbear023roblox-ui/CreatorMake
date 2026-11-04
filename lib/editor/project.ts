@@ -18,7 +18,7 @@ const SUMMARY_STORE = "summaries";
 const RECOVERY_STORE = "recoveries";
 const SETTINGS_STORE = "settings";
 const ASSET_STORE = "assets";
-export const CREATORMAKE_SCHEMA_VERSION = 17 as const;
+export const CREATORMAKE_SCHEMA_VERSION = 18 as const;
 const EMPTY_COMMISSION_BRIEF={clientLabel:"",gameName:"",targetDevices:["Desktop","Phone","Tablet"],requestedStyle:"",colorPalette:"",fonts:"",deliverables:"Roblox-ready project, PNG previews, project backup",notes:""};
 
 export const createId = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -34,7 +34,7 @@ export function createElement(type: ElementType, index = 0): EditorElement {
     canvasSizeX: 600, canvasSizeY: 720, automaticCanvasSize: "None" as const, canvasPositionX: 0, canvasPositionY: 0, scrollingDirection: "Y" as const,
     scrollBarThickness: 8, scrollBarImageColor: "#7457ff", scrollBarImageTransparency: 0, elasticBehavior: "WhenScrollable" as const, scrollingEnabled: true, verticalScrollBarPosition: "Right" as const, scrollBarInset: "ScrollBar" as const,
     frameType: type === "frame" ? "frame" as const : type === "container" || type === "scrolling-frame" ? "content" as const : "card" as const,
-    borderColor: "#6b7280", borderWidth: type === "text" ? 0 : 1, cornerRadius: 6,
+    borderColor: "#6b7280", borderWidth: type === "text" ? 0 : 1, strokeLineCap:"round" as const, strokeLineJoin:"round" as const, strokeDash:[] as number[], cornerRadius: 6,
     corners: { tl: 6, tr: 6, br: 6, bl: 6 }, gradientType: "none" as const, gradientAngle: 135,
     cornerTypes: { ...DEFAULT_CORNER_TYPES }, geometry: { ...DEFAULT_VECTOR_GEOMETRY, kind:defaultGeometryKindForElementType(type) }, booleanOperation: null, booleanOperands: [],
     gradientStops: [{ id: createId("stop"), color: "#7457ff", position: 0, opacity: 100 }, { id: createId("stop"), color: "#25c8ff", position: 100, opacity: 100 }], blendMode: "normal" as const, effects:[],

@@ -25,13 +25,21 @@ test("the three demonstrations differ in geometry, typography, materials, and co
   assert.ok(modern.some((element)=>element.name==="Quest Art Field"));
   assert.ok(modern.some((element)=>element.name==="Player Avatar"));
   assert.ok(future.some((element)=>element.type==="three-d"&&element.threeD.material==="holographic"));
-  assert.ok(future.some((element)=>element.geometry.kind==="cut-corner-rectangle"));
+  assert.ok(future.some((element)=>element.geometry.kind==="tech-panel"));
+  assert.ok(future.some((element)=>element.geometry.kind==="ornamental-frame"));
+  assert.ok(retro.some((element)=>element.geometry.kind==="arcade-marquee"));
+  assert.ok(modern.some((element)=>element.geometry.kind==="organic-panel"));
+  for(const demo of [retro,modern,future]){
+    const roots=demo.filter((element)=>!element.parentId);
+    assert.ok(roots.some((element)=>element.width>=900&&element.height>=580),"each demo owns a full-canvas backdrop");
+    assert.ok(demo.every((element)=>element.parentId||element.x>=0&&element.y>=0),"root layers stay on canvas");
+  }
   assert.notDeepEqual(new Set(retro.map((element)=>element.fontFamily)),new Set(modern.map((element)=>element.fontFamily)));
 });
 
 test("Creative Mode treatments are multi-property, editable, and non-destructive",()=>{
   const source=createElement("button"),before=structuredClone(source);
-  for(const treatment of ["depth","gloss","border","highlight","retro","texture","glow"]){
+  for(const treatment of ["depth","gloss","border","highlight","retro","texture","glow","chrome","holographic","cartoon-plastic","cinematic-metal"]){
     const patch=applyCreativeTreatment(source,treatment);
     assert.ok(Object.keys(patch).length>=1);
     assert.ok((patch.effects??[]).length>=2,`${treatment} must build a real editable effect stack`);
@@ -50,6 +58,7 @@ test("the real editor exposes the visual gallery, Creative Mode, and Roblox hand
   assert.match(library,/design-kit-gallery/);
   assert.match(library,/Complete interface/);
   assert.match(editor,/Creative Mode quick actions/);
+  for(const material of ["Chrome","Holographic","Cartoon Plastic","Cinematic Metal"])assert.match(editor,new RegExp(material));
   assert.match(editor,/Roblox properties/);
   assert.match(toolbar,/Export to Roblox/);
   assert.match(css,/data-workspace="creative"/);

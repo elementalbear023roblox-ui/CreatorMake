@@ -17,6 +17,16 @@ const projectFixture=()=>{
   return{screen:{width:1920,height:1080},elements:[frame,title,button,shape]};
 };
 const options={...DEFAULT_ROBLOX_EXPORT_OPTIONS,screenGuiName:"PixelGui",visualMode:"PIXEL_ACCURATE"};
+
+test("advanced stroke caps, joins, and dashes stay identical in the Roblox raster source",()=>{
+  const line=createVectorElement("line");
+  line.strokeLineCap="square";line.strokeLineJoin="bevel";line.strokeDash=[14,7,2,7];
+  const svg=renderElementSvg(line,2);
+  assert.match(svg,/stroke-linecap="square"/);
+  assert.match(svg,/stroke-linejoin="bevel"/);
+  assert.match(svg,/stroke-dasharray="14 7 2 7"/);
+});
+
 const logicalTopLeft=(node)=>{
   const position=node.properties.Position,size=node.properties.Size,anchor=node.properties.AnchorPoint;
   return{x:position.xOffset-size.xOffset*anchor.x,y:position.yOffset-size.yOffset*anchor.y};

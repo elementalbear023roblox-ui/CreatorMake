@@ -15,6 +15,18 @@ test("every advanced primitive produces editable finite vector geometry",()=>{
   }
 });
 
+test("professional silhouettes provide curves, asymmetry, and a true compound frame",()=>{
+  const marquee=geometryPresentation(createVectorElement("arcade-marquee"));
+  const organic=geometryPresentation(createVectorElement("organic-panel"));
+  const technical=geometryPresentation(createVectorElement("tech-panel"));
+  const frame=geometryPresentation(createVectorElement("ornamental-frame"));
+  assert.match(marquee.path,/ C /);
+  assert.match(organic.path,/ C /);
+  assert.notEqual(technical.path,geometryPresentation(createVectorElement("cut-corner-rectangle")).path);
+  assert.equal((frame.path.match(/\bM\b/g)??[]).length,2);
+  assert.equal(frame.fillRule,"evenodd");
+});
+
 test("advanced corner modes produce distinct saved paths",()=>{
   const element=createVectorElement("rounded-rectangle");
   const paths=new Set();

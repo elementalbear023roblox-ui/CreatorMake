@@ -17,14 +17,16 @@ test("3D objects are real saved editor elements with safe Roblox image fallback"
   assert.match(classification.resolvedLabel,/Premium|Image/);
 });
 
-test("schema 17 migrates older projects without losing editable geometry",()=>{
+test("schema 18 migrates older projects without losing editable geometry and stroke controls",()=>{
   const project=createProject("Migration"),frame=createElement("frame");
   project.elements=[frame];
   const legacy=structuredClone(project);legacy.schemaVersion=15;delete legacy.elements[0].threeD;
   const restored=normalizeProject(legacy);
-  assert.equal(restored.schemaVersion,17);
+  assert.equal(restored.schemaVersion,18);
   assert.equal(restored.elements[0].geometry.kind,"rectangle");
   assert.equal(restored.elements[0].threeD.primitive,"cube");
+  assert.equal(restored.elements[0].strokeLineCap,"round");
+  assert.deepEqual(restored.elements[0].strokeDash,[]);
 });
 
 test("Native and Image Text are distinct editable insert choices",()=>{

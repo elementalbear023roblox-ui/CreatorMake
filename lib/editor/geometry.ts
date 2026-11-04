@@ -1,9 +1,9 @@
 import type { CornerKey, CornerType, EditorElement, ElementType, GeometryKind, PathNode, VectorGeometry } from "./types.ts";
 
 export const GEOMETRY_OPTIONS: ReadonlyArray<{kind:GeometryKind;label:string}> = [
-  {kind:"rectangle",label:"Rectangle"},{kind:"rounded-rectangle",label:"Rounded Rectangle"},{kind:"ellipse",label:"Ellipse"},{kind:"circle",label:"Circle"},{kind:"line",label:"Line"},{kind:"triangle",label:"Triangle"},{kind:"polygon",label:"Polygon"},{kind:"star",label:"Star"},{kind:"diamond",label:"Diamond"},{kind:"trapezoid",label:"Trapezoid"},{kind:"parallelogram",label:"Parallelogram"},{kind:"chevron",label:"Chevron"},{kind:"arrow",label:"Arrow"},{kind:"capsule",label:"Capsule"},{kind:"ring",label:"Ring"},{kind:"arc",label:"Arc"},{kind:"pie",label:"Pie"},{kind:"notched-rectangle",label:"Notched Rectangle"},{kind:"cut-corner-rectangle",label:"Cut-Corner Rectangle"},{kind:"ticket",label:"Ticket"},{kind:"bracket",label:"Bracket"},{kind:"tab",label:"Tab"},{kind:"banner",label:"Banner"},{kind:"plaque",label:"Plaque"},{kind:"ribbon",label:"Ribbon"},{kind:"custom-path",label:"Custom Path"},
+  {kind:"rectangle",label:"Rectangle"},{kind:"rounded-rectangle",label:"Rounded Rectangle"},{kind:"ellipse",label:"Ellipse"},{kind:"circle",label:"Circle"},{kind:"line",label:"Line"},{kind:"triangle",label:"Triangle"},{kind:"polygon",label:"Polygon"},{kind:"star",label:"Star"},{kind:"diamond",label:"Diamond"},{kind:"trapezoid",label:"Trapezoid"},{kind:"parallelogram",label:"Parallelogram"},{kind:"chevron",label:"Chevron"},{kind:"arrow",label:"Arrow"},{kind:"capsule",label:"Capsule"},{kind:"ring",label:"Ring"},{kind:"arc",label:"Arc"},{kind:"pie",label:"Pie"},{kind:"notched-rectangle",label:"Notched Rectangle"},{kind:"cut-corner-rectangle",label:"Cut-Corner Rectangle"},{kind:"ticket",label:"Ticket"},{kind:"bracket",label:"Bracket"},{kind:"tab",label:"Tab"},{kind:"banner",label:"Banner"},{kind:"plaque",label:"Plaque"},{kind:"ribbon",label:"Ribbon"},{kind:"arcade-marquee",label:"Arcade Marquee"},{kind:"organic-panel",label:"Organic Panel"},{kind:"tech-panel",label:"Technical Panel"},{kind:"ornamental-frame",label:"Ornamental Frame"},{kind:"custom-path",label:"Custom Path"},
 ];
-const DIRECTIONAL_CAPTION_GEOMETRIES=new Set<GeometryKind>(["trapezoid","parallelogram","chevron","arrow","notched-rectangle","cut-corner-rectangle","tab","banner","plaque","ribbon","custom-path"]);
+const DIRECTIONAL_CAPTION_GEOMETRIES=new Set<GeometryKind>(["trapezoid","parallelogram","chevron","arrow","notched-rectangle","cut-corner-rectangle","tab","banner","plaque","ribbon","arcade-marquee","organic-panel","tech-panel","ornamental-frame","custom-path"]);
 export const isDirectionalCaptionGeometry=(kind:GeometryKind)=>DIRECTIONAL_CAPTION_GEOMETRIES.has(kind);
 const GEOMETRY_KINDS=new Set<GeometryKind>(GEOMETRY_OPTIONS.map((option)=>option.kind));
 
@@ -76,6 +76,24 @@ const vectorPath=(element:EditorElement,kind:GeometryKind,width:number,height:nu
   if(kind==="banner")return{path:pathFromPoints([{x:0,y:0},{x:width,y:0},{x:width-ix,y:height/2},{x:width,y:height},{x:0,y:height}]),open:false,fillRule:"nonzero"};
   if(kind==="plaque")return{path:pathFromPoints([{x:ix,y:0},{x:width-ix,y:0},{x:width,y:height/2},{x:width-ix,y:height},{x:ix,y:height},{x:0,y:height/2}]),open:false,fillRule:"nonzero"};
   if(kind==="ribbon"){const fold=Math.max(2,Math.min(width,height)*thickness);return{path:pathFromPoints([{x:0,y:fold},{x:ix,y:fold},{x:ix,y:0},{x:width-ix,y:0},{x:width-ix,y:fold},{x:width,y:fold},{x:width-fold,y:height/2},{x:width,y:height-fold},{x:width-ix,y:height-fold},{x:width-ix,y:height},{x:ix,y:height},{x:ix,y:height-fold},{x:0,y:height-fold},{x:fold,y:height/2}]),open:false,fillRule:"nonzero"};}
+  if(kind==="arcade-marquee"){
+    const shoulder=Math.max(12,Math.min(width*.18,height*.32)),waist=Math.max(8,Math.min(width*.065,height*.18));
+    return{path:`M ${n(shoulder)} 0 C ${n(shoulder*.45)} 0 0 ${n(shoulder*.55)} 0 ${n(shoulder)} L 0 ${n(height*.34)} C ${n(waist)} ${n(height*.4)} ${n(waist)} ${n(height*.6)} 0 ${n(height*.66)} L 0 ${n(height-shoulder)} C 0 ${n(height-shoulder*.45)} ${n(shoulder*.45)} ${n(height)} ${n(shoulder)} ${n(height)} L ${n(width-shoulder)} ${n(height)} C ${n(width-shoulder*.45)} ${n(height)} ${n(width)} ${n(height-shoulder*.45)} ${n(width)} ${n(height-shoulder)} L ${n(width)} ${n(height*.66)} C ${n(width-waist)} ${n(height*.6)} ${n(width-waist)} ${n(height*.4)} ${n(width)} ${n(height*.34)} L ${n(width)} ${n(shoulder)} C ${n(width)} ${n(shoulder*.45)} ${n(width-shoulder*.45)} 0 ${n(width-shoulder)} 0 Z`,open:false,fillRule:"nonzero"};
+  }
+  if(kind==="organic-panel"){
+    const bend=Math.max(8,Math.min(width*.12,height*.28)),sway=Math.max(6,Math.min(width*.08,height*.2));
+    return{path:`M ${n(bend*1.2)} 0 C ${n(width*.28)} ${n(sway*.35)} ${n(width*.58)} ${n(-sway*.2)} ${n(width-bend*.85)} ${n(bend*.3)} C ${n(width-bend*.15)} ${n(bend*.5)} ${n(width)} ${n(bend)} ${n(width)} ${n(bend*1.6)} L ${n(width)} ${n(height-bend*.8)} C ${n(width-sway*.25)} ${n(height-bend*.18)} ${n(width-bend*.7)} ${n(height)} ${n(width-bend*1.45)} ${n(height)} C ${n(width*.62)} ${n(height-sway*.5)} ${n(width*.28)} ${n(height+sway*.15)} ${n(bend)} ${n(height-bend*.45)} C ${n(bend*.25)} ${n(height-bend*.7)} 0 ${n(height-bend*1.15)} 0 ${n(height-bend*1.75)} L 0 ${n(bend*1.25)} C 0 ${n(bend*.55)} ${n(bend*.45)} ${n(bend*.1)} ${n(bend*1.2)} 0 Z`,open:false,fillRule:"nonzero"};
+  }
+  if(kind==="tech-panel"){
+    const cut=Math.max(8,Math.min(width*.095,height*.22)),step=Math.max(5,Math.min(width*.04,height*.1));
+    return{path:pathFromPoints([{x:cut,y:0},{x:width-cut*1.6,y:0},{x:width-cut*.85,y:cut*.75},{x:width,y:cut*.75},{x:width,y:height-cut*1.35},{x:width-cut*.7,y:height-cut*.65},{x:width-cut*.7,y:height},{x:cut*1.35,y:height},{x:cut*.55,y:height-cut*.55},{x:0,y:height-cut*.55},{x:0,y:cut},{x:cut-step,y:cut}]),open:false,fillRule:"nonzero"};
+  }
+  if(kind==="ornamental-frame"){
+    const rim=Math.max(3,Math.min(Math.min(width,height)*thickness,width*.22,height*.34)),outer=Math.max(10,Math.min(width*.1,height*.24)),innerW=Math.max(1,width-rim*2),innerH=Math.max(1,height-rim*2),inner=Math.max(4,Math.min(outer*.62,innerW*.12,innerH*.26));
+    const outerPath=`M ${n(outer)} 0 Q 0 0 0 ${n(outer)} L 0 ${n(height-outer)} Q 0 ${n(height)} ${n(outer)} ${n(height)} L ${n(width-outer)} ${n(height)} Q ${n(width)} ${n(height)} ${n(width)} ${n(height-outer)} L ${n(width)} ${n(outer)} Q ${n(width)} 0 ${n(width-outer)} 0 Z`;
+    const innerPath=`M ${n(rim+inner)} ${n(rim)} L ${n(width-rim-inner)} ${n(rim)} Q ${n(width-rim)} ${n(rim)} ${n(width-rim)} ${n(rim+inner)} L ${n(width-rim)} ${n(height-rim-inner)} Q ${n(width-rim)} ${n(height-rim)} ${n(width-rim-inner)} ${n(height-rim)} L ${n(rim+inner)} ${n(height-rim)} Q ${n(rim)} ${n(height-rim)} ${n(rim)} ${n(height-rim-inner)} L ${n(rim)} ${n(rim+inner)} Q ${n(rim)} ${n(rim)} ${n(rim+inner)} ${n(rim)} Z`;
+    return{path:`${outerPath} ${innerPath}`,open:false,fillRule:"evenodd"};
+  }
   if(geometry.nodes.length>=2)return{path:pathNodesToSvg(geometry.nodes,geometry.closed,width,height),open:!geometry.closed,fillRule:"evenodd"};
   return{path:geometry.pathData||"M 50 50",open:!geometry.closed,fillRule:"evenodd",transform:`scale(${n(width/100)} ${n(height/100)})`};
 };

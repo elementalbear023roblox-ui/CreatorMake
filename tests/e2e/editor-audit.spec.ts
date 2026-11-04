@@ -167,3 +167,32 @@ test("compact Insert opens one contained drawer", async ({ page }) => {
   expect(box!.x + box!.width).toBeLessThanOrEqual(607);
   await expect(page.locator(".workspace > .right-panel")).toHaveCount(0);
 });
+
+test("professional demo stays editable through preview, save, reload, and Roblox export", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?workflow=professional-demo");
+  await page.getByRole("button", { name: /^Insert Add objects and assets$/ }).click();
+  await page.getByRole("button", { name: "Design kits", exact: true }).click();
+  const card=page.locator(".design-kit-card").filter({hasText:"Demo · Modern Adventure"});
+  await card.getByRole("button", {name:"Insert interface"}).click();
+  await expect(page.locator(".canvas-element")).toHaveCount(31);
+  await expect(page.locator(".project-chip small")).toContainText("Saved",{timeout:10_000});
+
+  await page.reload();
+  await expect(page.locator(".canvas-element")).toHaveCount(31);
+  await page.getByRole("button", {name:"Preview project"}).click();
+  await expect(page.locator(".preview-diagnostics.ready")).toContainText("Responsive check passed");
+  await expect(page.locator(".preview-canvas .canvas-element")).toHaveCount(31);
+
+  await page.getByRole("button", {name:"Export to Roblox"}).click();
+  const exportDialog=page.getByRole("dialog",{name:/Roblox/i});
+  await expect(exportDialog).toBeVisible();
+  const [download]=await Promise.all([page.waitForEvent("download"),exportDialog.getByRole("button",{name:"Project JSON"}).click()]);
+  const downloadPath=await download.path();
+  expect(downloadPath).not.toBeNull();
+  const project=JSON.parse(await readFile(downloadPath!,"utf8"));
+  expect(project.schemaVersion).toBe(18);
+  expect(project.elements).toHaveLength(31);
+  expect(project.elements.some((element:{geometry:{kind:string}})=>element.geometry.kind==="organic-panel")).toBeTruthy();
+  expect(project.elements.some((element:{geometry:{kind:string}})=>element.geometry.kind==="tech-panel")).toBeTruthy();
+});
