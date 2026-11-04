@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { INTERFACE_THEMES, WORKSPACE_MODES, buildInterfaceTokens, getTheme, themeContrastReport, tokensToCssVariables } from "../lib/ui/interface-themes.ts";
 
-test("publishes the six professional workspace modes in product order", () => {
-  assert.deepEqual(WORKSPACE_MODES, ["design", "vector", "prototype", "roblox", "review", "deliver"]);
+test("publishes Creative Mode plus the six specialist workspaces in product order", () => {
+  assert.deepEqual(WORKSPACE_MODES, ["creative", "design", "vector", "prototype", "roblox", "review", "deliver"]);
 });
 
 test("ships exactly 30 unique built-in interface themes", () => {

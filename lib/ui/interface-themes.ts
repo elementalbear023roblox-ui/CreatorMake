@@ -1,8 +1,8 @@
 export type AppearanceMode = "light" | "dark" | "system";
 export type ResolvedAppearance = "light" | "dark";
 export type DensityMode = "compact" | "comfortable";
-export type WorkspaceMode = "design" | "vector" | "prototype" | "roblox" | "review" | "deliver";
-export const WORKSPACE_MODES: WorkspaceMode[] = ["design", "vector", "prototype", "roblox", "review", "deliver"];
+export type WorkspaceMode = "creative" | "design" | "vector" | "prototype" | "roblox" | "review" | "deliver";
+export const WORKSPACE_MODES: WorkspaceMode[] = ["creative", "design", "vector", "prototype", "roblox", "review", "deliver"];
 
 export type ThemeDefinition = {
   id: string;
