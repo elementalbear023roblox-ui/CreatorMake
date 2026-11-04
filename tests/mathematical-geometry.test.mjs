@@ -34,7 +34,7 @@ test("auto-fit settings normalize safely and mathematical definitions affect the
 
 test("renderer and CSS preserve zero-alpha backgrounds and keep editor overlays out of exports",async()=>{
   const [surface,css,rasterizer]=await Promise.all([readFile(new URL("../components/editor/ThreeDObjectSurface.tsx",import.meta.url),"utf8"),readFile(new URL("../app/globals.css",import.meta.url),"utf8"),readFile(new URL("../lib/editor/canvas-rasterizer.ts",import.meta.url),"utf8")]);
-  assert.match(surface,/scene\.background=null/);assert.match(surface,/setClearColor\(0x000000,0\)/);assert.match(surface,/setClearAlpha\(0\)/);assert.match(surface,/FIT_OBJECT/);assert.match(surface,/EXPAND_BOUNDS/);assert.match(surface,/generateImplicitSurface/);
+  assert.match(surface,/scene\.background=null/);assert.match(surface,/setClearColor\(0x000000,0\)/);assert.match(surface,/setClearAlpha\(0\)/);assert.match(surface,/FIT_OBJECT/);assert.match(surface,/AUTO_TIGHT/);assert.match(surface,/tightThreeDRenderBounds/);assert.match(surface,/selectionPadding="10"/);assert.match(surface,/generateImplicitSurface/);
   const rule=css.match(/\.three-d-element-surface\{[^}]+\}/)?.[0]??"";assert.match(rule,/background:transparent!important/);assert.match(rule,/box-shadow:none!important/);assert.doesNotMatch(rule,/radial-gradient/);assert.match(css,/\[data-creatormake-export-element\] \.three-d-badge/);
   assert.match(rasterizer,/source\.dataset\.cssWidth/);assert.match(rasterizer,/context\.clearRect/);
 });

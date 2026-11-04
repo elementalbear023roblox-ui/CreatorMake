@@ -217,3 +217,42 @@ test("3D preview refines to Ultra resolution only after interaction settles",asy
   expect(resolution.pixelWidth).toBeGreaterThanOrEqual(resolution.cssWidth*5.9);
   expect(resolution.pixelHeight).toBeGreaterThanOrEqual(resolution.cssHeight*5.9);
 });
+
+test("reference pixel letters are real 3D meshes with exact automatic bounds",async({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto("/?workflow=pixel-alphabet-bounds");
+  await page.getByRole("button",{name:/^Insert Add objects and assets$/}).click();
+  await page.locator(".roblox-library-switch button").filter({hasText:"3D"}).click();
+  await page.getByRole("button",{name:"Pixel Alphabet",exact:true}).click();
+  await page.getByRole("button",{name:"Insert 3D pixel A"}).click();
+  const canvas=page.getByLabel("3D Pixel A transparent 3D preview");
+  await expect(canvas).toHaveAttribute("data-render-ready","true",{timeout:15_000});
+  await expect(canvas).toHaveAttribute("data-selection-padding","10");
+  const before=await canvas.evaluate((node)=>({geometry:(node.closest(".three-d-element-surface") as HTMLElement).dataset.geometryBounds!.split(",").map(Number),render:(node.closest(".three-d-element-surface") as HTMLElement).dataset.renderBounds!.split(",").map(Number),effect:Number((node.closest(".three-d-element-surface") as HTMLElement).dataset.effectPadding),width:node.getBoundingClientRect().width,parentWidth:(node.closest(".canvas-element") as HTMLElement).getBoundingClientRect().width}));
+  const [left,top,width,height]=before.geometry,[renderLeft,renderTop,renderWidth,renderHeight]=before.render;
+  expect(before.effect).toBe(0);
+  expect(renderLeft).toBe(Math.floor(left-10));
+  expect(renderTop).toBe(Math.floor(top-10));
+  expect(renderWidth).toBe(Math.ceil(left+width+10)-Math.floor(left-10));
+  expect(renderHeight).toBe(Math.ceil(top+height+10)-Math.floor(top-10));
+  expect(before.width).toBeLessThan(before.parentWidth);
+  await page.getByRole("button",{name:"Design Layout and appearance"}).click();
+  await page.getByRole("spinbutton",{name:"Rotate Y value"}).fill("67");
+  await expect(canvas).toHaveAttribute("data-render-ready","true");
+  await expect.poll(async()=>canvas.evaluate((node)=>(node.closest(".three-d-element-surface") as HTMLElement).dataset.geometryBounds)).not.toBe(before.geometry.join(","));
+});
+
+test("3D Letter Composer creates independent editable CREATORMAKE objects",async({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto("/?workflow=pixel-word-composer");
+  await page.getByRole("button",{name:/^Insert Add objects and assets$/}).click();
+  await page.locator(".roblox-library-switch button").filter({hasText:"3D"}).click();
+  await page.getByRole("button",{name:"Composer",exact:true}).click();
+  await page.getByLabel("Source text").fill("CREATORMAKE");
+  await page.getByRole("button",{name:"Generate separate 3D letters"}).click();
+  const letters=page.locator('canvas[aria-label^="3D Pixel "]');
+  await expect(letters).toHaveCount(11);
+  await page.getByRole("tab",{name:"Layers",exact:true}).click();
+  await expect(page.locator('[data-layer-type="container"]').filter({hasText:"3D Pixel Word · CREATORMAKE"})).toBeVisible();
+  await expect(page.locator('[data-layer-type="three-d"]')).toHaveCount(11);
+});
