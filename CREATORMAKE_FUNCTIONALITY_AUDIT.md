@@ -66,7 +66,7 @@ No currently supported automated test is failing. Live Google Drive, live Roblox
 | Templates/presets | WORKING | No failure reproduced | None | Preset insertion, isolation, and project-manifest exclusion tests passed |
 | PNG/JPEG/WebP/GIF/SVG asset import | WORKING | No failure reproduced | None | Import accept list, PNG browser import, SVG path conversion, and persistence tests passed |
 | Local project create/name/save/load/duplicate/delete/recovery | WORKING | No failure reproduced | None | IndexedDB-compatible lifecycle, recovery snapshots, duplication, migration tests passed |
-| Save/reload data integrity | WORKING | No failure reproduced | None | Mixed browser project retained six objects and Neon Glow across reload; schema 18 migration and professional-demo reload tests passed |
+| Save/reload data integrity | WORKING | No failure reproduced | None | Mixed browser project retained six objects and Neon Glow across reload; schema 19 dimensional migration and professional-demo reload tests passed |
 | Project backup import/export | WORKING | No failure reproduced | None | Browser downloaded and parsed project JSON; `.creatormake` schema round-trip tests passed |
 | Per-object transparent PNG export | WORKING | No failure reproduced | None | Browser downloaded a generated PNG and Sharp verified format, dimensions, and alpha |
 | Full-canvas PNG export | NOT IMPLEMENTED | Current UI exports per-object Roblox visual PNGs, not a flattened full-canvas image | None | No such control/API found |

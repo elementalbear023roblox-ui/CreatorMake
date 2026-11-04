@@ -29,7 +29,7 @@ CreatorMake now has a broader live design vocabulary instead of relying on round
 - Added persistent line joins: miter, round, and bevel.
 - Added solid, dash, dot, and dash-dot patterns.
 - Added controls to the advanced Stroke & Corners inspector.
-- Updated schema 18 migration so older projects receive safe round/solid defaults without losing data.
+- Updated schema 19 migration so older projects receive safe geometry and dimensional defaults without losing data.
 
 ### Materials and effects
 
@@ -59,7 +59,7 @@ All three final Desktop previews report `Responsive check passed`, contain no pa
 - Core suite: 195/195 passed, including geometry, migration, pixel export, adaptive Roblox export, Studio Sync, 3D, Boolean geometry, and design-system coverage.
 - Export option suite: 7/7 passed.
 - Real-browser suite: 7/7 passed across 1440×900, 1024×768, the reported 607×420 regression size, and 390×844.
-- The browser workflow inserts the modern demo, saves it, reloads 31 editable objects, opens a responsive preview, downloads Project JSON, and verifies the new geometry kinds in the saved schema 18 document.
+- The browser workflow inserts the modern demo, saves it, reloads 31 editable objects, opens a responsive preview, downloads Project JSON, and verifies the new geometry kinds in the saved schema 19 document.
 - Production static build completed successfully.
 - ESLint completed with 0 errors and 21 pre-existing warnings.
 

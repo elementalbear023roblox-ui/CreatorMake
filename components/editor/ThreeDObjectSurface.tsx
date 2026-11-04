@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { EditorElement, ThreeDSettings } from "@/lib/editor/types";
 import { generateImplicitSurface, generateParametricCurve, generateParametricSurface, generatePolarContour } from "@/lib/editor/mathematical-geometry";
 import { normalizeThreeDSettings, projectedBoundsFromPoints, rawProjectedBoundsFromPoints, threeDGeometryKey } from "@/lib/editor/three-d";
+import { geometryPresentation } from "@/lib/editor/geometry";
+import { flattenSvgPath } from "@/lib/editor/boolean";
 
 type THREE=typeof import("three");
 type RenderStatus="ready"|"lost"|"error";
@@ -21,7 +23,9 @@ function mathBufferGeometry(THREE:THREE,settings:ThreeDSettings){
   geometry.setAttribute("position",new THREE.Float32BufferAttribute(generated.positions,3));geometry.setIndex(generated.indices);geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();return geometry;
 }
 
-function buildGeometry(THREE:THREE,settings:ThreeDSettings){
+function sourceShape(THREE:THREE,element:EditorElement){const presentation=geometryPresentation(element),match=String(presentation.transform??"").match(/scale\(([-\d.]+)(?:[ ,]+([-\d.]+))?\)/),sx=match?Number(match[1]):1,sy=match?Number(match[2]??match[1]):1,rings=flattenSvgPath(presentation.path).map((ring)=>ring.map((point)=>({x:point.x*sx,y:point.y*sy})));if(!rings.length)return roundedRectangle(THREE,2.7,1.5,.08);const points=rings.flat(),minX=Math.min(...points.map((p)=>p.x)),maxX=Math.max(...points.map((p)=>p.x)),minY=Math.min(...points.map((p)=>p.y)),maxY=Math.max(...points.map((p)=>p.y)),width=Math.max(.001,maxX-minX),height=Math.max(.001,maxY-minY),factor=2.7/Math.max(width,height),path=(ring:typeof rings[number],target:import("three").Path)=>ring.forEach((point,index)=>{const x=(point.x-(minX+maxX)/2)*factor,y=-(point.y-(minY+maxY)/2)*factor;if(index)target.lineTo(x,y);else target.moveTo(x,y);});const shape=new THREE.Shape();path(rings[0],shape);shape.closePath();rings.slice(1).forEach((ring)=>{const hole=new THREE.Path();path(ring,hole);hole.closePath();shape.holes.push(hole);});return shape;}
+
+function buildGeometry(THREE:THREE,settings:ThreeDSettings,element:EditorElement){
   const quality=settings.previewQuality==="PERFORMANCE"?.55:settings.previewQuality==="HIGH"?1.5:1,segments=Math.max(3,Math.min(128,Math.round(settings.segments*quality))),depth=Math.max(.04,settings.depth/80),bevel=Math.max(0,settings.bevel/80);
   if(settings.geometryMode==="PARAMETRIC_SURFACE"||settings.geometryMode==="IMPLICIT_SURFACE")return mathBufferGeometry(THREE,settings);
   if(settings.geometryMode==="PARAMETRIC_CURVE"){
@@ -39,14 +43,14 @@ function buildGeometry(THREE:THREE,settings:ThreeDSettings){
   if(settings.primitive==="pyramid")return new THREE.ConeGeometry(1.15,1.9,4);
   if(settings.primitive==="plane")return new THREE.BoxGeometry(2.55,1.62,Math.max(.025,depth*.08),1,1,1);
   if(settings.primitive==="rounded-box"||settings.primitive==="extruded-shape"){
-    const shape=roundedRectangle(THREE,2.7,1.5,settings.primitive==="rounded-box"?Math.max(.04,settings.cornerRadius):Math.max(.02,settings.cornerRadius*.45)),geometry=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:bevel>0,bevelSize:bevel,bevelThickness:bevel,bevelSegments:settings.bevelSegments,curveSegments:Math.max(8,segments)});geometry.center();return geometry;
+    const shape=settings.primitive==="extruded-shape"?sourceShape(THREE,element):roundedRectangle(THREE,2.7,1.5,Math.max(.04,settings.cornerRadius)),geometry=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:bevel>0,bevelSize:bevel,bevelThickness:bevel,bevelSegments:settings.bevelSegments,curveSegments:Math.max(8,segments)});geometry.center();return geometry;
   }
   return new THREE.BoxGeometry(2.35,1.55,depth+.48,1,1,1);
 }
 
-function createGeometry(THREE:THREE,settings:ThreeDSettings,key:string){
+function createGeometry(THREE:THREE,settings:ThreeDSettings,element:EditorElement,key:string){
   const cached=geometryTemplates.get(key);if(cached)return cached.clone();
-  const geometry=buildGeometry(THREE,settings);geometry.computeBoundingBox();geometry.computeBoundingSphere();geometryTemplates.set(key,geometry.clone());
+  const geometry=buildGeometry(THREE,settings,element);geometry.computeBoundingBox();geometry.computeBoundingSphere();geometryTemplates.set(key,geometry.clone());
   if(geometryTemplates.size>16){const oldest=geometryTemplates.keys().next().value as string|undefined;if(oldest){geometryTemplates.get(oldest)?.dispose();geometryTemplates.delete(oldest);}}
   return geometry;
 }
@@ -76,7 +80,7 @@ function createRuntime(THREE:THREE,canvas:HTMLCanvasElement,surface:HTMLSpanElem
   };
   const render=()=>{if(disposed||context.isContextLost()||!lastSettings)return;renderer.clear(true,true,true);renderer.render(scene,camera);const projected=projectedBoundsFromPoints(projectedPoints(),renderWidth,renderHeight);bounds.style.left=`${projected.left+(logicalWidth-renderWidth)/2}px`;bounds.style.top=`${projected.top+(logicalHeight-renderHeight)/2}px`;bounds.style.width=`${projected.width}px`;bounds.style.height=`${projected.height}px`;canvas.dataset.renderReady="true";delete canvas.dataset.renderError;onStatus("ready",canvas.dataset.geometryError);};
   const scheduleRender=()=>{delete canvas.dataset.renderReady;if(frame)cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{frame=0;render();});};
-  const update=(element:EditorElement)=>{if(disposed)return;lastElement=element;const settings=normalizeThreeDSettings(element.threeD);lastSettings=settings;const nextGeometryKey=threeDGeometryKey(settings);if(nextGeometryKey!==geometryKey)try{const next=createGeometry(THREE,settings,nextGeometryKey),previous=mesh.geometry;mesh.geometry=next;previous.dispose();geometryKey=nextGeometryKey;delete canvas.dataset.geometryError;}catch(error){canvas.dataset.geometryError=error instanceof Error?error.message:"The mathematical geometry is invalid.";}
+  const update=(element:EditorElement)=>{if(disposed)return;lastElement=element;const settings=normalizeThreeDSettings(element.threeD);lastSettings=settings;const sourceKey=settings.primitive==="extruded-shape"?`${geometryPresentation(element).path}|${geometryPresentation(element).transform??""}|${element.width}x${element.height}`:"",nextGeometryKey=`${threeDGeometryKey(settings)}|${sourceKey}`;if(nextGeometryKey!==geometryKey)try{const next=createGeometry(THREE,settings,element,nextGeometryKey),previous=mesh.geometry;mesh.geometry=next;previous.dispose();geometryKey=nextGeometryKey;delete canvas.dataset.geometryError;}catch(error){canvas.dataset.geometryError=error instanceof Error?error.message:"The mathematical geometry is invalid.";}
     const physical=["glass","transparent","holographic","iridescent"].includes(settings.material),nextMaterialKind=physical?"physical":settings.material==="toon"?"toon":"standard";if(nextMaterialKind!==materialKind){const previous=mesh.material as import("three").Material;mesh.material=nextMaterialKind==="physical"?new THREE.MeshPhysicalMaterial({transmission:settings.material==="glass"?.88:0,thickness:.8,ior:1.42,clearcoat:1}):nextMaterialKind==="toon"?new THREE.MeshToonMaterial():new THREE.MeshStandardMaterial();previous.dispose();materialKind=nextMaterialKind;}
     const material=mesh.material as import("three").MeshStandardMaterial;material.color.set(settings.color);if("metalness" in material)material.metalness=settings.material==="chrome"?.95:settings.material==="metal"||settings.material==="brushed-metal"?.72:settings.material==="holographic"||settings.material==="iridescent"?.42:settings.metalness;if("roughness" in material)material.roughness=settings.material==="chrome"?.08:settings.material==="glass"?.12:settings.material==="matte"?.88:settings.material==="brushed-metal"?.3:settings.material==="retro-plastic"?.52:settings.roughness;material.transparent=settings.transparent||["glass","transparent","holographic","iridescent"].includes(settings.material);material.opacity=settings.material==="glass"?Math.min(.48,settings.opacity/100):settings.material==="transparent"?Math.min(.72,settings.opacity/100):settings.opacity/100;if("emissive" in material){material.emissive.set(settings.emissiveColor);material.emissiveIntensity=["emissive","neon","holographic"].includes(settings.material)?Math.max(.6,settings.emissiveIntensity):settings.emissiveIntensity;}material.side=THREE.DoubleSide;material.needsUpdate=true;
     root.position.set(settings.pivotX,settings.pivotY,settings.pivotZ+settings.positionZ/100);mesh.position.set(-settings.pivotX,-settings.pivotY,-settings.pivotZ);root.quaternion.setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(settings.rotationX),THREE.MathUtils.degToRad(settings.rotationY),THREE.MathUtils.degToRad(settings.rotationZ),settings.transformSpace==="local"?"XYZ":"ZYX"));root.scale.set(settings.scale*settings.scaleX,settings.scale*settings.scaleY,settings.scale*settings.scaleZ);

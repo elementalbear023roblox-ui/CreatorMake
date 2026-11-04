@@ -1,0 +1,16 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createElement, normalizeProject, createProject } from "../lib/editor/project.ts";
+import { applyDimensionalStyle, dimensionPresentation, dimensionalBackground, DIMENSIONAL_MATERIALS, DIMENSIONAL_STYLES } from "../lib/editor/dimensional.ts";
+import { classifyRobloxElement } from "../lib/roblox/classification.ts";
+import { renderElementSvg, visualBoundsForElement } from "../lib/roblox/render-assets.ts";
+
+test("arbitrary bezier silhouettes become real edge polygons and one rear surface",()=>{const element=createElement("vector");element.width=260;element.height=180;element.geometry={...element.geometry,kind:"custom-path",closed:true,pathData:"M 12 80 C 18 8 92 2 126 38 C 170 4 246 28 238 92 C 230 164 156 174 112 142 C 62 176 8 148 12 80 Z"};element.dimension=applyDimensionalStyle(element.dimension,"arcade-plastic");const built=dimensionPresentation(element);assert.ok(built.faces.length>20);assert.ok(built.faces.length<512);assert.match(built.backPath,/M/);assert.ok(built.faces.every((face)=>/M.*L.*L.*L.*Z/.test(face.path)));assert.notEqual(built.dx,0);assert.notEqual(built.dy,0);});
+
+test("compound geometry keeps hole contours and dimensional export metadata",()=>{const element=createElement("vector");element.geometry={...element.geometry,kind:"custom-path",closed:true,pathData:"M 0 0 L 100 0 L 100 100 L 0 100 Z M 30 30 L 30 70 L 70 70 L 70 30 Z"};element.dimension=applyDimensionalStyle(element.dimension,"chrome-metallic");const built=dimensionPresentation(element),svg=renderElementSvg(element,2,"full");assert.ok((built.backPath.match(/M/g)??[]).length===2);assert.match(svg,/data-dimensional="true"/);assert.match(svg,/dimension-side-face/);assert.match(svg,/data-face-count=/);});
+
+test("six style families and material surfaces remain visibly distinct",()=>{assert.equal(DIMENSIONAL_STYLES.length,6);assert.equal(DIMENSIONAL_MATERIALS.length,12);const element=createElement("button"),backgrounds=new Set(DIMENSIONAL_MATERIALS.map((material)=>{element.dimension={...element.dimension,enabled:true,material};return dimensionalBackground(element);}));assert.equal(backgrounds.size,12);});
+
+test("dimensional objects use premium Roblox raster or hybrid delivery",()=>{const shape=createElement("vector");shape.dimension=applyDimensionalStyle(shape.dimension,"holographic-glass");const button=createElement("button");button.dimension=applyDimensionalStyle(button.dimension,"premium-cartoon");assert.equal(classifyRobloxElement(shape).classification,"RASTERIZED");assert.equal(classifyRobloxElement(button).classification,"HYBRID");assert.equal(classifyRobloxElement(button).intendedRobloxClass,"ImageButton");const bounds=visualBoundsForElement(shape);assert.ok(bounds.width>shape.width);assert.ok(bounds.height>shape.height);});
+
+test("schema 19 migrates dimensional defaults without destructively changing source geometry",()=>{const project=createProject("Dimension migration"),element=createElement("vector");project.elements.push(element);const source=structuredClone(element.geometry);project.schemaVersion=18;delete project.elements[0].dimension;const restored=normalizeProject(project);assert.equal(restored.schemaVersion,19);assert.equal(restored.elements[0].dimension.enabled,false);assert.deepEqual(restored.elements[0].geometry,source);});

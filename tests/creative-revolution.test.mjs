@@ -42,7 +42,7 @@ test("Creative Mode treatments are multi-property, editable, and non-destructive
   for(const treatment of ["depth","gloss","border","highlight","retro","texture","glow","chrome","holographic","cartoon-plastic","cinematic-metal"]){
     const patch=applyCreativeTreatment(source,treatment);
     assert.ok(Object.keys(patch).length>=1);
-    assert.ok((patch.effects??[]).length>=2,`${treatment} must build a real editable effect stack`);
+    assert.ok((patch.effects??[]).length>=2||patch.dimension?.enabled,`${treatment} must build a real editable effect stack or true dimensional geometry`);
   }
   assert.deepEqual(source,before,"previewing a treatment must not mutate the source element");
   assert.ok(WORKSPACE_MODES.includes("creative"));

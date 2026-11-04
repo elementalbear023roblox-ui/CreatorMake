@@ -191,8 +191,9 @@ test("professional demo stays editable through preview, save, reload, and Roblox
   const downloadPath=await download.path();
   expect(downloadPath).not.toBeNull();
   const project=JSON.parse(await readFile(downloadPath!,"utf8"));
-  expect(project.schemaVersion).toBe(18);
+  expect(project.schemaVersion).toBe(19);
   expect(project.elements).toHaveLength(31);
   expect(project.elements.some((element:{geometry:{kind:string}})=>element.geometry.kind==="organic-panel")).toBeTruthy();
   expect(project.elements.some((element:{geometry:{kind:string}})=>element.geometry.kind==="tech-panel")).toBeTruthy();
+  expect(project.elements.some((element:{dimension:{enabled:boolean}})=>element.dimension.enabled)).toBeTruthy();
 });

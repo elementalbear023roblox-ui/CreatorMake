@@ -107,7 +107,7 @@ export function geometryKindForElement(element:EditorElement):GeometryKind{
   return legacyDefaultGeometry(element.geometry)?defaultGeometryKindForElementType(element.type):element.geometry.kind;
 }
 export function geometryPresentation(element:EditorElement,width=element.width,height=element.height):GeometryPresentation{const kind=geometryKindForElement(element);if(!GEOMETRY_KINDS.has(kind))throw new Error(`Unsupported geometry renderer: ${String(kind)}`);return vectorPath(element,kind,Math.max(1,width),Math.max(1,height));}
-export function usesVectorSurface(element:EditorElement){const kind=geometryKindForElement(element);return element.type==="vector"||!["rectangle","rounded-rectangle"].includes(kind)||Object.values(element.cornerTypes).some((type)=>type!=="round");}
+export function usesVectorSurface(element:EditorElement){const kind=geometryKindForElement(element);return element.dimension?.enabled===true||element.type==="vector"||!["rectangle","rounded-rectangle"].includes(kind)||Object.values(element.cornerTypes).some((type)=>type!=="round");}
 export function supportsAdvancedCorners(element:EditorElement){const kind=geometryKindForElement(element);return ["frame","container","scrolling-frame","rectangle","roundRect","button"].includes(element.type)||(element.type==="vector"&&(kind==="rectangle"||kind==="rounded-rectangle"));}
 export function openGeometryStrokeWidth(element:EditorElement){const kind=geometryKindForElement(element);return kind==="line"||kind==="arc"||kind==="custom-path"?Math.max(1,Math.min(element.width,element.height)*clamp(element.geometry.thickness,1,48)/100):element.borderWidth;}
 

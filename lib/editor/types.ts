@@ -151,6 +151,35 @@ export type ThreeDSettings = {
   exportStrategy:"AUTO"|"IMAGE"|"VIEWPORT_FRAME";
 };
 
+export type DimensionalMaterial="glossy-plastic"|"molded-plastic"|"polished-chrome"|"brushed-metal"|"gold"|"glass"|"holographic"|"matte"|"iridescent"|"painted-metal"|"cartoon"|"retro-plastic";
+export type DimensionalStylePreset="arcade-plastic"|"premium-cartoon"|"chrome-metallic"|"cinematic-depth"|"futuristic-technology"|"holographic-glass";
+export type DimensionalLightingPreset="soft-studio"|"glossy-arcade"|"game-show-90s"|"dramatic-cinematic"|"cartoon-studio"|"metallic-showcase"|"purple-neon"|"futuristic-hologram";
+export type DimensionSettings={
+  enabled:boolean;
+  stylePreset:DimensionalStylePreset;
+  depth:number;
+  direction:number;
+  bevelWidth:number;
+  bevelSmoothness:number;
+  material:DimensionalMaterial;
+  sideColor:string;
+  roughness:number;
+  metallic:number;
+  reflectivity:number;
+  emission:number;
+  transparency:number;
+  lightingPreset:DimensionalLightingPreset;
+  lightAngle:number;
+  lightElevation:number;
+  lightIntensity:number;
+  ambient:number;
+  rim:number;
+  shadowSoftness:number;
+  shadowOpacity:number;
+  projection:"perspective"|"orthographic";
+  quality:"PERFORMANCE"|"BALANCED"|"HIGH";
+};
+
 export type EditorElement = {
   id: string;
   type: ElementType;
@@ -271,6 +300,7 @@ export type EditorElement = {
   skewX: number;
   skewY: number;
   threeD: ThreeDSettings;
+  dimension: DimensionSettings;
   locked: boolean;
   hidden: boolean;
   imageAssetId: string | null;
@@ -351,7 +381,7 @@ export type ProjectExportOptions = {
 };
 
 export type EditorProject = {
-  schemaVersion: 18;
+  schemaVersion: 19;
   id: string;
   name: string;
   createdAt: number;

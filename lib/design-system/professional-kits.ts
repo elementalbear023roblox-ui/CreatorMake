@@ -1,6 +1,7 @@
 import { createElement, createId } from "../editor/project.ts";
 import type { EditorElement, ElementType } from "../editor/types.ts";
 import { createVisualEffect } from "../effects/registry.ts";
+import { applyDimensionalStyle } from "../editor/dimensional.ts";
 
 export type ProfessionalDesignAssetId =
   | "retro-show-panel"
@@ -189,24 +190,25 @@ export function createProfessionalDesignAsset(id:ProfessionalDesignAssetId,index
   if(id==="future-hud-module")return{elements:futureHud(index)};
   if(id==="cinematic-title-card")return{elements:cinematicCard(index)};
   if(id==="minimal-settings-card")return{elements:minimalCard(index)};
-  if(id==="demo-retro-game-show")return{elements:decorateDemo(retroPanel(index),"retro",index),background:"#1a0f51"};
-  if(id==="demo-modern-roblox")return{elements:decorateDemo(modernCard(index),"modern",index),background:"#132d4f"};
-  return{elements:decorateDemo(futureHud(index),"future",index),background:"#030912"};
+  const dimensionalize=(items:EditorElement[],kind:"retro"|"modern"|"future")=>items.map((item)=>{const match=kind==="retro"?/Prize Panel Shell|Prize Title Plate|Prize Marquee|Retro PLAY|Retro PRIZES|Retro HOW TO PLAY/.test(item.name):kind==="modern"?/Adventure Quest Card|Quest Title|Quest Continue|Quest Reward Badge|Nav QUESTS|Party Ready Chip/.test(item.name):/Holographic Command Module|HUD Title|HUD .* Tab|Reactor Compound Reticle|Command SYS/.test(item.name);if(!match)return item;const style=kind==="retro"?"arcade-plastic":kind==="modern"?"premium-cartoon":"futuristic-technology";return{...item,shadow:"none",dimension:applyDimensionalStyle(item.dimension,style)};});
+  if(id==="demo-retro-game-show")return{elements:dimensionalize(decorateDemo(retroPanel(index),"retro",index),"retro"),background:"#1a0f51"};
+  if(id==="demo-modern-roblox")return{elements:dimensionalize(decorateDemo(modernCard(index),"modern",index),"modern"),background:"#132d4f"};
+  return{elements:dimensionalize(decorateDemo(futureHud(index),"future",index),"future"),background:"#030912"};
 }
 
 export type CreativeTreatmentId="depth"|"gloss"|"border"|"highlight"|"retro"|"texture"|"glow"|"chrome"|"holographic"|"cartoon-plastic"|"cinematic-metal";
 
 export function applyCreativeTreatment(element:EditorElement,treatment:CreativeTreatmentId){
   const without=(types:string[])=>element.effects.filter((item)=>!types.includes(item.type));
-  if(treatment==="depth")return{shadow:"0 15px 0 rgba(7,10,20,.38), 0 28px 48px rgba(0,0,0,.35)",translateZ:Math.max(10,element.translateZ),rotateX:element.rotateX||2,effects:[...without(["bevel","drop-shadow"]),effect("bevel",{size:5,depth:82,softness:28}),effect("drop-shadow",{y:15,blur:28,opacity:42})]} satisfies Patch;
+  if(treatment==="depth")return{dimension:applyDimensionalStyle(element.dimension,"premium-cartoon"),shadow:"none",translateZ:Math.max(10,element.translateZ),rotateX:element.rotateX||2,effects:without(["bevel","drop-shadow"])} satisfies Patch;
   if(treatment==="gloss")return{gradientType:"linear",gradientAngle:180,gradientStops:stops(element.fill==="transparent"?"#e7f8ff":element.fill,"#59677d"),effects:[...without(["glass","light-sweep"]),effect("glass",{blur:8,opacity:20}),effect("light-sweep",{width:25,intensity:82,angle:110})]} satisfies Patch;
   if(treatment==="border")return{borderWidth:Math.max(3,element.borderWidth),cornerRadius:Math.max(10,element.cornerRadius),corners:corners(Math.max(10,element.cornerRadius)),effects:[...without(["gradient-border","inner-shadow"]),effect("gradient-border",{colorA:"#fff17b",colorB:"#5de7ff",colorC:"#9d5cff",width:3}),effect("inner-shadow",{y:3,blur:8,opacity:35})]} satisfies Patch;
   if(treatment==="highlight")return{effects:[...without(["light-sweep","shimmer"]),effect("light-sweep",{width:18,intensity:100,angle:118}),effect("shimmer",{width:16,opacity:52,angle:110})]} satisfies Patch;
   if(treatment==="retro")return{fontFamily:(element.type==="text"||element.type==="button")?"Bungee":element.fontFamily,fontId:(element.type==="text"||element.type==="button")?"bungee":element.fontId,fontWeight:Math.max(800,element.fontWeight),borderWidth:Math.max(4,element.borderWidth),cornerRadius:Math.max(16,element.cornerRadius),corners:corners(Math.max(16,element.cornerRadius)),shadow:"0 8px 0 #512065, 0 16px 28px rgba(0,0,0,.3)",effects:[...without(["halftone","bevel"]),effect("halftone",{size:9,dotSize:2,opacity:22,color:"#241038"}),effect("bevel",{size:5,depth:95})]} satisfies Patch;
   if(treatment==="texture")return{effects:[...without(["grain","vignette"]),effect("grain",{size:3,intensity:18}),effect("vignette",{amount:24,softness:72})]} satisfies Patch;
   if(treatment==="glow")return{effects:[...without(["neon-glow","edge-glow"]),effect("neon-glow",{color:element.borderColor==="transparent"?"#63eaff":element.borderColor,radius:18,layers:3,intensity:115}),effect("edge-glow",{color:"#a48bff",radius:8,opacity:58})]} satisfies Patch;
-  if(treatment==="chrome")return{fill:"#b9c7d4",borderColor:"#edf8ff",borderWidth:Math.max(2,element.borderWidth),gradientType:"linear",gradientAngle:180,gradientStops:stops("#f9fdff","#526273","#dfeaf1"),shadow:"0 10px 18px rgba(4,12,20,.32), inset 0 2px 0 rgba(255,255,255,.72)",effects:[...without(["bevel","light-sweep","grain"]),effect("bevel",{size:5,depth:88,softness:18}),effect("light-sweep",{width:14,intensity:92,angle:104}),effect("grain",{size:2,intensity:5})]} satisfies Patch;
-  if(treatment==="holographic")return{fill:"#5ae7f2",borderColor:"#d9fbff",borderWidth:Math.max(2,element.borderWidth),gradientType:"conic",gradientAngle:32,gradientStops:stops("#59f0df","#a56cff","#ff79bd"),blendMode:"screen",shadow:"0 0 26px rgba(77,224,255,.36), inset 0 0 18px rgba(255,255,255,.22)",effects:[...without(["holographic","edge-glow","shimmer"]),effect("holographic",{speed:.45,intensity:76}),effect("edge-glow",{color:"#65efff",radius:10,opacity:66}),effect("shimmer",{width:14,opacity:45,angle:116})]} satisfies Patch;
-  if(treatment==="cartoon-plastic")return{borderColor:"#ffffff",borderWidth:Math.max(3,element.borderWidth),gradientType:"linear",gradientAngle:180,gradientStops:stops(element.fill==="transparent"?"#72d9ff":element.fill,"#274b85"),shadow:"0 9px 0 #182849, 0 16px 24px rgba(8,13,30,.28), inset 0 4px 0 rgba(255,255,255,.5)",effects:[...without(["bevel","light-sweep","inner-shadow"]),effect("bevel",{size:6,depth:96,softness:16}),effect("light-sweep",{width:24,intensity:62,angle:108}),effect("inner-shadow",{y:4,blur:7,opacity:22})]} satisfies Patch;
-  return{fill:"#303844",borderColor:"#9ca9b8",borderWidth:Math.max(1,element.borderWidth),gradientType:"linear",gradientAngle:112,gradientStops:stops("#65717e","#171d25","#424d59"),shadow:"0 16px 32px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.18)",effects:[...without(["bevel","grain","vignette"]),effect("bevel",{size:3,depth:54,softness:34}),effect("grain",{size:2,intensity:12}),effect("vignette",{amount:20,softness:70})]} satisfies Patch;
+  if(treatment==="chrome")return{dimension:applyDimensionalStyle(element.dimension,"chrome-metallic"),fill:"#b9c7d4",borderColor:"#edf8ff",borderWidth:Math.max(2,element.borderWidth),shadow:"none",effects:without(["bevel","light-sweep","grain"])} satisfies Patch;
+  if(treatment==="holographic")return{dimension:applyDimensionalStyle(element.dimension,"holographic-glass"),fill:"#5ae7f2",borderColor:"#d9fbff",borderWidth:Math.max(2,element.borderWidth),blendMode:"screen",shadow:"none",effects:[...without(["holographic","edge-glow"]),effect("edge-glow",{color:"#65efff",radius:10,opacity:66})]} satisfies Patch;
+  if(treatment==="cartoon-plastic")return{dimension:applyDimensionalStyle(element.dimension,"premium-cartoon"),borderColor:"#ffffff",borderWidth:Math.max(3,element.borderWidth),shadow:"none",effects:without(["bevel","light-sweep","inner-shadow"])} satisfies Patch;
+  return{dimension:applyDimensionalStyle(element.dimension,"cinematic-depth"),fill:"#303844",borderColor:"#9ca9b8",borderWidth:Math.max(1,element.borderWidth),shadow:"none",effects:[...without(["bevel","grain","vignette"]),effect("grain",{size:2,intensity:12}),effect("vignette",{amount:20,softness:70})]} satisfies Patch;
 }
