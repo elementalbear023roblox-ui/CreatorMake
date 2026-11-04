@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createElement, createProject, normalizeProject } from "../lib/editor/project.ts";
-import { normalizeThreeDSettings, projectedBoundsFromPoints, threeDGeometryKey } from "../lib/editor/three-d.ts";
+import { normalizeThreeDSettings, projectedBoundsFromPoints, threeDGeometryKey, threeDResolutionPlan } from "../lib/editor/three-d.ts";
 import { classifyRobloxElement } from "../lib/roblox/classification.ts";
 
 test("3D transforms are finite, independently scalable, and safe from zero geometry",()=>{
@@ -23,8 +23,15 @@ test("projected 3D bounds remain finite and clipped to the viewport",()=>{
   assert.deepEqual(projectedBoundsFromPoints([{x:-.5,y:.5},{x:.75,y:-.25}],320,200),{left:80,top:50,width:200,height:75});const fallback=projectedBoundsFromPoints([{x:Number.NaN,y:0}],320,200);assert.ok(Number.isFinite(fallback.left)&&Number.isFinite(fallback.width));
 });
 
+test("adaptive 3D resolution supersamples when idle and stays inside GPU-safe budgets",()=>{
+  const balanced=threeDResolutionPlan({width:320,height:260,quality:"BALANCED",devicePixelRatio:1,activeRenderers:1,maxTextureSize:8192});assert.equal(balanced.interactiveScale,1.5);assert.equal(balanced.settledScale,2.5);assert.equal(balanced.pixelWidth,800);assert.equal(balanced.pixelHeight,650);
+  const ultra=threeDResolutionPlan({width:320,height:260,quality:"ULTRA",devicePixelRatio:1,activeRenderers:1,maxTextureSize:8192});assert.equal(ultra.settledScale,6);assert.equal(ultra.pixelWidth,1920);assert.equal(ultra.pixelHeight,1560);
+  const crowded=threeDResolutionPlan({width:960,height:600,quality:"ULTRA",devicePixelRatio:2,activeRenderers:16,maxTextureSize:4096});assert.ok(crowded.settledScale<ultra.settledScale);assert.ok(crowded.pixelWidth<=4096);assert.ok(crowded.pixelWidth*crowded.pixelHeight<=crowded.pixelBudget+4096);
+  const exported=threeDResolutionPlan({width:320,height:260,quality:"BALANCED",requestedScale:8,activeRenderers:20,maxTextureSize:8192});assert.equal(exported.exporting,true);assert.equal(exported.settledScale,8);assert.equal(exported.interactiveScale,8);
+});
+
 test("stable renderer lifecycle updates one scene and recovers WebGL context loss",async()=>{
-  const surface=await readFile(new URL("../components/editor/ThreeDObjectSurface.tsx",import.meta.url),"utf8"),canvas=await readFile(new URL("../components/editor/CanvasStage.tsx",import.meta.url),"utf8");assert.match(surface,/\[element\.id\]/);assert.doesNotMatch(surface,/forceContextLoss/);assert.match(surface,/webglcontextlost/);assert.match(surface,/webglcontextrestored/);assert.match(surface,/ResizeObserver/);assert.match(surface,/threeDGeometryKey/);assert.match(surface,/requestAnimationFrame/);assert.match(surface,/three-d-projected-bounds/);for(const shortcut of ['"w"','"e"','"r"','"q"'])assert.match(canvas,new RegExp(shortcut));assert.match(canvas,/startThreeDGizmo/);assert.match(canvas,/gizmoSpace/);
+  const surface=await readFile(new URL("../components/editor/ThreeDObjectSurface.tsx",import.meta.url),"utf8"),canvas=await readFile(new URL("../components/editor/CanvasStage.tsx",import.meta.url),"utf8");assert.match(surface,/\[element\.id\]/);assert.doesNotMatch(surface,/forceContextLoss/);assert.match(surface,/webglcontextlost/);assert.match(surface,/webglcontextrestored/);assert.match(surface,/ResizeObserver/);assert.match(surface,/threeDGeometryKey/);assert.match(surface,/requestAnimationFrame/);assert.match(surface,/requestIdleCallback/);assert.match(surface,/resolutionScale/);assert.match(surface,/three-d-projected-bounds/);for(const shortcut of ['"w"','"e"','"r"','"q"'])assert.match(canvas,new RegExp(shortcut));assert.match(canvas,/startThreeDGizmo/);assert.match(canvas,/gizmoSpace/);
 });
 
 test("3D export remains an honest editable-source ImageLabel fallback",()=>{

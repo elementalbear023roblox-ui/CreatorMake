@@ -142,7 +142,7 @@ export type ThreeDSettings = {
   cornerRadius:number;
   lightColor:string;
   shadows:boolean;
-  previewQuality:"PERFORMANCE"|"BALANCED"|"HIGH";
+  previewQuality:"PERFORMANCE"|"BALANCED"|"HIGH"|"ULTRA";
   fitMode:ThreeDFitMode;
   viewportPadding:number;
   geometryMode:ThreeDGeometryMode;

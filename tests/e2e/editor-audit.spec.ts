@@ -197,3 +197,23 @@ test("professional demo stays editable through preview, save, reload, and Roblox
   expect(project.elements.some((element:{geometry:{kind:string}})=>element.geometry.kind==="tech-panel")).toBeTruthy();
   expect(project.elements.some((element:{dimension:{enabled:boolean}})=>element.dimension.enabled)).toBeTruthy();
 });
+
+test("3D preview refines to Ultra resolution only after interaction settles",async({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto("/?workflow=adaptive-3d-resolution");
+  await page.getByRole("button",{name:/^Insert Add objects and assets$/}).click();
+  await page.getByRole("button",{name:"Design kits",exact:true}).click();
+  const card=page.locator(".design-kit-card").filter({hasText:"Demo · Orbital Command"});
+  await card.getByRole("button",{name:"Insert interface"}).click();
+  const canvas=page.getByLabel("Holographic Reactor transparent 3D preview");
+  await expect(canvas).toHaveAttribute("data-render-ready","true",{timeout:15_000});
+  await page.getByRole("button",{name:"Design Layout and appearance"}).click();
+  await page.locator('[data-layer-type="three-d"]').filter({hasText:"Holographic Reactor"}).click();
+  await page.locator("details.three-d-inspector").filter({hasText:"3D Lighting & Camera"}).locator("summary").click();
+  await page.getByLabel("Pixel resolution").selectOption("ULTRA");
+  await expect(canvas).toHaveAttribute("data-resolution-mode","settled",{timeout:15_000});
+  const resolution=await canvas.evaluate((node)=>({scale:Number(node.dataset.resolutionScale),pixelWidth:Number(node.dataset.pixelWidth),pixelHeight:Number(node.dataset.pixelHeight),cssWidth:Number(node.dataset.cssWidth),cssHeight:Number(node.dataset.cssHeight)}));
+  expect(resolution.scale).toBeGreaterThanOrEqual(5.9);
+  expect(resolution.pixelWidth).toBeGreaterThanOrEqual(resolution.cssWidth*5.9);
+  expect(resolution.pixelHeight).toBeGreaterThanOrEqual(resolution.cssHeight*5.9);
+});
