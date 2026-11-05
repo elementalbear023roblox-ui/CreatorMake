@@ -7,7 +7,7 @@ export type RobloxObjectExportMode = "AUTO" | "ORIGINAL" | "IMAGE";
 export type TextSizingMode = "fixed" | "fit-geometry" | "responsive";
 export type TextOrientation = "auto" | "horizontal" | "follow-shape" | "custom";
 export type RetroVisualFamily = "windows" | "internet" | "cdrom" | "arcade" | "gameshow" | "horror";
-export type RetroComponentKind = "window" | "frame" | "button" | "template" | "decoration" | "pattern" | "pixel-art";
+export type RetroComponentKind = "window" | "dialog" | "frame" | "button" | "control" | "icon" | "template" | "decoration" | "pattern" | "pixel-art";
 export type RetroMetadata = {
   componentId:string;
   assetId:string;
@@ -16,6 +16,13 @@ export type RetroMetadata = {
   role:string;
   style:string;
   pixelScale:number;
+  authenticity?:"historical"|"custom-colors"|"stylized";
+  borderPrimitive?:"raised"|"sunken"|"window"|"default-button"|"focus"|"flat";
+  layoutRole?:"window-frame"|"dialog"|"titlebar"|"window-control"|"menu"|"toolbar"|"navigation"|"navigation-item"|"client"|"status"|"dialog-icon"|"dialog-message"|"action-row"|"action"|"field"|"tab"|"scrollbar";
+  autoLayout?:boolean;
+  detached?:boolean;
+  referenceScale?:number;
+  fontMatch?:"ms-sans-serif-system"|"metric-compatible-fallback"|"creative";
 };
 export type EditorAsset = {
   id:string;

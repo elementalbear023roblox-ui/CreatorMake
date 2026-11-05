@@ -1,5 +1,5 @@
 export type FontCategory = "Sans Serif" | "Serif" | "Monospace" | "Pixel" | "Retro" | "Arcade" | "Computer" | "Terminal" | "Game UI" | "Horror" | "Sci-Fi" | "Industrial" | "Broadcast" | "Game Show" | "Cartoon" | "Comic" | "Handwritten" | "Display" | "Elegant" | "Condensed" | "Wide";
-export type CreatorFont = { id:string;displayName:string;family:string;categories:FontCategory[];weights:number[];styles:Array<"normal"|"italic">;sourceType:"remote-stylesheet";source:"Google Fonts";sourceUrl:string;license:string };
+export type CreatorFont = { id:string;displayName:string;family:string;categories:FontCategory[];weights:number[];styles:Array<"normal"|"italic">;sourceType:"remote-stylesheet"|"system";source:string;sourceUrl:string;license:string };
 export type FontLoadStatus = "idle" | "loading" | "loaded" | "failed";
 export type FontFailureReason="NETWORK_ERROR"|"CSS_LOAD_ERROR"|"FACE_LOAD_ERROR"|"WEIGHT_NOT_AVAILABLE"|"STYLE_NOT_AVAILABLE"|"TIMEOUT"|"SOURCE_NOT_FOUND"|"FALLBACK_DETECTED";
 export type FontDiagnostic={status:FontLoadStatus;failureReason?:FontFailureReason;message?:string;loadDurationMs?:number;attempts:number};
@@ -86,6 +86,7 @@ groups.forEach(({categories,families}) => families.forEach((family) => {
   const verified=verifiedVariants[family];
   deduped.set(id,{ id,displayName:family,family,categories:[...new Set([...(existing?.categories??[]),...categories])],weights:verified?.weights??(singleWeight?[400]:[400,700]),styles:verified?.styles??(italicCapable?["normal","italic"]:["normal"]),sourceType:"remote-stylesheet",source:"Google Fonts",sourceUrl:"https://fonts.googleapis.com/css2",license:"Open font license; see Google Fonts family metadata" });
 }));
+deduped.set("ms-sans-serif-8",{id:"ms-sans-serif-8",displayName:"MS Sans Serif",family:"MS Sans Serif",categories:["Sans Serif","Retro","Computer"],weights:[400,700],styles:["normal"],sourceType:"system",source:"Locally installed system font",sourceUrl:"https://learn.microsoft.com/en-us/typography/font-list/microsoft-sans-serif",license:"Not redistributed. Uses the visitor's licensed local installation; CreatorMake falls back to Microsoft Sans Serif, Arial, then sans-serif and labels that result as an approximation."});
 
 export const CREATOR_FONTS = [...deduped.values()].sort((a,b)=>a.family.localeCompare(b.family));
 export const FONT_BY_ID = Object.fromEntries(CREATOR_FONTS.map((font)=>[font.id,font]));
@@ -133,6 +134,10 @@ export function loadCreatorFont(font: CreatorFont, weight=400, style:"normal"|"i
   const existing=promises.get(key); if(existing)return existing;
   status.set(key,"loading");diagnostics.set(key,{status:"loading",attempts:0});
   const request=(async():Promise<FontLoadStatus>=>{const started=performance.now();let lastReason:FontFailureReason="FACE_LOAD_ERROR",lastMessage="Font face did not load.";
+    if(font.sourceType==="system"){
+      const available=document.fonts.check(`${actualStyle} ${actualWeight} 11px ${JSON.stringify(font.family)}`);
+      status.set(key,available?"loaded":"failed");diagnostics.set(key,available?{status:"loaded",loadDurationMs:Math.round(performance.now()-started),attempts:1}:{status:"failed",failureReason:"SOURCE_NOT_FOUND",message:`${font.family} is not installed; the historically labeled preset will render with its documented compatible fallback.`,loadDurationMs:Math.round(performance.now()-started),attempts:1});return available?"loaded":"failed";
+    }
     for(let attempt=1;attempt<=3;attempt++)try{
       let link=document.querySelector<HTMLLinkElement>(`link[data-creator-font="${key}"]`);
       if(!link){link=document.createElement("link");link.rel="stylesheet";link.dataset.creatorFont=key;link.href=`${font.sourceUrl}?family=${encodeURIComponent(font.family).replace(/%20/g,"+")}:ital,wght@${actualStyle==="italic"?1:0},${actualWeight}&display=block`;document.head.appendChild(link);}
@@ -156,6 +161,7 @@ const blobDataUrl=(buffer:ArrayBuffer,mimeType:string)=>new Promise<string>((res
 
 /** Returns a self-contained @font-face stylesheet for SVG/foreignObject capture. */
 export function creatorFontRasterStyle(font:CreatorFont,weight=400,style:"normal"|"italic"="normal",text="CreatorMake"){
+  if(font.sourceType==="system")return Promise.resolve("");
   const{weight:actualWeight,style:actualStyle}=resolveCreatorFontVariant(font,weight,style),cacheKey=`${keyFor(font,actualWeight,actualStyle)}:${text}`;
   const existing=rasterStyles.get(cacheKey);if(existing)return existing;
   const request=(async()=>{

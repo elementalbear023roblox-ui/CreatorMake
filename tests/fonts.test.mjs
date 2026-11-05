@@ -10,7 +10,7 @@ test("public font registry has stable unique ids and complete legal source metad
     assert.equal(FONT_BY_ID[font.id],font);
     assert.match(font.id,/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     assert.equal(font.displayName,font.family);
-    assert.ok(font.sourceUrl.startsWith("https://fonts.googleapis.com/"));
+    assert.ok(font.sourceType==="system"?font.sourceUrl.startsWith("https://learn.microsoft.com/"):font.sourceUrl.startsWith("https://fonts.googleapis.com/"));
     assert.ok(font.license.length>10);
     assert.ok(font.weights.length>0&&font.weights.every((weight)=>Number.isInteger(weight)&&weight>=100&&weight<=900));
     assert.ok(font.styles.length>0&&font.styles.every((style)=>style==="normal"||style==="italic"));

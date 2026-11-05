@@ -6,8 +6,8 @@ import { RETRO_LIBRARY, type RetroAssetId, type RetroCategory } from "@/lib/retr
 import { PixelStudio } from "./PixelStudio";
 
 type Props={onInsert:(id:RetroAssetId)=>void;onCreatePixel:(name:string,pixels:string[],size:number)=>void};
-const CATEGORIES:RetroCategory[]=["Windows","Frames","Buttons","Text","Icons","Pixel Art","Patterns","Decorations","Components","Templates"];
-const FAMILY_LABELS={windows:"95 / 98",internet:"EARLY WEB",cdrom:"CD-ROM",arcade:"ARCADE",gameshow:"GAME SHOW",horror:"HORROR"} as const;
+const CATEGORIES:RetroCategory[]=["Windows","Buttons","Inputs","Navigation","Containers","System Icons","Frames","Text","Icons","Pixel Art","Patterns","Decorations","Components","Templates"];
+const FAMILY_LABELS={windows:"WIN 98 CLASSIC",internet:"EARLY WEB",cdrom:"CD-ROM",arcade:"ARCADE",gameshow:"GAME SHOW",horror:"HORROR"} as const;
 
 export function RetroLibraryPanel({onInsert,onCreatePixel}:Props){
   const[category,setCategory]=useState<RetroCategory>("Windows"),[query,setQuery]=useState(""),[family,setFamily]=useState("all"),[pixelOpen,setPixelOpen]=useState(false);
