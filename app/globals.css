@@ -3,6 +3,7 @@
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 @import "./property-grid.css";
 @import "./typography-overrides.css";
+@import "./retro-studio.css";
 
 :root{color-scheme:dark;--background:#111219;--foreground:#f4f5f8;--card:#151720;--card-foreground:#f4f5f8;--popover:#151720;--popover-foreground:#f4f5f8;--primary:#7457ff;--primary-foreground:#fff;--secondary:#22242e;--secondary-foreground:#eee;--muted:#20222b;--muted-foreground:#8c91a3;--accent:#2b2d38;--accent-foreground:#fff;--destructive:#e95869;--border:#2b2d38;--input:#30323e;--ring:#7457ff;--radius:.375rem;--bg:#090a0f;--panel:#12131a;--line:#272a35;--text:#f4f5f8;--muted-text:#8c91a3;--purple:#7457ff;--cyan:#48d7ff}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:var(--text)}button,input,textarea,select{font:inherit;color:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.42}.editor-shell{display:grid;grid-template-rows:52px minmax(0,1fr) 58px;height:100vh;min-width:840px;background:var(--bg)}

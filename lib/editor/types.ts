@@ -6,6 +6,17 @@ export type TextRobloxExportMode = "AUTO" | "NATIVE_TEXT" | "PIXEL_ACCURATE" | "
 export type RobloxObjectExportMode = "AUTO" | "ORIGINAL" | "IMAGE";
 export type TextSizingMode = "fixed" | "fit-geometry" | "responsive";
 export type TextOrientation = "auto" | "horizontal" | "follow-shape" | "custom";
+export type RetroVisualFamily = "windows" | "internet" | "cdrom" | "arcade" | "gameshow" | "horror";
+export type RetroComponentKind = "window" | "frame" | "button" | "template" | "decoration" | "pattern" | "pixel-art";
+export type RetroMetadata = {
+  componentId:string;
+  assetId:string;
+  family:RetroVisualFamily;
+  kind:RetroComponentKind;
+  role:string;
+  style:string;
+  pixelScale:number;
+};
 export type EditorAsset = {
   id:string;
   name:string;
@@ -345,6 +356,7 @@ export type EditorElement = {
   threeD: ThreeDSettings;
   pixelComposer: import("./pixel-alphabet").PixelComposerSettings | null;
   typographyComposer: TypographyComposerSettings | null;
+  retro: RetroMetadata | null;
   dimension: DimensionSettings;
   locked: boolean;
   hidden: boolean;

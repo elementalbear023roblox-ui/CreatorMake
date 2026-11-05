@@ -3,8 +3,8 @@ import "./globals.css";
 import "./interface-themes.css";
 
 export const metadata: Metadata = {
-  title: "CreatorMake — Interface Editor",
-  description: "A local-first visual editor for game UI, HUDs, menus, and app interfaces.",
+  title: "CreatorMake — Retro GUI Studio",
+  description: "A professional studio for Windows 95/98, early web, CD-ROM, arcade, game-show, pixel-art, and Roblox interfaces.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
