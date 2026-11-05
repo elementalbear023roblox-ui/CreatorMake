@@ -44,7 +44,7 @@ test("intelligent anchors preserve frame anatomy during resize",()=>{
 
 test("classic pixel edges are explicit layers and the library separates historical assets",async()=>{
   const css=await readFile(new URL("../app/retro-studio.css",import.meta.url),"utf8"),source=await readFile(new URL("../components/editor/ElementSurface.tsx",import.meta.url),"utf8");
-  assert.match(css,/\.win98-raised.*border-color:#fff #000 #000 #fff/);assert.match(css,/\.win98-sunken.*border-color:#000 #fff #fff #000/);assert.match(source,/win98-pixel-border/);
+  assert.match(css,/\.win98-raised.*border-color:#fff #000 #000 #fff/);assert.match(css,/\.win98-sunken.*border-color:#000 #fff #fff #000/);assert.ok((source.match(/<RetroPixelBorder element=\{element\}\/>/g)??[]).length>=2,"ordinary and vector surfaces both mount pixel borders");
   const historical=RETRO_LIBRARY.filter((item)=>item.family==="windows");assert.ok(historical.length>=25);assert.ok(historical.some((item)=>item.category==="Inputs"));assert.ok(historical.some((item)=>item.category==="Navigation"));assert.ok(historical.some((item)=>item.category==="System Icons"));
   assert.equal(WINDOWS98_CLASSIC.colors.buttonFace,"#c0c0c0");assert.equal(WINDOWS98_CLASSIC.font.pointSize,8);
 });
