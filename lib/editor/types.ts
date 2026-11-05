@@ -79,7 +79,35 @@ export type ScrollingDirection = "X" | "Y" | "XY";
 export type ElasticBehavior = "WhenScrollable" | "Always" | "Never";
 export type VerticalScrollBarPosition = "Left" | "Right";
 export type ScrollBarInset = "None" | "ScrollBar" | "Always";
-export type ThreeDPrimitive = "cube" | "sphere" | "cylinder" | "cone" | "torus" | "capsule" | "pyramid" | "rounded-box" | "plane" | "extruded-shape" | "pixel-letter";
+export type FontOutlineCommand =
+  | { type:"M"|"L";x:number;y:number }
+  | { type:"Q";x:number;y:number;x1:number;y1:number }
+  | { type:"C";x:number;y:number;x1:number;y1:number;x2:number;y2:number }
+  | { type:"Z" };
+export type ThreeDGlyphDefinition = { advanceWidth:number;xMin:number;yMin:number;xMax:number;yMax:number;commands:FontOutlineCommand[] };
+export type ProjectThreeDFont = {
+  id:string;
+  family:string;
+  displayName:string;
+  originalName:string;
+  format:"TTF"|"OTF"|"WOFF"|"WOFF2";
+  source:"builtin"|"imported";
+  copyright:string;
+  license:string;
+  embedding:"installable"|"editable"|"preview-print"|"restricted"|"unknown";
+  unitsPerEm:number;
+  ascender:number;
+  descender:number;
+  supportedCharacters:string;
+  glyphs:Record<string,ThreeDGlyphDefinition>;
+  kerning:Record<string,number>;
+  importedAt:number;
+};
+export type TypographyComposerSettings = {
+  fontId:string;text:string;letterSpacing:number;wordSpacing:number;lineSpacing:number;alignment:"left"|"center"|"right";
+  scale:number;depth:number;bevel:number;bevelDepth:number;bevelSegments:number;curveDetail:number;material:string;groupRotation:number;letterRotation:number;perspective:number;kerning:boolean;
+};
+export type ThreeDPrimitive = "cube" | "sphere" | "cylinder" | "cone" | "torus" | "capsule" | "pyramid" | "rounded-box" | "plane" | "extruded-shape" | "pixel-letter" | "font-letter";
 export type ThreeDMaterial = "matte" | "plastic" | "metal" | "chrome" | "glass" | "transparent" | "emissive" | "neon" | "holographic" | "iridescent" | "brushed-metal" | "retro-plastic" | "toon";
 export type ThreeDFitMode = "FIT_OBJECT" | "EXPAND_BOUNDS" | "MANUAL";
 export type ThreeDGeometryMode = "PRIMITIVE" | "PARAMETRIC_SURFACE" | "IMPLICIT_SURFACE" | "PARAMETRIC_CURVE" | "POLAR_SHAPE";
@@ -117,6 +145,15 @@ export type ThreeDSettings = {
   pixelGlyph:string;
   pixelGlyphIndex:number;
   pixelGeometryResolution:number;
+  fontId:string;
+  fontFamily:string;
+  fontGlyph:string;
+  fontGlyphOutline:ThreeDGlyphDefinition|null;
+  curveDetail:number;
+  bevelDepth:number;
+  bevelColor:string;
+  surfaceSmoothing:boolean;
+  depthDirection:"forward"|"backward"|"centered";
   automaticBounds:boolean;
   boundsPadding:number;
   metalness:number;
@@ -307,6 +344,7 @@ export type EditorElement = {
   skewY: number;
   threeD: ThreeDSettings;
   pixelComposer: import("./pixel-alphabet").PixelComposerSettings | null;
+  typographyComposer: TypographyComposerSettings | null;
   dimension: DimensionSettings;
   locked: boolean;
   hidden: boolean;
@@ -388,7 +426,7 @@ export type ProjectExportOptions = {
 };
 
 export type EditorProject = {
-  schemaVersion: 19;
+  schemaVersion: 20;
   id: string;
   name: string;
   createdAt: number;
@@ -413,6 +451,7 @@ export type EditorProject = {
   researchCache: Record<string, ResearchResult>;
   generationHistory: GenerationHistoryEntry[];
   projectFonts: Array<{ fontId: string; weights: number[]; styles: Array<"normal" | "italic"> }>;
+  threeDFonts: ProjectThreeDFont[];
   fontPolicy: { allowSyntheticWeight: boolean; allowSyntheticItalic: boolean };
   exportOptions:ProjectExportOptions;
 };

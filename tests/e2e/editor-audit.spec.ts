@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import sharp from "sharp";
+import opentype from "opentype.js";
 
 const viewports = [
   { name: "desktop", width: 1440, height: 900 },
@@ -191,7 +192,7 @@ test("professional demo stays editable through preview, save, reload, and Roblox
   const downloadPath=await download.path();
   expect(downloadPath).not.toBeNull();
   const project=JSON.parse(await readFile(downloadPath!,"utf8"));
-  expect(project.schemaVersion).toBe(19);
+  expect(project.schemaVersion).toBe(20);
   expect(project.elements).toHaveLength(31);
   expect(project.elements.some((element:{geometry:{kind:string}})=>element.geometry.kind==="organic-panel")).toBeTruthy();
   expect(project.elements.some((element:{geometry:{kind:string}})=>element.geometry.kind==="tech-panel")).toBeTruthy();
@@ -223,7 +224,7 @@ test("reference pixel letters are real 3D meshes with exact automatic bounds",as
   await page.goto("/?workflow=pixel-alphabet-bounds");
   await page.getByRole("button",{name:/^Insert Add objects and assets$/}).click();
   await page.locator(".roblox-library-switch button").filter({hasText:"3D"}).click();
-  await page.getByRole("button",{name:"Pixel Alphabet",exact:true}).click();
+  await page.getByRole("button",{name:"Pixel",exact:true}).click();
   await page.getByRole("button",{name:"Insert 3D pixel A"}).click();
   const canvas=page.getByLabel("3D Pixel A transparent 3D preview");
   await expect(canvas).toHaveAttribute("data-render-ready","true",{timeout:15_000});
@@ -247,7 +248,7 @@ test("3D Letter Composer creates independent editable CREATORMAKE objects",async
   await page.goto("/?workflow=pixel-word-composer");
   await page.getByRole("button",{name:/^Insert Add objects and assets$/}).click();
   await page.locator(".roblox-library-switch button").filter({hasText:"3D"}).click();
-  await page.getByRole("button",{name:"Composer",exact:true}).click();
+  await page.getByRole("button",{name:"Pixel",exact:true}).click();
   await page.getByLabel("Source text").fill("CREATORMAKE");
   await page.getByRole("button",{name:"Generate separate 3D letters"}).click();
   const letters=page.locator('canvas[aria-label^="3D Pixel "]');
@@ -255,4 +256,41 @@ test("3D Letter Composer creates independent editable CREATORMAKE objects",async
   await page.getByRole("tab",{name:"Layers",exact:true}).click();
   await expect(page.locator('[data-layer-type="container"]').filter({hasText:"3D Pixel Word · CREATORMAKE"})).toBeVisible();
   await expect(page.locator('[data-layer-type="three-d"]')).toHaveCount(11);
+});
+
+test("Marola uses original outline meshes, metrics, and tight bounds",async({page},testInfo)=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto("/?workflow=marola-3d-typography");
+  await page.getByRole("button",{name:/^Insert Add objects and assets$/}).click();
+  await page.locator(".roblox-library-switch button").filter({hasText:"3D"}).click();
+  await page.getByRole("button",{name:"3D Typography",exact:true}).click();
+  await expect(page.locator(".font-origin-note")).toContainText("Marola");
+  await expect(page.locator(".font-origin-note")).toContainText("Original supplied outline font");
+  await page.getByRole("button",{name:"Insert Marola A"}).click();
+  const letter=page.getByLabel("3D Marola A transparent 3D preview");
+  await expect(letter).toHaveAttribute("data-render-ready","true",{timeout:15_000});
+  await expect(letter).toHaveAttribute("data-selection-padding","10");
+  await expect(letter).not.toHaveAttribute("data-geometry-error",/.+/);
+  await page.getByRole("button",{name:/^Insert Add objects and assets$/}).click();
+  await page.getByRole("button",{name:"Compose Text",exact:true}).click();
+  await page.getByLabel("Source text").fill("MRCREATOR'S CREATOR TIME");
+  await page.getByRole("button",{name:"Generate editable 3D text"}).click();
+  await expect(page.locator('canvas[aria-label^="3D Marola "]')).toHaveCount(23);
+  await page.getByRole("tab",{name:"Layers",exact:true}).click();
+  await expect(page.locator('[data-layer-type="container"]').filter({hasText:"3D Marola · MRCREATOR'S CREATOR TIME"})).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath("marola-3d-composition.png"),fullPage:false});
+});
+
+test("custom TTF import persists project outlines and creates genuine 3D glyphs",async({page})=>{
+  const notdefPath=new opentype.Path();notdefPath.moveTo(0,0);notdefPath.lineTo(500,0);notdefPath.lineTo(500,700);notdefPath.lineTo(0,700);notdefPath.close();
+  const aPath=new opentype.Path();aPath.moveTo(40,0);aPath.lineTo(300,760);aPath.lineTo(560,0);aPath.lineTo(430,0);aPath.lineTo(365,200);aPath.lineTo(220,200);aPath.lineTo(155,0);aPath.close();aPath.moveTo(260,330);aPath.lineTo(325,330);aPath.lineTo(293,520);aPath.close();
+  const font=new opentype.Font({familyName:"Audit Outline",styleName:"Regular",unitsPerEm:1000,ascender:800,descender:-200,glyphs:[new opentype.Glyph({name:".notdef",advanceWidth:600,path:notdefPath}),new opentype.Glyph({name:"A",unicode:65,advanceWidth:620,path:aPath})]});
+  await page.setViewportSize({width:1440,height:900});await page.goto("/?workflow=custom-3d-font-import");await page.getByRole("button",{name:/^Insert Add objects and assets$/}).click();await page.locator(".roblox-library-switch button").filter({hasText:"3D"}).click();await page.getByRole("button",{name:"3D Typography",exact:true}).click();
+  await page.getByLabel("I have permission to use this font").check();
+  await page.locator(".font-import-box input[type=file]").setInputFiles({name:"audit-outline.ttf",mimeType:"font/ttf",buffer:Buffer.from(font.toArrayBuffer())});
+  await expect(page.locator(".font-import-box")).toContainText("Audit Outline imported",{timeout:15_000});
+  await expect(page.locator(".three-d-typography select").first()).toHaveValue(/audit-outline-/);
+  await page.getByRole("button",{name:"Insert Audit Outline A"}).click();
+  const canvas=page.getByLabel("3D Audit Outline A transparent 3D preview");await expect(canvas).toHaveAttribute("data-render-ready","true",{timeout:15_000});await expect(canvas).toHaveAttribute("data-selection-padding","10");
+  await expect(page.locator(".project-chip small")).toContainText("Saved",{timeout:10_000});await page.reload();await page.getByRole("button",{name:/^Insert Add objects and assets$/}).click();await page.locator(".roblox-library-switch button").filter({hasText:"3D"}).click();await page.getByRole("button",{name:"3D Typography",exact:true}).click();await expect(page.locator(".three-d-typography select").first().locator("option")).toContainText(["Marola","Audit Outline · Project"]);
 });

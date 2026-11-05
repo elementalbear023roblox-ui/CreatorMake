@@ -18,7 +18,7 @@
     "plugin:build": "node --experimental-strip-types scripts/generate-studio-plugin.mjs",
     "test:options": "node --experimental-strip-types --test tests/options-quality.test.mjs",
     "test:e2e": "playwright test",
-    "test:core": "node --experimental-strip-types --test tests/pixel-alphabet.test.mjs tests/dimensional-engine.test.mjs tests/geometry-precision.test.mjs tests/intent.test.mjs tests/layout.test.mjs tests/snapping.test.mjs tests/image-workflow.test.mjs tests/roblox.test.mjs tests/roblox-editor-overhaul.test.mjs tests/professional-revamp.test.mjs tests/creative-revolution.test.mjs tests/three-d-repair.test.mjs tests/mathematical-geometry.test.mjs tests/roblox-pixel-export.test.mjs tests/roblox-adaptive-export.test.mjs tests/roblox-text-export.test.mjs tests/roblox-text-scaling.test.mjs tests/roblox-font-registry.test.mjs tests/layer-reparent.test.mjs tests/commission-workflow.test.mjs tests/sync.test.mjs tests/studio-sync-server.test.mjs tests/roblox-open-cloud.test.mjs tests/ai-agent.test.mjs tests/editor-stability.test.mjs tests/google-account.test.mjs tests/creator-account.test.mjs tests/effects-engine.test.mjs tests/fonts.test.mjs tests/geometry.test.mjs tests/boolean.test.mjs tests/interface-themes.test.mjs",
+    "test:core": "node --experimental-strip-types --test tests/three-d-typography.test.mjs tests/pixel-alphabet.test.mjs tests/dimensional-engine.test.mjs tests/geometry-precision.test.mjs tests/intent.test.mjs tests/layout.test.mjs tests/snapping.test.mjs tests/image-workflow.test.mjs tests/roblox.test.mjs tests/roblox-editor-overhaul.test.mjs tests/professional-revamp.test.mjs tests/creative-revolution.test.mjs tests/three-d-repair.test.mjs tests/mathematical-geometry.test.mjs tests/roblox-pixel-export.test.mjs tests/roblox-adaptive-export.test.mjs tests/roblox-text-export.test.mjs tests/roblox-text-scaling.test.mjs tests/roblox-font-registry.test.mjs tests/layer-reparent.test.mjs tests/commission-workflow.test.mjs tests/sync.test.mjs tests/studio-sync-server.test.mjs tests/roblox-open-cloud.test.mjs tests/ai-agent.test.mjs tests/editor-stability.test.mjs tests/google-account.test.mjs tests/creator-account.test.mjs tests/effects-engine.test.mjs tests/fonts.test.mjs tests/geometry.test.mjs tests/boolean.test.mjs tests/interface-themes.test.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
@@ -35,6 +35,7 @@
     "lucide-react": "^1.31.0",
     "next": "16.3.4",
     "next-themes": "^0.4.6",
+    "opentype.js": "^1.3.4",
     "polygon-clipping": "^0.15.7",
     "radix-ui": "^1.6.7",
     "react": "19.2.6",
@@ -48,6 +49,7 @@
     "tailwind-merge": "3.6.0",
     "three": "^0.187.0",
     "vaul": "^1.1.2",
+    "wawoff2": "^2.0.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -56,6 +58,7 @@
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
+    "@types/opentype.js": "^1.3.9",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/three": "^0.187.0",

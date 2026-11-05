@@ -1,0 +1,8 @@
+.professional-insert-library:has(>.pixel-alphabet-library)>.pixel-composer {
+  grid-row: 5;
+  padding-top: 0;
+}
+
+.professional-insert-library:has(>.pixel-alphabet-library)>footer {
+  grid-row: 6;
+}
