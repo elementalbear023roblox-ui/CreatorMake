@@ -13,10 +13,11 @@ export const RETRO_ICON_LIBRARY:RetroIconDefinition[]=[
 ];
 
 export const RETRO_ICON_MATERIAL_PRESETS=[
+  {id:"metal",name:"Polished Metal",material:"metal" as ThreeDMaterial,roughness:.24,metalness:.68},
   {id:"glossy",name:"Retro Glossy Plastic",material:"retro-plastic" as ThreeDMaterial,roughness:.2,metalness:.08},
   {id:"computer",name:"Classic Computer Plastic",material:"plastic" as ThreeDMaterial,roughness:.54,metalness:.02},
   {id:"chrome",name:"Chrome",material:"chrome" as ThreeDMaterial,roughness:.08,metalness:.95},
-  {id:"gold",name:"Gold",material:"metal" as ThreeDMaterial,roughness:.19,metalness:.78,color:"#ffd33d",sideColor:"#9b4d08",accentColor:"#fff2a1"},
+  {id:"gold",name:"Gold",material:"brushed-metal" as ThreeDMaterial,roughness:.19,metalness:.78,color:"#ffd33d",sideColor:"#9b4d08",accentColor:"#fff2a1"},
   {id:"arcade",name:"Arcade Plastic",material:"plastic" as ThreeDMaterial,roughness:.16,metalness:.04},
   {id:"matte",name:"Matte Plastic",material:"matte" as ThreeDMaterial,roughness:.88,metalness:0},
   {id:"translucent",name:"Translucent Plastic",material:"transparent" as ThreeDMaterial,roughness:.18,metalness:.04,opacity:72,transparent:true},
