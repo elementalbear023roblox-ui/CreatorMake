@@ -81,11 +81,17 @@ Raised and sunken controls use two deliberate one-pixel edge layers. They are re
 - Standard application window anatomy.
 - File Explorer window: title, menu, toolbar, address bar, split client, scrollbar, and status bar.
 - Properties/settings window: tabs, group box, combo field, checkbox, preview, and aligned action row.
+- Open File dialog: location field, file list, name/type fields, toolbar controls, and 75 × 23 px actions.
+- Installation wizard: navigation banner, instructions, separator, and Back/Next/Cancel row.
+- Help viewer: menu, toolbar, contents tree, topic client, and bottom status row.
 - Buttons, checkbox, radio button, toolbar button.
-- Text box, combo box, and list box.
-- Menu, tab control, scrollbar, status bar, and progress bar.
+- Default, standard, pressed, disabled, scroll-arrow, spin, and caption-button states.
+- Text, password, multiline, numeric, combo, list, and trackbar inputs.
+- Menu, dropdown menu, tab control, tree view, toolbar, scrollbar, status bar, and progress bar.
 - Group box and recessed panel.
-- Original warning, error, information, question, folder, and file icon recreations.
+- Original warning, error, information, question, folder, file, computer, disk, settings, search, printer, network, and display icon recreations.
+
+The verified Windows family now contains more than 50 insertion-ready entries. Structural assets use declared roles: menu and toolbar rows attach below window chrome, status rows attach to the bottom edge, scrollbars attach to the right edge, and action controls anchor to the lower-right. Complete windows and dialogs remain top-level unless the user explicitly reparents them.
 
 ## Font status
 
