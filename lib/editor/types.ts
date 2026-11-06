@@ -195,6 +195,10 @@ export type ThreeDSettings = {
   emissiveIntensity:number;
   transparent:boolean;
   opacity:number;
+  colorKeyEnabled:boolean;
+  colorKeyColor:string;
+  colorKeyTolerance:number;
+  colorKeySoftness:number;
   lightIntensity:number;
   ambientIntensity:number;
   cameraFov:number;

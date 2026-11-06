@@ -5,6 +5,7 @@ import { createRetroIconElement, RETRO_ICON_CAMERA_PRESETS, RETRO_ICON_LIBRARY, 
 import { createProject, normalizeProject } from "../lib/editor/project.ts";
 import { normalizeThreeDSettings, threeDGeometryKey, tightThreeDRenderBounds } from "../lib/editor/three-d.ts";
 import { classifyRobloxElement } from "../lib/roblox/classification.ts";
+import { applyColorKeyPixels, colorKeyAlpha } from "../lib/editor/color-key.ts";
 
 test("the initial retro CGI collection contains four distinct editable silhouettes",()=>{
   assert.deepEqual(RETRO_ICON_LIBRARY.map((item)=>item.kind),["gear","dollar","clock","monitor"]);
@@ -22,7 +23,15 @@ test("each icon is a real saved 3D object with tight alpha-aware image export",(
 });
 
 test("icon-specific geometry and screen settings survive project migration",()=>{
-  const project=createProject("Retro CGI icons"),gear=createRetroIconElement({kind:"gear",style:"pixelated-cgi",settings:{gearTeeth:17,toothDepth:.41,holeSize:.27}}),clock=createRetroIconElement({kind:"clock",style:"classic-cgi",settings:{clockHour:4.5,clockMinute:37,rimThickness:.26}}),monitor=createRetroIconElement({kind:"monitor",style:"classic-cgi",settings:{iconScreenContent:"warning",screenColor:"#102938"}});project.elements=[gear,clock,monitor];const restored=normalizeProject(structuredClone(project));assert.deepEqual(restored.elements.map((item)=>({kind:item.threeD.iconKind,style:item.threeD.iconStyle})),[{kind:"gear",style:"pixelated-cgi"},{kind:"clock",style:"classic-cgi"},{kind:"monitor",style:"classic-cgi"}]);assert.equal(restored.elements[0].threeD.gearTeeth,17);assert.equal(restored.elements[1].threeD.clockMinute,37);assert.equal(restored.elements[2].threeD.iconScreenContent,"warning");
+  const project=createProject("Retro CGI icons"),gear=createRetroIconElement({kind:"gear",style:"pixelated-cgi",settings:{gearTeeth:17,toothDepth:.41,holeSize:.27,colorKeyEnabled:true,colorKeyColor:"#7457ff",colorKeyTolerance:21,colorKeySoftness:7}}),clock=createRetroIconElement({kind:"clock",style:"classic-cgi",settings:{clockHour:4.5,clockMinute:37,rimThickness:.26}}),monitor=createRetroIconElement({kind:"monitor",style:"classic-cgi",settings:{iconScreenContent:"warning",screenColor:"#102938"}});project.elements=[gear,clock,monitor];const restored=normalizeProject(structuredClone(project));assert.deepEqual(restored.elements.map((item)=>({kind:item.threeD.iconKind,style:item.threeD.iconStyle})),[{kind:"gear",style:"pixelated-cgi"},{kind:"clock",style:"classic-cgi"},{kind:"monitor",style:"classic-cgi"}]);assert.equal(restored.elements[0].threeD.gearTeeth,17);assert.equal(restored.elements[0].threeD.colorKeyEnabled,true);assert.equal(restored.elements[0].threeD.colorKeyColor,"#7457ff");assert.equal(restored.elements[0].threeD.colorKeyTolerance,21);assert.equal(restored.elements[1].threeD.clockMinute,37);assert.equal(restored.elements[2].threeD.iconScreenContent,"warning");
+});
+
+test("color-to-transparency removes the target, feathers nearby shades, and preserves unrelated pixels",()=>{
+  assert.equal(colorKeyAlpha(255,0,255,255,{color:"#ff00ff",tolerance:0,softness:0}),0);
+  assert.equal(colorKeyAlpha(0,255,0,255,{color:"#ff00ff",tolerance:5,softness:5}),255);
+  const pixels=new Uint8ClampedArray([255,0,255,255,245,4,245,255,0,255,0,255]);
+  applyColorKeyPixels(pixels,{color:"#ff00ff",tolerance:1,softness:8});
+  assert.equal(pixels[3],0);assert.ok(pixels[7]>0&&pixels[7]<255);assert.equal(pixels[11],255);
 });
 
 test("geometry keys invalidate for every visible icon construction change",()=>{
@@ -34,5 +43,5 @@ test("the renderer keeps exactly ten design pixels around projected geometry",()
 });
 
 test("the visible editor exposes the Icon Studio, alpha export, small-size QA, and complete composite models",async()=>{
-  const studio=await readFile(new URL("../components/editor/RetroIconStudio.tsx",import.meta.url),"utf8"),surface=await readFile(new URL("../components/editor/ThreeDObjectSurface.tsx",import.meta.url),"utf8"),library=await readFile(new URL("../components/editor/RetroLibraryPanel.tsx",import.meta.url),"utf8");assert.match(library,/3D Icons/);assert.match(library,/Open 3D Icon Studio/);assert.match(studio,/SMALL-SIZE CHECK/);assert.match(studio,/PNG alpha/);assert.match(studio,/WebP alpha/);assert.match(studio,/Insert into canvas/);assert.match(surface,/buildRetroIconModel/);assert.match(surface,/retroGearProfile/);assert.match(surface,/iconScreenContent/);assert.match(surface,/materialSlots=Math\.max/);assert.match(surface,/getImageData\(x,y,1,1\)\.data\[3\]>8/);
+  const studio=await readFile(new URL("../components/editor/RetroIconStudio.tsx",import.meta.url),"utf8"),surface=await readFile(new URL("../components/editor/ThreeDObjectSurface.tsx",import.meta.url),"utf8"),library=await readFile(new URL("../components/editor/RetroLibraryPanel.tsx",import.meta.url),"utf8");assert.match(library,/3D Icons/);assert.match(library,/Open 3D Icon Studio/);assert.match(studio,/SMALL-SIZE CHECK/);assert.match(studio,/COLOR TO TRANSPARENCY/);assert.match(studio,/Color key tolerance/);assert.match(studio,/PNG alpha/);assert.match(studio,/WebP alpha/);assert.match(studio,/Insert into canvas/);assert.match(surface,/buildRetroIconModel/);assert.match(surface,/retroGearProfile/);assert.match(surface,/iconScreenContent/);assert.match(surface,/applyColorKeyPixels/);assert.match(surface,/materialSlots=Math\.max/);assert.match(surface,/getImageData\(x,y,1,1\)\.data\[3\]>8/);
 });
