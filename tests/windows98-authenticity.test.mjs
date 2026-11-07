@@ -44,6 +44,17 @@ test("file picker, installer, and help window use complete classic anatomy",()=>
   assert.ok([...open.elements,...installer.elements,...help.elements].filter((item)=>item.type==="text"||item.type==="button").every((item)=>item.fontFamily==="MS Sans Serif"));
 });
 
+test("expanded Windows 98 preset collection uses aligned classic geometry",()=>{
+  const ids=["window-98-save-file","window-98-control-panel","window-98-run","window-98-shutdown","window-98-about","window-98-find","window-98-network-login","window-98-printer-queue"];
+  for(const id of ids){const built=createRetroAsset(id,0),root=built.elements.find((item)=>item.id===built.rootId),title=built.elements.find((item)=>item.retro?.layoutRole==="titlebar"&&item.type==="frame"),caption=built.elements.find((item)=>item.parentId===title?.id&&item.type==="text");assert.ok(root&&title&&caption,`${id} window anatomy`);assert.deepEqual([title.x,title.y,title.width,title.height],[root.x+3,root.y+3,root.width-6,18],`${id} title alignment`);assert.equal(caption.textColor,"#ffffff",`${id} active caption color`);assert.ok(built.elements.every((item)=>Number.isInteger(item.x)&&Number.isInteger(item.y)&&Number.isInteger(item.width)&&Number.isInteger(item.height)),`${id} integer geometry`);assert.ok(built.elements.filter((item)=>item.type==="text"||item.type==="button").every((item)=>item.fontFamily==="MS Sans Serif"&&item.fontSize===11),`${id} typography`);for(const action of built.elements.filter((item)=>item.retro?.layoutRole==="action"))assert.deepEqual([action.width,action.height],[75,23],`${id} action geometry`);}
+});
+
+test("Windows 98 text library provides distinct aligned label roles",()=>{
+  const ids=["text-win98-label","text-win98-heading","text-win98-description","text-win98-status","text-win98-disabled","text-win98-menu","text-win98-caption","text-win98-group-label"];
+  for(const id of ids){const built=createRetroAsset(id,0),root=built.elements.find((item)=>item.id===built.rootId),labels=built.elements.filter((item)=>item.type==="text");assert.ok(root&&labels.length,`${id} hierarchy`);assert.ok(labels.every((item)=>item.fontFamily==="MS Sans Serif"&&item.fontSize===11&&item.textRobloxExportMode==="PIXEL_ACCURATE"),`${id} classic typography`);}
+  assert.equal(RETRO_LIBRARY.filter((item)=>item.category==="Text"&&item.family==="windows").length,8);
+});
+
 test("expanded controls have distinct authentic construction",()=>{
   const states=[["button-win98","default-button",100],["button-win98-standard","raised",100],["button-win98-pressed","sunken",100],["button-win98-disabled","raised",62]];
   for(const [id,border,opacity] of states){const built=createRetroAsset(id,0),root=built.elements.find((item)=>item.id===built.rootId);assert.ok(root);assert.deepEqual([root.width,root.height],[75,23]);assert.equal(root.retro.borderPrimitive,border);assert.equal(root.opacity,opacity);assert.equal(root.fontFamily,"MS Sans Serif");}

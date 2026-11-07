@@ -5,14 +5,14 @@ import { preferredMessageBoxSize, WINDOWS98_CLASSIC, win98Constraints, win98Font
 
 export type RetroCategory="Windows"|"Buttons"|"Inputs"|"Navigation"|"Containers"|"System Icons"|"Frames"|"Text"|"Icons"|"Pixel Art"|"Patterns"|"Decorations"|"Components"|"Templates";
 export type RetroAssetId=
-  |"window-98-app"|"window-95-dialog"|"window-98-error"|"window-98-info"|"window-98-question"|"window-98-explorer"|"window-98-properties"|"window-98-settings"|"window-98-open-file"|"window-98-installer"|"window-98-help"|"window-internet"
+  |"window-98-app"|"window-95-dialog"|"window-98-error"|"window-98-info"|"window-98-question"|"window-98-explorer"|"window-98-properties"|"window-98-settings"|"window-98-open-file"|"window-98-save-file"|"window-98-installer"|"window-98-help"|"window-98-control-panel"|"window-98-run"|"window-98-shutdown"|"window-98-about"|"window-98-find"|"window-98-network-login"|"window-98-printer-queue"|"window-internet"
   |"control-checkbox"|"control-radio"|"control-toolbar-button"|"control-scroll-arrow"|"control-spin"|"control-caption-close"|"control-caption-minimize"|"control-caption-maximize"
   |"input-text"|"input-combo"|"input-list"|"input-password"|"input-multiline"|"input-numeric"|"input-trackbar"
   |"nav-menu"|"nav-tabs"|"nav-scrollbar"|"nav-status"|"nav-progress"|"nav-tree"|"nav-toolbar"|"nav-dropdown-menu"|"container-group"|"container-recessed"
   |"icon-warning"|"icon-error"|"icon-info"|"icon-question"|"icon-folder"|"icon-file"|"icon-computer98"|"icon-disk"|"icon-settings"|"icon-search"|"icon-printer"|"icon-network"|"icon-display"
   |"frame-checker"|"frame-stepped"|"frame-cdrom"
   |"button-win98"|"button-win98-standard"|"button-win98-pressed"|"button-win98-disabled"|"button-arcade"|"button-cdrom"|"button-gameshow"
-  |"text-pixel-title"|"icon-computer"|"pattern-checker"|"decoration-stars"|"component-warning"
+  |"text-win98-label"|"text-win98-heading"|"text-win98-description"|"text-win98-status"|"text-win98-disabled"|"text-win98-menu"|"text-win98-caption"|"text-win98-group-label"|"text-pixel-title"|"icon-computer"|"pattern-checker"|"decoration-stars"|"component-warning"
   |"template-windows98"|"template-cdrom"|"template-creator-time";
 
 export type RetroLibraryItem={
@@ -29,8 +29,16 @@ export const RETRO_LIBRARY:RetroLibraryItem[]=[
   {id:"window-98-properties",name:"Properties Window",category:"Windows",family:"windows",description:"Compact property sheet with tabs, group box, fields, and aligned actions.",preview:"win-properties",badge:"DIALOG"},
   {id:"window-98-settings",name:"Settings Dialog",category:"Windows",family:"windows",description:"Classic settings surface with grouped controls and predictable anchors.",preview:"win-settings"},
   {id:"window-98-open-file",name:"Open File Dialog",category:"Windows",family:"windows",description:"Measured file picker with look-in field, file list, filename, type filter, and aligned actions.",preview:"win-open",badge:"DIALOG"},
+  {id:"window-98-save-file",name:"Save As Dialog",category:"Windows",family:"windows",description:"Aligned classic Save As dialog with measured fields, file list, and stacked action buttons.",preview:"win-save",badge:"NEW"},
   {id:"window-98-installer",name:"Installation Wizard",category:"Windows",family:"windows",description:"Classic wizard anatomy with banner, instructions, separator, and Back/Next/Cancel actions.",preview:"win-installer",badge:"WIZARD"},
   {id:"window-98-help",name:"Help Window",category:"Windows",family:"windows",description:"Structured help viewer with menu, toolbar, navigation tree, topic pane, and status bar.",preview:"win-help",badge:"APPLICATION"},
+  {id:"window-98-control-panel",name:"Control Panel",category:"Windows",family:"windows",description:"Aligned Control Panel window with classic icon grid, menu, client area, and status bar.",preview:"win-control-panel",badge:"NEW"},
+  {id:"window-98-run",name:"Run Dialog",category:"Windows",family:"windows",description:"Compact Run command dialog with prompt, input field, and evenly spaced action row.",preview:"win-run",badge:"NEW"},
+  {id:"window-98-shutdown",name:"Shut Down Windows",category:"Windows",family:"windows",description:"Classic shutdown choice dialog with aligned radio controls and command buttons.",preview:"win-shutdown",badge:"NEW"},
+  {id:"window-98-about",name:"About Windows 98",category:"Windows",family:"windows",description:"Compact About dialog with system mark, version labels, separator, and centered action.",preview:"win-about",badge:"NEW"},
+  {id:"window-98-find",name:"Find Files Dialog",category:"Windows",family:"windows",description:"Classic Find window with aligned tabs, labeled fields, action buttons, and results list.",preview:"win-find",badge:"NEW"},
+  {id:"window-98-network-login",name:"Network Logon",category:"Windows",family:"windows",description:"Compact network credentials dialog with aligned labels, edit fields, and actions.",preview:"win-logon",badge:"NEW"},
+  {id:"window-98-printer-queue",name:"Printer Queue",category:"Windows",family:"windows",description:"Application-style printer queue with menu, column headings, job row, and status bar.",preview:"win-printer",badge:"NEW"},
   {id:"window-internet",name:"Web Surfer Window",category:"Windows",family:"internet",description:"Early-browser chrome with tiled page graphics and chunky navigation.",preview:"internet"},
   {id:"frame-checker",name:"Checker Slice Frame",category:"Frames",family:"gameshow",description:"Crisp repeating purple-and-yellow nine-slice border.",preview:"checker",badge:"9-SLICE"},
   {id:"frame-stepped",name:"Stepped Pixel Frame",category:"Frames",family:"arcade",description:"Layered frame with preserved pixel corners and inset center.",preview:"stepped"},
@@ -80,6 +88,14 @@ export const RETRO_LIBRARY:RetroLibraryItem[]=[
   {id:"button-arcade",name:"Arcade Action Button",category:"Buttons",family:"arcade",description:"High-contrast electronic action control with pixel depth.",preview:"button-arcade"},
   {id:"button-cdrom",name:"Glossy CD-ROM Button",category:"Buttons",family:"cdrom",description:"Asymmetric dimensional control with reflective highlight.",preview:"button-cdrom"},
   {id:"button-gameshow",name:"Game Show Buzzer",category:"Buttons",family:"gameshow",description:"Chunky candy-plastic control for loud 1990s interfaces.",preview:"button-show"},
+  {id:"text-win98-label",name:"Classic Field Label",category:"Text",family:"windows",description:"MS Sans Serif 8 pt label aligned to a 21 px classic input control.",preview:"win-text-label",badge:"NEW"},
+  {id:"text-win98-heading",name:"Classic Bold Heading",category:"Text",family:"windows",description:"Compact bold section heading using Windows 98 reference metrics.",preview:"win-text-heading",badge:"NEW"},
+  {id:"text-win98-description",name:"Classic Description",category:"Text",family:"windows",description:"Multi-line explanatory copy with compact Windows 98 line spacing.",preview:"win-text-copy",badge:"NEW"},
+  {id:"text-win98-status",name:"Status Bar Label",category:"Text",family:"windows",description:"Inset-ready status text aligned to a classic 20 px status panel.",preview:"win-text-status",badge:"NEW"},
+  {id:"text-win98-disabled",name:"Disabled Label",category:"Text",family:"windows",description:"Embossed gray disabled-state label constructed from editable text layers.",preview:"win-text-disabled",badge:"NEW"},
+  {id:"text-win98-menu",name:"Menu Label",category:"Text",family:"windows",description:"Compact menu item label with optional accelerator underline treatment.",preview:"win-text-menu",badge:"NEW"},
+  {id:"text-win98-caption",name:"Title Bar Caption",category:"Text",family:"windows",description:"White bold active-window caption sized for an 18 px title bar.",preview:"win-text-caption",badge:"NEW"},
+  {id:"text-win98-group-label",name:"Group Box Label",category:"Text",family:"windows",description:"Button-face-backed label positioned across a classic group-box border.",preview:"win-text-group",badge:"NEW"},
   {id:"text-pixel-title",name:"Pixel Display Title",category:"Text",family:"arcade",description:"Sharp display lettering with editable outline and shadow.",preview:"type"},
   {id:"icon-computer",name:"Retro Computer Icon",category:"Icons",family:"windows",description:"Original editable pixel-style desktop computer icon.",preview:"icon"},
   {id:"pattern-checker",name:"Web Checker Tile",category:"Patterns",family:"internet",description:"Editable checker background with deliberately crisp scale.",preview:"pattern"},
@@ -221,17 +237,55 @@ function classicChrome(m:Builder["make"],root:EditorElement,titleText:string,men
   const menu=m("frame",`${titleText} Menu Bar`,root.x+3,root.y+21,root.width-6,19,{fill:"#c0c0c0",borderColor:"transparent",borderWidth:0,...win98Constraints("left-right","top")},root,"menu");menu.retro=withRetro(menu.retro!,{layoutRole:"menu",autoLayout:true});let offset=5;menuLabels.forEach((label)=>{const width=Math.max(34,label.length*7+12);m("text",`${label} Menu`,menu.x+offset,menu.y+3,width,13,{...text(label,11,400),...win98Font(400),textDecoration:offset===5?"underline":"none"},menu,"menu-item");offset+=width;});return menu;
 }
 
-function fileDialog(index:number):RetroBuildResult{
-  const id="window-98-open-file" as const,b=builder(id,"windows","dialog",index),m=b.make,x=214,y=98,w=532,h=386;
-  const root=m("frame","Open File Dialog",x,y,w,h,{...win98Surface("window"),frameType:"window",minWidth:460,minHeight:330},null,"window");root.retro=withRetro(root.retro!,{kind:"dialog",borderPrimitive:"window",layoutRole:"window-frame",autoLayout:true});classicChrome(m,root,"Open");
+function fileDialog(index:number,id:"window-98-open-file"|"window-98-save-file"="window-98-open-file"):RetroBuildResult{
+  const save=id==="window-98-save-file",b=builder(id,"windows","dialog",index),m=b.make,x=214,y=98,w=532,h=386;
+  const root=m("frame",save?"Save As Dialog":"Open File Dialog",x,y,w,h,{...win98Surface("window"),frameType:"window",minWidth:460,minHeight:330},null,"window");root.retro=withRetro(root.retro!,{kind:"dialog",borderPrimitive:"window",layoutRole:"window-frame",autoLayout:true});classicChrome(m,root,save?"Save As":"Open");
   m("text","Look In Label",x+15,y+32,46,14,{...text("Look in:",11,400),...win98Font(400)},root,"label");
   const location=m("frame","Look In Field",x+64,y+27,w-160,21,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","top")},root,"field");location.retro=withRetro(location.retro!,{borderPrimitive:"sunken",layoutRole:"field"});m("text","Look In Value",location.x+24,location.y+4,location.width-46,13,{...text("Desktop",11,400),...win98Font(400)},location,"field-text");m("rectangle","Desktop Folder Glyph",location.x+4,location.y+4,14,11,{fill:"#ffff00",borderColor:"#000000",borderWidth:1,shadow:"none"},location,"icon");const drop=m("button","Look In Arrow",location.x+location.width-18,location.y+2,16,17,{...text("▼",8,700,"center"),...win98Font(700),...win98Surface("raised"),verticalAlign:"center",...win98Constraints("right","top")},location,"control");drop.retro=withRetro(drop.retro!,{kind:"button",borderPrimitive:"raised",layoutRole:"field"});
   ["↑","▣","▦"].forEach((label,i)=>{const tool=m("button",`File Tool ${i+1}`,x+w-91+i*24,y+27,22,21,{...text(label,9,700,"center"),...win98Font(700),...win98Surface("raised"),verticalAlign:"center",...win98Constraints("right","top")},root,"button");tool.retro=withRetro(tool.retro!,{kind:"button",borderPrimitive:"raised",layoutRole:"toolbar"});});
   const list=m("frame","File List",x+15,y+58,w-30,230,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","top-bottom")},root,"content");list.retro=withRetro(list.retro!,{borderPrimitive:"sunken",layoutRole:"client",autoLayout:true});
   [["▰","My Computer"],["▥","My Documents"],["▣","CreatorMake"],["▤","References"],["▰","Roblox Export"],["▥","Textures"]].forEach(([glyph,label],i)=>{const col=i%3,row=Math.floor(i/3);m("text",`File ${i} Icon`,list.x+22+col*158,list.y+20+row*82,28,28,{...text(glyph,18,400,"center"),...win98Font(400),textColor:"#000080"},list,"icon");m("text",`File ${i} Label`,list.x+4+col*158,list.y+52+row*82,118,16,{...text(label,11,400,"center"),...win98Font(400)},list,"label");});
-  m("text","File Name Label",x+18,y+302,66,14,{...text("File name:",11,400),...win98Font(400)},root,"label");const filename=m("frame","File Name Field",x+86,y+297,w-190,21,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","bottom")},root,"field");filename.retro=withRetro(filename.retro!,{borderPrimitive:"sunken",layoutRole:"field"});m("text","File Name Value",filename.x+4,filename.y+4,filename.width-8,13,{...text("interface.creatormake",11,400),...win98Font(400)},filename,"field-text");
+  m("text","File Name Label",x+18,y+302,66,14,{...text("File name:",11,400),...win98Font(400)},root,"label");const filename=m("frame","File Name Field",x+86,y+297,w-190,21,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","bottom")},root,"field");filename.retro=withRetro(filename.retro!,{borderPrimitive:"sunken",layoutRole:"field"});m("text","File Name Value",filename.x+4,filename.y+4,filename.width-8,13,{...text(save?"My Interface.creatormake":"interface.creatormake",11,400),...win98Font(400)},filename,"field-text");
   m("text","File Type Label",x+18,y+331,66,14,{...text("Files of type:",11,400),...win98Font(400)},root,"label");const typeField=m("frame","File Type Field",x+86,y+326,w-190,21,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","bottom")},root,"field");typeField.retro=withRetro(typeField.retro!,{borderPrimitive:"sunken",layoutRole:"field"});m("text","File Type Value",typeField.x+4,typeField.y+4,typeField.width-26,13,{...text("CreatorMake Projects (*.creatormake)",11,400),...win98Font(400)},typeField,"field-text");
-  [["Open",y+297],["Cancel",y+326]].forEach(([label,buttonY],i)=>{const action=m("button",`${label} Button`,x+w-90,Number(buttonY),75,23,{...text(String(label),11,400,"center"),...win98Font(400),...win98Surface(i===0?"default-button":"raised"),verticalAlign:"center",...win98Constraints("right","bottom")},root,"button");action.retro=withRetro(action.retro!,{kind:"button",borderPrimitive:i===0?"default-button":"raised",layoutRole:"action"});});
+  [[save?"Save":"Open",y+297],["Cancel",y+326]].forEach(([label,buttonY],i)=>{const action=m("button",`${label} Button`,x+w-90,Number(buttonY),75,23,{...text(String(label),11,400,"center"),...win98Font(400),...win98Surface(i===0?"default-button":"raised"),verticalAlign:"center",...win98Constraints("right","bottom")},root,"button");action.retro=withRetro(action.retro!,{kind:"button",borderPrimitive:i===0?"default-button":"raised",layoutRole:"action"});});
+  return{elements:b.elements,assets:[],rootId:root.id};
+}
+
+type AdditionalWindowId="window-98-control-panel"|"window-98-run"|"window-98-shutdown"|"window-98-about"|"window-98-find"|"window-98-network-login"|"window-98-printer-queue";
+function actionRow(m:Builder["make"],root:EditorElement,labels:string[],bottom=11,defaultIndex=0){
+  const width=WINDOWS98_CLASSIC.metrics.buttonWidth,gap=WINDOWS98_CLASSIC.metrics.buttonGap,total=labels.length*width+(labels.length-1)*gap,start=root.x+root.width-WINDOWS98_CLASSIC.metrics.dialogMarginX-total,y=root.y+root.height-bottom-WINDOWS98_CLASSIC.metrics.buttonHeight;
+  return labels.map((label,i)=>{const button=m("button",`${label} Button`,start+i*(width+gap),y,width,WINDOWS98_CLASSIC.metrics.buttonHeight,{...text(label,11,400,"center"),...win98Font(400),...win98Surface(i===defaultIndex?"default-button":"raised"),verticalAlign:"center",...win98Constraints("right","bottom")},root,"button");button.retro=withRetro(button.retro!,{kind:"button",borderPrimitive:i===defaultIndex?"default-button":"raised",layoutRole:"action",autoLayout:true});return button;});
+}
+
+function additionalWindowsPreset(index:number,id:AdditionalWindowId):RetroBuildResult{
+  const specs={
+    "window-98-control-panel":{name:"Control Panel",w:620,h:420,kind:"window" as const},
+    "window-98-run":{name:"Run",w:420,h:188,kind:"dialog" as const},
+    "window-98-shutdown":{name:"Shut Down Windows",w:440,h:246,kind:"dialog" as const},
+    "window-98-about":{name:"About Windows 98",w:430,h:260,kind:"dialog" as const},
+    "window-98-find":{name:"Find: All Files",w:548,h:360,kind:"dialog" as const},
+    "window-98-network-login":{name:"Enter Network Password",w:420,h:238,kind:"dialog" as const},
+    "window-98-printer-queue":{name:"CreatorMake Printer",w:650,h:390,kind:"window" as const},
+  }[id],x=Math.round((960-specs.w)/2)+(index%3)*10,y=Math.round((600-specs.h)/2)+(index%3)*10,b=builder(id,"windows",specs.kind,index),m=b.make;
+  const root=m("frame",specs.name,x,y,specs.w,specs.h,{...win98Surface("window"),frameType:"window",minWidth:Math.min(specs.w,360),minHeight:Math.min(specs.h,150)},null,"window");root.retro=withRetro(root.retro!,{kind:specs.kind,borderPrimitive:"window",layoutRole:"window-frame",autoLayout:true});
+  const application=id==="window-98-control-panel"||id==="window-98-printer-queue";classicChrome(m,root,specs.name,application?["File","Edit","View","Help"]:[]);
+  if(id==="window-98-control-panel"){
+    const client=m("frame","Control Panel Client",x+5,y+43,specs.w-10,specs.h-70,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","top-bottom")},root,"content");client.retro=withRetro(client.retro!,{borderPrimitive:"sunken",layoutRole:"client",autoLayout:true});
+    const entries=[["▣","Add New Hardware"],["▤","Add/Remove Programs"],["▧","Date/Time"],["▦","Display"],["⌨","Keyboard"],["▰","Modems"],["▱","Mouse"],["▥","Network"],["▨","Printers"],["◫","Sounds"]];entries.forEach(([glyph,label],i)=>{const col=i%4,row=Math.floor(i/4),left=client.x+24+col*145,top=client.y+18+row*86;m("text",`${label} Icon`,left+47,top,34,34,{...text(glyph,22,400,"center"),...win98Font(400),textColor:"#000080"},client,"icon");m("text",`${label} Label`,left,top+39,128,30,{...text(label,11,400,"center"),...win98Font(400),verticalAlign:"top"},client,"label");});
+    const status=m("frame","Control Panel Status",x+5,y+specs.h-25,specs.w-10,20,{...win98Surface("sunken"),...win98Constraints("left-right","bottom")},root,"status");status.retro=withRetro(status.retro!,{borderPrimitive:"sunken",layoutRole:"status"});m("text","Control Panel Status Text",status.x+4,status.y+3,status.width-8,14,{...text("10 object(s)",11,400),...win98Font(400)},status,"status-text");
+  }else if(id==="window-98-run"){
+    m("rectangle","Run Icon",x+18,y+42,32,28,{fill:"#c0c0c0",borderColor:"#000080",borderWidth:2,shadow:"none"},root,"icon");m("text","Run Prompt",x+64,y+35,specs.w-82,48,{...text("Type the name of a program, folder, document, or Internet resource, and Windows will open it for you.",11,400),...win98Font(400),lineHeight:1.25},root,"content");m("text","Open Label",x+18,y+94,38,14,{...text("Open:",11,400),...win98Font(400)},root,"label");const field=m("frame","Run Command Field",x+60,y+89,specs.w-78,21,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","top")},root,"field");field.retro=withRetro(field.retro!,{borderPrimitive:"sunken",layoutRole:"field"});m("text","Run Command",field.x+4,field.y+4,field.width-8,13,{...text("creatormake.exe",11,400),...win98Font(400)},field,"field-text");actionRow(m,root,["OK","Cancel","Browse..."],11,0);
+  }else if(id==="window-98-shutdown"){
+    m("rectangle","Shutdown Computer",x+22,y+45,42,38,{fill:"#c0c0c0",borderColor:"#000000",borderWidth:1,shadow:"none"},root,"icon");m("frame","Shutdown Screen",x+28,y+50,30,21,{...win98Surface("sunken","#008080")},root,"icon");m("text","Shutdown Prompt",x+82,y+38,specs.w-104,18,{...text("What do you want the computer to do?",11,400),...win98Font(400)},root,"content");["Shut down","Restart","Restart in MS-DOS mode"].forEach((label,i)=>{const radio=m("ellipse",`${label} Radio`,x+86,y+70+i*30,13,13,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window)},root,"control");radio.retro=withRetro(radio.retro!,{kind:"control",borderPrimitive:"sunken"});if(i===0)m("ellipse","Selected Radio",radio.x+4,radio.y+4,5,5,{fill:"#000000",borderColor:"transparent",borderWidth:0},radio,"control");m("text",`${label} Label`,x+106,y+68+i*30,specs.w-130,17,{...text(label,11,400),...win98Font(400)},root,"label");});actionRow(m,root,["Yes","No","Help"],11,0);
+  }else if(id==="window-98-about"){
+    m("frame","About Logo",x+18,y+39,78,78,{...win98Surface("raised")},root,"icon");m("text","About Logo Mark",x+24,y+50,66,44,{...text("Microsoft\nWindows 98",14,700,"center"),...win98Font(700),textColor:"#000080",lineHeight:1.1},root,"icon");m("text","About Product",x+116,y+39,specs.w-136,52,{...text("Microsoft Windows 98\nSecond Edition",11,700),...win98Font(700),lineHeight:1.35},root,"content");m("text","About Version",x+116,y+95,specs.w-136,38,{...text("Copyright © 1981–1999 Microsoft Corp.\nThis original recreation contains no Microsoft artwork.",11,400),...win98Font(400),lineHeight:1.3},root,"content");m("line","About Separator",x+16,y+148,specs.w-32,2,{fill:"#808080",borderColor:"#ffffff",borderWidth:1},root,"separator");m("text","About Memory",x+24,y+166,specs.w-48,30,{...text("Physical memory available to Windows:\t64,000 KB",11,400),...win98Font(400)},root,"label");actionRow(m,root,["OK"],11,0);
+  }else if(id==="window-98-find"){
+    ["Name & Location","Date","Advanced"].forEach((label,i)=>{const tab=m("button",`${label} Tab`,x+12+i*112,y+31,i===0?112:104,22,{...text(label,11,i===0?700:400,"center"),...win98Font(i===0?700:400),...win98Surface("raised"),verticalAlign:"center"},root,"tab");tab.retro=withRetro(tab.retro!,{kind:"control",borderPrimitive:"raised",layoutRole:"tab"});});const page=m("frame","Find Tab Page",x+11,y+51,specs.w-22,118,{...win98Surface("raised"),...win98Constraints("left-right","top")},root,"content");page.retro=withRetro(page.retro!,{borderPrimitive:"raised",layoutRole:"client"});[["Named:",20],["Look in:",55]].forEach(([label,top])=>{m("text",`${label} Label`,page.x+14,page.y+Number(top)+4,58,14,{...text(String(label),11,400),...win98Font(400)},page,"label");const field=m("frame",`${label} Field`,page.x+76,page.y+Number(top),page.width-92,21,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","top")},page,"field");field.retro=withRetro(field.retro!,{borderPrimitive:"sunken",layoutRole:"field"});m("text",`${label} Value`,field.x+4,field.y+4,field.width-8,13,{...text(label==="Named:"?"*.creatormake":"Local Disk (C:)",11,400),...win98Font(400)},field,"field-text");});const results=m("frame","Find Results",x+12,y+181,specs.w-24,117,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","top-bottom")},root,"content");results.retro=withRetro(results.retro!,{borderPrimitive:"sunken",layoutRole:"client"});m("text","Result Headers",results.x+5,results.y+4,results.width-10,16,{...text("Name                         In Folder                 Size",11,700),...win98Font(700)},results,"label");actionRow(m,root,["Find Now","Stop","New Search"],11,0);
+  }else if(id==="window-98-network-login"){
+    m("frame","Network Icon",x+20,y+45,48,38,{...win98Surface("raised")},root,"icon");m("text","Network Icon Mark",x+25,y+54,38,18,{...text("NET",11,700,"center"),...win98Font(700),textColor:"#000080"},root,"icon");m("text","Network Prompt",x+82,y+38,specs.w-102,42,{...text("Enter your user name and password to log on to the network.",11,400),...win98Font(400),lineHeight:1.25},root,"content");[["User name:",92,"CREATOR"],["Password:",125,"••••••••"]].forEach(([label,top,value])=>{m("text",`${label} Label`,x+34,y+Number(top)+4,78,14,{...text(String(label),11,400),...win98Font(400)},root,"label");const field=m("frame",`${label} Field`,x+116,y+Number(top),specs.w-150,21,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","top")},root,"field");field.retro=withRetro(field.retro!,{borderPrimitive:"sunken",layoutRole:"field"});m("text",`${label} Value`,field.x+4,field.y+4,field.width-8,13,{...text(String(value),11,400),...win98Font(400)},field,"field-text");});actionRow(m,root,["OK","Cancel"],11,0);
+  }else{
+    const toolbar=m("frame","Printer Toolbar",x+3,y+40,specs.w-6,31,{fill:"#c0c0c0",borderColor:"#808080",borderWidth:0,...win98Constraints("left-right","top")},root,"toolbar");toolbar.retro=withRetro(toolbar.retro!,{layoutRole:"toolbar"});["Pause","Resume","Cancel"].forEach((label,i)=>{const button=m("button",`${label} Tool`,toolbar.x+5+i*65,toolbar.y+3,61,25,{...text(label,10,400,"center"),...win98Font(400),...win98Surface("raised"),verticalAlign:"center"},toolbar,"button");button.retro=withRetro(button.retro!,{kind:"button",borderPrimitive:"raised",layoutRole:"toolbar"});});const list=m("frame","Print Job List",x+5,y+73,specs.w-10,specs.h-100,{...win98Surface("sunken",WINDOWS98_CLASSIC.colors.window),...win98Constraints("left-right","top-bottom")},root,"content");list.retro=withRetro(list.retro!,{borderPrimitive:"sunken",layoutRole:"client"});m("text","Print Headers",list.x+5,list.y+4,list.width-10,17,{...text("Document                 Status          Owner       Size",11,700),...win98Font(700)},list,"label");m("line","Print Header Rule",list.x+3,list.y+23,list.width-6,1,{fill:"#808080",borderColor:"transparent",borderWidth:0},list,"separator");m("text","Print Job",list.x+5,list.y+31,list.width-10,17,{...text("CreatorMake UI          Printing        Creator     2.1 MB",11,400),...win98Font(400),fill:"#000080",textColor:"#ffffff"},list,"content");const status=m("frame","Printer Status",x+5,y+specs.h-25,specs.w-10,20,{...win98Surface("sunken"),...win98Constraints("left-right","bottom")},root,"status");status.retro=withRetro(status.retro!,{borderPrimitive:"sunken",layoutRole:"status"});m("text","Printer Status Text",status.x+4,status.y+3,status.width-8,14,{...text("1 document(s) in queue",11,400),...win98Font(400)},status,"status-text");
+  }
   return{elements:b.elements,assets:[],rootId:root.id};
 }
 
@@ -333,6 +387,16 @@ function retroButton(id:"button-win98"|"button-win98-standard"|"button-win98-pre
   return{elements:b.elements,assets:[],rootId:button.id};
 }
 
+type Win98TextId="text-win98-label"|"text-win98-heading"|"text-win98-description"|"text-win98-status"|"text-win98-disabled"|"text-win98-menu"|"text-win98-caption"|"text-win98-group-label";
+function win98TextAsset(id:Win98TextId,index:number):RetroBuildResult{
+  const item=RETRO_LIBRARY.find((entry)=>entry.id===id)!,b=builder(id,"windows","decoration",index),m=b.make,x=320,y=230;
+  const root=m("container",item.name,x,y,320,id==="text-win98-description"?52:id==="text-win98-caption"?18:id==="text-win98-status"?20:24,{fill:id==="text-win98-caption"?"#000080":id==="text-win98-status"||id==="text-win98-group-label"?"#c0c0c0":"transparent",borderColor:"transparent",borderWidth:0,shadow:"none"},null,"label");root.retro=withRetro(root.retro!,{layoutRole:id==="text-win98-caption"?"titlebar":id==="text-win98-status"?"status":"navigation-item",autoLayout:true});
+  const copy=id==="text-win98-label"?"File name:":id==="text-win98-heading"?"Display settings":id==="text-win98-description"?"Choose an option, then click Apply to update these settings.":id==="text-win98-status"?"Ready":id==="text-win98-disabled"?"This option is unavailable":id==="text-win98-menu"?"File":id==="text-win98-caption"?"CreatorMake — Retro Project":"Options";
+  if(id==="text-win98-disabled")m("text","Disabled Highlight",x+1,y+3,root.width-2,15,{...text(copy,11,400),...win98Font(400),textColor:"#ffffff"},root,"label");
+  const label=m("text",item.name,x+(id==="text-win98-caption"?4:id==="text-win98-status"?4:id==="text-win98-group-label"?8:0),y+(id==="text-win98-caption"?2:id==="text-win98-status"?3:id==="text-win98-disabled"?2:id==="text-win98-group-label"?-1:3),root.width-(id==="text-win98-caption"?8:id==="text-win98-status"?8:id==="text-win98-group-label"?16:0),id==="text-win98-description"?44:14,{...text(copy,11,id==="text-win98-heading"||id==="text-win98-caption"?700:400,id==="text-win98-menu"?"left":"left"),...win98Font(id==="text-win98-heading"||id==="text-win98-caption"?700:400),textColor:id==="text-win98-caption"?"#ffffff":id==="text-win98-disabled"?"#808080":"#000000",textDecoration:id==="text-win98-menu"?"underline":"none",fill:id==="text-win98-group-label"?"#c0c0c0":"transparent",verticalAlign:id==="text-win98-caption"?"center":"top",lineHeight:id==="text-win98-description"?1.3:WINDOWS98_CLASSIC.font.lineHeight},root,"label");label.retro=withRetro(label.retro!,{layoutRole:id==="text-win98-caption"?"titlebar":id==="text-win98-status"?"status":"navigation-item"});
+  return{elements:b.elements,assets:[],rootId:root.id};
+}
+
 function simpleAsset(id:Exclude<RetroAssetId,"window-98-app"|"window-95-dialog"|"window-internet"|"frame-checker"|"frame-stepped"|"frame-cdrom"|"button-win98"|"button-arcade"|"button-cdrom"|"button-gameshow"|"template-windows98"|"template-cdrom"|"template-creator-time">,index:number):RetroBuildResult{
   const item=RETRO_LIBRARY.find((entry)=>entry.id===id)!,b=builder(id,item.family,item.category==="Patterns"?"pattern":item.category==="Icons"?"decoration":item.category==="Text"?"decoration":"decoration",index),m=b.make;
   if(id==="text-pixel-title"){const root=m("text","Pixel Display Title",244,230,472,92,{...text("INSERT COIN",42,900,"center"),fontFamily:"Press Start 2P",fontId:"press-start-2p",textColor:"#fff45d",textStrokeColor:"#7b1d9b",textStrokeWidth:3,textShadows:["5px 5px 0 #ff3f9c"],letterSpacing:2},null,"title");return{elements:b.elements,assets:[],rootId:root.id};}
@@ -370,26 +434,47 @@ function creatorTimeTemplate(index:number):RetroBuildResult{
   return{elements:b.elements,assets:[],background:"#250b59",rootId:bg.id};
 }
 
-export function createRetroAsset(id:RetroAssetId,index=0):RetroBuildResult{
+function createRetroAssetRaw(id:RetroAssetId,index=0):RetroBuildResult{
   if(id==="window-98-app")return windows98(id,index);
   if(id==="window-95-dialog")return systemDialog(index);
   if(id==="window-98-error"||id==="window-98-info"||id==="window-98-question")return systemDialog(index,id);
   if(id==="window-98-explorer")return windowsExplorer(index);
   if(id==="window-98-properties"||id==="window-98-settings")return propertiesWindow(index,id);
-  if(id==="window-98-open-file")return fileDialog(index);
+  if(id==="window-98-open-file"||id==="window-98-save-file")return fileDialog(index,id);
   if(id==="window-98-installer")return installerWizard(index);
   if(id==="window-98-help")return helpWindow(index);
+  if(id==="window-98-control-panel"||id==="window-98-run"||id==="window-98-shutdown"||id==="window-98-about"||id==="window-98-find"||id==="window-98-network-login"||id==="window-98-printer-queue")return additionalWindowsPreset(index,id);
   if(id==="window-internet")return internetWindow(index);
   if(id.startsWith("control-")||id.startsWith("input-")||id.startsWith("nav-")||id.startsWith("container-"))return win98Control(id as Extract<RetroAssetId,`control-${string}`|`input-${string}`|`nav-${string}`|`container-${string}`>,index);
   if(id.startsWith("icon-")&&id!=="icon-computer")return win98IconAsset(id as Extract<RetroAssetId,`icon-${string}`>,index);
   if(id==="frame-checker")return nineSliceFrame(index);
   if(id==="frame-stepped"||id==="frame-cdrom")return layeredFrame(id,index);
   if(id==="button-win98"||id==="button-win98-standard"||id==="button-win98-pressed"||id==="button-win98-disabled"||id==="button-arcade"||id==="button-cdrom"||id==="button-gameshow")return retroButton(id,index);
+  if(id.startsWith("text-win98-"))return win98TextAsset(id as Win98TextId,index);
   if(id==="template-windows98")return windows98(id,index,true);
   if(id==="template-cdrom")return cdromTemplate(index);
   if(id==="template-creator-time")return creatorTimeTemplate(index);
   return simpleAsset(id,index);
 }
+
+export function alignRetroPreset(result:RetroBuildResult):RetroBuildResult{
+  const byId=new Map(result.elements.map((item)=>[item.id,item]));
+  for(const item of result.elements){
+    item.x=Math.round(item.x);item.y=Math.round(item.y);item.width=Math.max(1,Math.round(item.width));item.height=Math.max(1,Math.round(item.height));
+    if(item.retro?.family!=="windows")continue;
+    if(item.type==="text"||item.type==="button"){const textColor=item.textColor;Object.assign(item,win98Font(item.fontWeight>=700?700:400));item.textColor=textColor;item.textPadding={top:0,right:0,bottom:0,left:0};if(item.type==="button")item.verticalAlign="center";}
+    const role=item.retro.layoutRole,parent=item.parentId?byId.get(item.parentId):undefined;
+    if(role==="titlebar"&&item.type==="frame"&&parent?.retro?.layoutRole==="window-frame"){item.x=parent.x+3;item.y=parent.y+3;item.width=parent.width-6;item.height=WINDOWS98_CLASSIC.metrics.titleBar;}
+    if(role==="window-control"){item.width=WINDOWS98_CLASSIC.metrics.captionButton;item.height=WINDOWS98_CLASSIC.metrics.captionButton;}
+    if(role==="field"&&item.type==="frame")item.height=WINDOWS98_CLASSIC.metrics.fieldHeight;
+    if(role==="action"){item.width=WINDOWS98_CLASSIC.metrics.buttonWidth;item.height=WINDOWS98_CLASSIC.metrics.buttonHeight;}
+    if(role==="status"&&item.type==="frame"&&parent?.retro?.layoutRole==="window-frame"){item.x=parent.x+5;item.y=parent.y+parent.height-25;item.width=parent.width-10;item.height=WINDOWS98_CLASSIC.metrics.statusHeight;}
+  }
+  const actionGroups=new Map<string,EditorElement[]>();for(const item of result.elements)if(item.retro?.family==="windows"&&item.retro.layoutRole==="action"&&item.parentId){const key=`${item.parentId}:${Math.round(item.y/3)}`;actionGroups.set(key,[...(actionGroups.get(key)??[]),item]);}for(const group of actionGroups.values())if(group.length>1){group.sort((a,b)=>a.x-b.x);const y=Math.round(group.reduce((sum,item)=>sum+item.y,0)/group.length);group.forEach((item,i)=>{item.y=y;if(i)item.x=group[i-1].x+group[i-1].width+WINDOWS98_CLASSIC.metrics.buttonGap;});}
+  return result;
+}
+
+export function createRetroAsset(id:RetroAssetId,index=0):RetroBuildResult{return alignRetroPreset(createRetroAssetRaw(id,index));}
 
 export function createPixelArtAsset(name:string,pixels:string[],size:number,index=0):RetroBuildResult{
   const componentId=createId("pixel-art"),assetId=createId("pixel-art-asset"),cell=8,svgSize=size*cell;

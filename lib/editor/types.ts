@@ -161,11 +161,17 @@ export type ThreeDSettings = {
   bevelSegments:number;
   material:ThreeDMaterial;
   color:string;
+  colorOpacity:number;
   sideColor:string;
+  sideColorOpacity:number;
   backColor:string;
+  backColorOpacity:number;
   accentColor:string;
+  accentColorOpacity:number;
   detailColor:string;
+  detailColorOpacity:number;
   screenColor:string;
+  screenColorOpacity:number;
   iconKind:RetroIconKind;
   iconStyle:RetroIconStyle;
   iconScreenContent:RetroIconScreenContent;
@@ -185,6 +191,7 @@ export type ThreeDSettings = {
   curveDetail:number;
   bevelDepth:number;
   bevelColor:string;
+  bevelColorOpacity:number;
   surfaceSmoothing:boolean;
   depthDirection:"forward"|"backward"|"centered";
   automaticBounds:boolean;
@@ -192,6 +199,7 @@ export type ThreeDSettings = {
   metalness:number;
   roughness:number;
   emissiveColor:string;
+  emissiveColorOpacity:number;
   emissiveIntensity:number;
   transparent:boolean;
   opacity:number;
