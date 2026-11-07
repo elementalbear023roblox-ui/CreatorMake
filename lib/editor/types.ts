@@ -125,7 +125,13 @@ export type TypographyComposerSettings = {
   fontId:string;text:string;letterSpacing:number;wordSpacing:number;lineSpacing:number;alignment:"left"|"center"|"right";
   scale:number;depth:number;bevel:number;bevelDepth:number;bevelSegments:number;curveDetail:number;material:string;groupRotation:number;letterRotation:number;perspective:number;kerning:boolean;
 };
-export type RetroIconKind = "gear" | "dollar" | "clock" | "monitor";
+export type RetroIconKind =
+  | "gear" | "dollar" | "clock" | "monitor"
+  | "warning-sign" | "dice" | "coin-pile" | "inverted-dice" | "shoe"
+  | "red-buzzer" | "prize-wheel" | "golden-ticket" | "winners-cup" | "stage-curtains"
+  | "slot-machine" | "marquee-sign" | "vhs-tape" | "hard-drive" | "compact-disc"
+  | "email-envelope" | "spinning-globe" | "starburst" | "mystery-box" | "puzzle-piece"
+  | "hourglass" | "golden-key";
 export type RetroIconStyle = "classic-cgi" | "pixelated-cgi";
 export type RetroIconScreenContent = "blank" | "static" | "error" | "warning" | "smile" | "desktop";
 export type ThreeDPrimitive = "cube" | "sphere" | "cylinder" | "cone" | "torus" | "capsule" | "pyramid" | "rounded-box" | "plane" | "extruded-shape" | "pixel-letter" | "font-letter" | "retro-icon";
