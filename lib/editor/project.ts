@@ -101,7 +101,7 @@ export function normalizeProject(project: EditorProject): EditorProject {
   project.platform ??= "Roblox"; project.status ??= "Draft"; project.tags ??= []; project.archived ??= false;project.projectKind ??= "blank";project.commissionBrief={...EMPTY_COMMISSION_BRIEF,...(project.commissionBrief??{}),targetDevices:[...(project.commissionBrief?.targetDevices??EMPTY_COMMISSION_BRIEF.targetDevices)]};
   project.exportOptions=normalizeProjectExportOptions(project.exportOptions);
   project.screen.x ??= 2100; project.screen.y ??= 1400;
-  project.references ??= []; project.activePresetIds ??= ["digital-system"]; project.favoritePresetIds ??= []; project.recentFontIds ??= []; project.customFrameRecipes ??= []; project.researchCache ??= {}; project.generationHistory ??= []; project.threeDFonts=Array.isArray(project.threeDFonts)?project.threeDFonts.filter((font)=>font&&typeof font.id==="string"&&font.glyphs&&typeof font.glyphs==="object"):[]; project.fontPolicy ??= {allowSyntheticWeight:false,allowSyntheticItalic:false};
+  project.selectedIds ??= []; project.references ??= []; project.activePresetIds ??= ["digital-system"]; project.favoritePresetIds ??= []; project.favoriteFontIds ??= []; project.recentFontIds ??= []; project.customFrameRecipes ??= []; project.researchCache ??= {}; project.generationHistory ??= []; project.threeDFonts=Array.isArray(project.threeDFonts)?project.threeDFonts.filter((font)=>font&&typeof font.id==="string"&&font.glyphs&&typeof font.glyphs==="object"):[]; project.fontPolicy ??= {allowSyntheticWeight:false,allowSyntheticItalic:false};
   project.assets ??= []; project.assets=project.assets.map((asset)=>({...asset,favorite:asset.favorite??false})); project.assetFolders ??= ["Logos","Icons","Characters","Textures","Backgrounds","Client Assets"];
   project.elements = project.elements.map((element) => {
     const base = createElement(element.type === ("shape" as ElementType) ? "rectangle" : element.type);
@@ -253,7 +253,6 @@ export async function importProjectData(value:unknown){
   if(!value||typeof value!=="object")throw new Error("The selected file is not a CreatorMake project.");
   const packageValue=value as {format?:string;project?:unknown},raw=packageValue.format==="creatormake-project"?packageValue.project:value,candidate=raw as Partial<EditorProject>;
   if(!candidate||typeof candidate!=="object"||!candidate.screen||!Array.isArray(candidate.elements))throw new Error("Project file is missing its screen or element hierarchy.");
-  if(typeof candidate.schemaVersion==="number"&&candidate.schemaVersion>CREATORMAKE_SCHEMA_VERSION)throw new Error(`This project uses schema ${candidate.schemaVersion}; update CreatorMake before importing it.`);
   const imported=normalizeProject(structuredClone(candidate) as EditorProject);imported.id=createId("project");imported.name=`${imported.name?.trim()||"Imported UI"}`;imported.createdAt=Date.now();imported.updatedAt=Date.now();imported.selectedIds=imported.selectedIds.filter((id)=>imported.elements.some((item)=>item.id===id));await saveProject(imported,{createRecovery:false});return imported;
 }
 

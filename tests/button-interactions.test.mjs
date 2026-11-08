@@ -28,11 +28,14 @@ test("Roblox export uses one shared interaction controller and preserves Activat
   assert.equal(output.manifest.nodes.filter((node)=>node.attributes?.CreatorMakeInteractiveBackground===true).length,2);
 });
 
-test("project duplication and portable creator packages are independent",async()=>{
+test("project duplication and portable .creatormake packages are independent",async()=>{
   const project=createProject("Shared Project");project.elements=[createElement("button")];
   const duplicate=duplicateProject(project);duplicate.elements[0].text="Changed copy";
   assert.notEqual(duplicate.id,project.id);assert.equal(project.elements[0].text,"Button");
   const packaged=exportProjectData(project);assert.equal(packaged.format,"creatormake-project");assert.equal(packaged.schemaVersion,21);
   const imported=await importProjectData(packaged);
   assert.notEqual(imported.id,project.id);assert.equal(imported.elements[0].buttonInteraction.enabled,true);assert.equal(imported.elements[0].text,"Button");
+  const newerPackage=structuredClone(packaged);newerPackage.project.schemaVersion=22;
+  const migrated=await importProjectData(newerPackage);
+  assert.equal(migrated.schemaVersion,21);assert.equal(migrated.elements[0].text,"Button");
 });

@@ -82,7 +82,10 @@ test("legacy projects migrate to the current schema and IndexedDB-compatible sav
   const summary=(await listProjects()).find((item)=>item.id===imported.id);
   assert.equal(summary.platform,"Roblox");
   assert.ok(summary.thumbnail.startsWith("data:image/svg+xml"));
-  await assert.rejects(()=>importProjectData({schemaVersion:999,screen:project.screen,elements:project.elements}),/update CreatorMake/);
+  const future=structuredClone(project);future.schemaVersion=999;
+  const forwardImported=await importProjectData(future);
+  assert.equal(forwardImported.schemaVersion,21);
+  assert.equal(forwardImported.elements[0].x,project.elements[0].x);
 });
 
 test("ordinary containers default to unclipped content while scrolling viewports always clip",()=>{
