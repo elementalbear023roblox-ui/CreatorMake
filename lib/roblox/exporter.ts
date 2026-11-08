@@ -428,8 +428,60 @@ function luaValue(value:RobloxPropertyValue):string{if(typeof value==="string")r
 const writeProperty=(target:string,key:string,value:RobloxPropertyValue)=>`${target}.${key} = ${luaValue(value)}`;
 const attributeValue=(value:string|number|boolean)=>typeof value==="string"?quote(value):String(value);
 
+const BUTTON_INTERACTION_CONTROLLER=`local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local root = script.Parent
+local connections, activeTweens = {}, {}
+local function color(value) local hex=tostring(value or "#ffffff"):gsub("#","");return Color3.fromRGB(tonumber(hex:sub(1,2),16) or 255,tonumber(hex:sub(3,4),16) or 255,tonumber(hex:sub(5,6),16) or 255) end
+local function targetFor(button) local wanted=button:GetAttribute("CreatorMakeInteractionTargetId");if wanted then for _,item in ipairs(button:GetDescendants()) do if item:GetAttribute("CreatorMakeId")==wanted then return item end end end;return button end
+local function apply(button,state,duration)
+  local target=targetFor(button);if not target or not target:IsA("GuiObject") then return end
+  if activeTweens[button] then activeTweens[button]:Cancel() end
+  local prefix="CreatorMake"..state
+  local goals={BackgroundColor3=color(button:GetAttribute(prefix.."Color")),BackgroundTransparency=tonumber(button:GetAttribute(prefix.."Transparency")) or 0}
+  if (target:IsA("ImageLabel") or target:IsA("ImageButton")) and button:GetAttribute("CreatorMakeImageTintSafe")==true then goals={ImageColor3=color(button:GetAttribute(prefix.."Color")),ImageTransparency=tonumber(button:GetAttribute(prefix.."Transparency")) or 0} end
+  local easing=Enum.EasingStyle[button:GetAttribute("CreatorMakeInteractionEasing") or "Quad"] or Enum.EasingStyle.Quad
+  local tween=TweenService:Create(target,TweenInfo.new(math.max(0,duration or 0),easing,Enum.EasingDirection.Out),goals);activeTweens[button]=tween;tween:Play()
+  local ok,gradient=pcall(function() return HttpService:JSONDecode(button:GetAttribute("CreatorMakeInteractionGradient"..state) or "{}") end)
+  local uiGradient=target:FindFirstChildOfClass("UIGradient")
+  if ok and gradient.gradientEnabled==true and type(gradient.gradientStops)=="table" then
+    uiGradient=uiGradient or Instance.new("UIGradient");local colors,alpha={},{}
+    for _,stop in ipairs(gradient.gradientStops) do local time=math.clamp((tonumber(stop.position) or 0)/100,0,1);table.insert(colors,ColorSequenceKeypoint.new(time,color(stop.color)));table.insert(alpha,NumberSequenceKeypoint.new(time,1-math.clamp((tonumber(stop.opacity) or 100)/100,0,1))) end
+    if #colors>=2 then uiGradient.Color=ColorSequence.new(colors);uiGradient.Transparency=NumberSequence.new(alpha);uiGradient.Rotation=tonumber(gradient.gradientAngle) or 0;uiGradient.Parent=target end
+  elseif uiGradient then uiGradient:Destroy() end
+end
+local function bind(button)
+  if not button:IsA("GuiButton") or button:GetAttribute("CreatorMakeInteractiveBackground")~=true then return end
+  button.AutoButtonColor=false;local suppressHover=false
+  table.insert(connections,button.MouseEnter:Connect(function() if not suppressHover and button.Visible and button.Active then apply(button,"Hover",button:GetAttribute("CreatorMakeHoverDuration")) end end))
+  table.insert(connections,button.MouseLeave:Connect(function() suppressHover=false;apply(button,"Normal",button:GetAttribute("CreatorMakeHoverDuration")) end))
+  table.insert(connections,button.InputBegan:Connect(function(input) if button.Visible and button.Active and (input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch) then apply(button,"Pressed",button:GetAttribute("CreatorMakePressedDuration")) end end))
+  table.insert(connections,button.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then apply(button,"Normal",button:GetAttribute("CreatorMakePressedDuration")) end end))
+  table.insert(connections,button.Activated:Connect(function() suppressHover=true;apply(button,"Normal",button:GetAttribute("CreatorMakePressedDuration")) end))
+  table.insert(connections,button:GetPropertyChangedSignal("Visible"):Connect(function() if not button.Visible then suppressHover=true;apply(button,"Normal",0) end end))
+  table.insert(connections,button:GetPropertyChangedSignal("Active"):Connect(function() if not button.Active then suppressHover=true;apply(button,"Normal",0) end end))
+  apply(button,"Normal",0)
+end
+for _,item in ipairs(root:GetDescendants()) do bind(item) end
+table.insert(connections,root.DescendantAdded:Connect(bind))
+script.Destroying:Connect(function() for _,tween in pairs(activeTweens) do tween:Cancel() end;for _,connection in ipairs(connections) do connection:Disconnect() end end)`;
+
+export function attachButtonInteractions(project:EditorProject,nodes:RobloxManifestNode[]){
+  let count=0;
+  for(const element of project.elements){
+    if(element.hidden||(element.type!=="button"&&element.type!=="image-button")||!element.buttonInteraction.enabled)continue;
+    const root=nodes.find((node)=>node.sourceId===element.id);if(!root)continue;
+    const visual=nodes.find((node)=>node.parentSourceId===element.id&&["Background","BackgroundImage"].includes(String(node.attributes?.CreatorMakeRole))),settings=element.buttonInteraction;
+    root.properties={...root.properties,Active:!settings.disabled};
+    root.attributes={...root.attributes,CreatorMakeInteractiveBackground:true,CreatorMakeInteractionTargetId:visual?.sourceId??element.id,CreatorMakeImageTintSafe:Boolean(visual),CreatorMakeNormalColor:settings.normal.color,CreatorMakeNormalTransparency:round(settings.normal.transparency/100,4),CreatorMakeHoverColor:settings.hover.color,CreatorMakeHoverTransparency:round(settings.hover.transparency/100,4),CreatorMakePressedColor:settings.pressed.color,CreatorMakePressedTransparency:round(settings.pressed.transparency/100,4),CreatorMakeHoverDuration:settings.hoverDuration,CreatorMakePressedDuration:settings.pressedDuration,CreatorMakeInteractionEasing:settings.easing,CreatorMakeInteractionGradientNormal:JSON.stringify(settings.normal),CreatorMakeInteractionGradientHover:JSON.stringify(settings.hover),CreatorMakeInteractionGradientPressed:JSON.stringify(settings.pressed),CreatorMakeHoverImageSource:element.imageStateAssetIds.hover??"",CreatorMakePressedImageSource:element.imageStateAssetIds.pressed??""};count+=1;
+  }
+  if(count)nodes.push({sourceId:"creatormake::button-interaction-controller",name:"CreatorMakeButtonInteractions",className:"LocalScript",parentSourceId:null,properties:{Source:BUTTON_INTERACTION_CONTROLLER,Enabled:true},attributes:{CreatorMakeRole:"SharedButtonInteractionController",CreatorMakeButtonCount:count},decorators:[]});
+  return count;
+}
+
 export function createRobloxExport(project:EditorProject,options:RobloxExportOptions,renderAssets?:RobloxRenderAsset[]){
   const renderedMode=options.visualMode!=="NATIVE",pixel=options.visualMode==="PIXEL_ACCURATE",adaptive=options.visualMode==="ADAPTIVE",assets=renderedMode?reconcileRenderAssets(project,options,renderAssets):[],nodes=pixel?pixelNodes(project,options,assets):adaptive?adaptiveNodes(project,options,assets):nativeSemanticNodes(project,options),imageManifest=createImageManifest(project,assets);
+  attachButtonInteractions(project,nodes);
   const manifestAssets=assets.map((asset)=>{const manifestAsset={...asset};delete manifestAsset.sourceDataUrl;delete manifestAsset.differenceDataUrl;return manifestAsset;});
   const projectId=project.id||options.screenGuiName,projectName=project.name||options.screenGuiName,guiId=`${projectId}:screen`,projectObjectIds=project.elements.map((element)=>element.id),exportedProjectObjectCount=project.elements.filter((element)=>!element.hidden).length;
   const manifest:RobloxManifest={kind:"project",messageType:"PROJECT_MANIFEST",schema:"creatormake.roblox-manifest",version:2,textExportArchitecture:3,projectId,projectName,guiId,manifestVersion:`${projectId}:${project.updatedAt??0}:${project.elements.length}`,projectObjectIds,exportDiagnostics:{projectObjectCount:project.elements.length,exportedProjectObjectCount,exportNodeCount:nodes.length,presetsExported:0,presetDefinitionsIncluded:false},screenGuiName:options.screenGuiName,deployTarget:"STARTER_GUI",screenGuiSettings:{enabled:true,displayOrder:options.displayOrder,ignoreGuiInset:renderedMode,resetOnSpawn:options.resetOnSpawn,zIndexBehavior:options.zIndexBehavior},referenceResolution:{width:renderedMode?project.screen.width:options.resolution.width,height:renderedMode?project.screen.height:options.resolution.height},sizingMode:renderedMode?"OFFSET":options.sizingMode,visualMode:options.visualMode,renderScale:options.renderScale,viewportScaleMode:renderedMode?"FIT":undefined,assets:manifestAssets,imageManifest,nodes};

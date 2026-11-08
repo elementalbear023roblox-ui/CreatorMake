@@ -2,6 +2,8 @@ export type ElementType = "frame" | "container" | "scrolling-frame" | "text" | "
 
 export type ImageFitMode = "fit" | "fill" | "stretch" | "original" | "tile";
 export type ImageState = "default" | "hover" | "pressed" | "disabled" | "selected";
+export type ButtonVisualState={color:string;transparency:number;gradientEnabled:boolean;gradientAngle:number;gradientStops:GradientStop[]};
+export type ButtonInteractionSettings={enabled:boolean;disabled:boolean;normal:ButtonVisualState;hover:ButtonVisualState;pressed:ButtonVisualState;hoverDuration:number;pressedDuration:number;easing:"Linear"|"Quad"|"Cubic"|"Quart"|"Quint"|"Sine"|"Back";imageMode:"auto"|"state-images"|"overlay";overlayOpacity:number};
 export type TextRobloxExportMode = "AUTO" | "NATIVE_TEXT" | "PIXEL_ACCURATE" | "NATIVE" | "PIXEL";
 export type RobloxObjectExportMode = "AUTO" | "ORIGINAL" | "IMAGE";
 export type TextSizingMode = "fixed" | "fit-geometry" | "responsive";
@@ -423,6 +425,7 @@ export type EditorElement = {
   imageTintOpacity: number;
   imageStateAssetIds: Record<ImageState,string | null>;
   imagePreviewState: ImageState;
+  buttonInteraction: ButtonInteractionSettings;
   sliceCenter: { left:number;top:number;right:number;bottom:number } | null;
   sliceScale: number;
   robloxExportMode: RobloxObjectExportMode | null;
@@ -478,7 +481,7 @@ export type ProjectExportOptions = {
 };
 
 export type EditorProject = {
-  schemaVersion: 20;
+  schemaVersion: 21;
   id: string;
   name: string;
   createdAt: number;

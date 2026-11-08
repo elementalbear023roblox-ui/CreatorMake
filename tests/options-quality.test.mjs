@@ -6,9 +6,9 @@ import { applyProjectOptionPreset, DEFAULT_PROJECT_EXPORT_OPTIONS, resolveProjec
 import { maximumSafeInternalScale, planPixelAccurateAssets } from "../lib/roblox/render-assets.ts";
 import { CREATORMAKE_MASTER_CAPABILITIES, ROBLOX_IMAGE_CAPABILITIES, planMasterRender } from "../lib/roblox/image-capabilities.ts";
 
-test("project export options persist in schema 20 while editor options remain outside the project",()=>{
+test("project export options persist in schema 21 while editor options remain outside the project",()=>{
   const project=createProject("Options");project.exportOptions={...project.exportOptions,renderedVisualQuality:"ULTRA",incrementalSync:false};
-  const restored=normalizeProject(structuredClone(project));assert.equal(restored.schemaVersion,20);assert.equal(restored.exportOptions.defaultRobloxExportMode,"AUTO");assert.equal(restored.exportOptions.exportQuality,"FINAL");assert.equal(restored.exportOptions.renderedVisualQuality,"ULTRA");assert.equal(restored.exportOptions.incrementalSync,false);assert.equal("previewQuality" in restored.exportOptions,false);
+  const restored=normalizeProject(structuredClone(project));assert.equal(restored.schemaVersion,21);assert.equal(restored.exportOptions.defaultRobloxExportMode,"AUTO");assert.equal(restored.exportOptions.exportQuality,"FINAL");assert.equal(restored.exportOptions.renderedVisualQuality,"ULTRA");assert.equal(restored.exportOptions.incrementalSync,false);assert.equal("previewQuality" in restored.exportOptions,false);
   const legacy=structuredClone(project);delete legacy.exportOptions;legacy.schemaVersion=13;assert.deepEqual(normalizeProject(legacy).exportOptions,DEFAULT_PROJECT_EXPORT_OPTIONS);
   const commission=createProject("Commission","commission");assert.equal(commission.exportOptions.defaultRobloxExportMode,"AUTO");assert.equal(commission.exportOptions.exportQuality,"FINAL");assert.equal(commission.exportOptions.robloxImages,"PUBLISHABLE");assert.equal(commission.exportOptions.hierarchyExport,"PRESERVE");assert.equal(commission.exportOptions.multiplayerSafeAssets,"REQUIRE");
 });

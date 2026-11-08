@@ -59,7 +59,7 @@ test("legacy projects migrate to the current schema and IndexedDB-compatible sav
   const legacyText=createElement("text");legacyText.fontSize=37;legacyText.fontSizeDesign=37;project.elements=[legacyText];
   const legacy=structuredClone(project);delete legacy.schemaVersion;delete legacy.elements[0].fontSizeDesign;delete legacy.elements[0].textSizingMode;delete legacy.elements[0].responsiveMinTextSize;delete legacy.elements[0].responsiveMaxTextSize;delete legacy.elements[0].textPadding;legacy.elements[0].autoFit=true;
   const normalized=normalizeProject(legacy);
-  assert.equal(normalized.schemaVersion,20);
+  assert.equal(normalized.schemaVersion,21);
   assert.equal(normalized.elements[0].automaticCanvasSize,"None");
   assert.equal(normalized.elements[0].fontId,"inter");
   assert.equal(normalized.elements[0].fontSizeDesign,37);
@@ -72,12 +72,12 @@ test("legacy projects migrate to the current schema and IndexedDB-compatible sav
   assert.equal((await listRecoverySnapshots()).length,1);
   assert.equal((await loadProject(project.id)).elements[0].x,project.elements[0].x);
   const imported=await importProjectData({format:"creatormake-project",formatVersion:1,project:JSON.parse(JSON.stringify(project))});
-  assert.equal(imported.schemaVersion,20);
+  assert.equal(imported.schemaVersion,21);
   assert.notEqual(imported.id,project.id);
   assert.equal(imported.elements[0].x,project.elements[0].x);
   const exported=exportProjectData(imported);
   assert.equal(exported.format,"creatormake-project");
-  assert.equal(exported.schemaVersion,20);
+  assert.equal(exported.schemaVersion,21);
   assert.equal(exported.project.id,imported.id);
   const summary=(await listProjects()).find((item)=>item.id===imported.id);
   assert.equal(summary.platform,"Roblox");

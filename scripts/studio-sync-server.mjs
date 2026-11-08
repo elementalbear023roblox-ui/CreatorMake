@@ -62,7 +62,7 @@ function sendJson(response, statusCode, value, origin) {
   response.end(body);
 }
 
-const SUPPORTED_NODE_CLASSES = new Set(["Frame", "ImageLabel", "ImageButton", "TextLabel", "TextButton", "TextBox", "ScrollingFrame"]);
+const SUPPORTED_NODE_CLASSES = new Set(["Frame", "ImageLabel", "ImageButton", "TextLabel", "TextButton", "TextBox", "ScrollingFrame", "LocalScript"]);
 const SUPPORTED_DECORATOR_CLASSES = new Set(["UIAspectRatioConstraint", "UICorner", "UIGradient", "UIGridLayout", "UIListLayout", "UIPadding", "UIScale", "UISizeConstraint", "UIStroke", "UITextSizeConstraint"]);
 const plainObject = (value) => Boolean(value && typeof value === "object" && !Array.isArray(value));
 const manifestFieldError = (node, index, field, reason) => new Error(`Manifest validation failed: Object: ${node?.sourceId || `nodes[${index}]`} | Type: ${node?.attributes?.CreatorMakeElementType || node?.className || "Unknown"} | Field: ${field} | Reason: ${reason}`);
@@ -114,7 +114,7 @@ function validateManifest(value) {
   }
   const projectObjectIds = new Set(value.projectObjectIds);
   for (const [index, node] of value.nodes.entries()) {
-    if (node.sourceId === "__creatormake_viewport") continue;
+    if (node.sourceId === "__creatormake_viewport" || node.sourceId === "creatormake::button-interaction-controller") continue;
     const attributes = node.attributes ?? {};
     const explicitOwner = attributes.CreatorMakeSourceElementId ?? attributes.CreatorMakeLayoutSourceId ?? attributes.CreatorMakeSourceId ?? attributes.CreatorMakeLogicalParentId;
     const ownerId = String(explicitOwner ?? node.sourceId).split("::")[0];

@@ -3,6 +3,7 @@ import { createRobloxExport } from "./exporter.ts";
 import type { RobloxExportOptions, RobloxRenderAsset } from "./types.ts";
 
 const VIEWPORT_SOURCE_ID="__creatormake_viewport";
+const SHARED_BUTTON_CONTROLLER_ID="creatormake::button-interaction-controller";
 
 const nodeOwnerId=(node:ReturnType<typeof createRobloxExport>["manifest"]["nodes"][number])=>{
   const attributes=node.attributes??{};
@@ -19,7 +20,7 @@ const nodeOwnerId=(node:ReturnType<typeof createRobloxExport>["manifest"]["nodes
 export function buildActiveProjectRobloxManifest(project:EditorProject,options:RobloxExportOptions,renderAssets?:RobloxRenderAsset[]){
   if(!project?.id||!project.name||!Array.isArray(project.elements))throw new Error("ACTIVE_PROJECT_MISSING: No CreatorMake project is currently available for import.");
   const output=createRobloxExport(project,options,renderAssets),allowedIds=new Set(project.elements.map((element)=>element.id));
-  const foreign=output.manifest.nodes.filter((node)=>node.sourceId!==VIEWPORT_SOURCE_ID&&!allowedIds.has(nodeOwnerId(node)));
+  const foreign=output.manifest.nodes.filter((node)=>node.sourceId!==VIEWPORT_SOURCE_ID&&node.sourceId!==SHARED_BUTTON_CONTROLLER_ID&&!allowedIds.has(nodeOwnerId(node)));
   if(foreign.length)throw new Error(`ACTIVE_PROJECT_EXPORT_VIOLATION: ${foreign.map((node)=>`${node.sourceId} (${node.name})`).join(", ")} did not originate in project ${project.id}.`);
   if(output.manifest.kind!=="project"||output.manifest.messageType!=="PROJECT_MANIFEST"||output.manifest.projectId!==project.id||output.manifest.guiId!==`${project.id}:screen`)throw new Error("ACTIVE_PROJECT_EXPORT_VIOLATION: the manifest lost its stable active-project identity.");
   if(output.manifest.exportDiagnostics.presetsExported!==0||output.manifest.exportDiagnostics.presetDefinitionsIncluded)throw new Error("ACTIVE_PROJECT_EXPORT_VIOLATION: preset definitions cannot be exported.");

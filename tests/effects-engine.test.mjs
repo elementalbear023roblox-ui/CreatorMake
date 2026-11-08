@@ -42,7 +42,7 @@ test("effect instances serialize, normalize unsafe input, and survive project mi
   assert.equal(normalized.length,1);assert.equal(normalized[0].parameters.radius,120);
   const project=createProject("Effects"),element=createElement("frame");element.effects=normalized;project.elements=[element];
   const restored=normalizeProject(structuredClone(project));
-  assert.equal(restored.schemaVersion,20);assert.equal(restored.elements[0].effects[0].type,"neon-glow");assert.notEqual(restored.elements[0].effects,element.effects);
+  assert.equal(restored.schemaVersion,21);assert.equal(restored.elements[0].effects[0].type,"neon-glow");assert.notEqual(restored.elements[0].effects,element.effects);
 });
 
 test("Roblox export never silently drops visual effects",()=>{

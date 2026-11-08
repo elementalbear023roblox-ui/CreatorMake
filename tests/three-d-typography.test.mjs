@@ -24,8 +24,8 @@ test("3D typography layout uses metrics, kerning, multiple lines, and independen
   assert.equal(new Set(layout.placements.map((item)=>item.index)).size,layout.placements.length);
 });
 
-test("schema 20 preserves imported fonts, outline glyph meshes, and editable source text",()=>{
+test("schema 21 preserves imported fonts, outline glyph meshes, and editable source text",()=>{
   const project=createProject("3D typography"),font=structuredClone(MAROLA_THREE_D_FONT),group=createElement("container"),letter=createElement("three-d");font.id="project-font";font.source="imported";font.importedAt=1;project.threeDFonts=[font];group.typographyComposer={...DEFAULT_TYPOGRAPHY_COMPOSER,fontId:font.id,text:"A"};letter.parentId=group.id;letter.threeD={...letter.threeD,primitive:"font-letter",fontId:font.id,fontFamily:font.family,fontGlyph:"A",fontGlyphOutline:structuredClone(font.glyphs.A),bevelDepth:7,curveDetail:24,depthDirection:"forward"};project.elements=[group,letter];
   const restored=normalizeProject(structuredClone(project));
-  assert.equal(restored.schemaVersion,20);assert.equal(restored.threeDFonts[0].glyphs.A.commands.length,font.glyphs.A.commands.length);assert.equal(restored.elements[0].typographyComposer?.text,"A");assert.equal(restored.elements[1].threeD.primitive,"font-letter");assert.equal(restored.elements[1].threeD.fontGlyph,"A");assert.equal(restored.elements[1].threeD.bevelDepth,7);assert.equal(restored.elements[1].threeD.depthDirection,"forward");assert.equal(restored.elements[1].threeD.boundsPadding,10);
+  assert.equal(restored.schemaVersion,21);assert.equal(restored.threeDFonts[0].glyphs.A.commands.length,font.glyphs.A.commands.length);assert.equal(restored.elements[0].typographyComposer?.text,"A");assert.equal(restored.elements[1].threeD.primitive,"font-letter");assert.equal(restored.elements[1].threeD.fontGlyph,"A");assert.equal(restored.elements[1].threeD.bevelDepth,7);assert.equal(restored.elements[1].threeD.depthDirection,"forward");assert.equal(restored.elements[1].threeD.boundsPadding,10);
 });

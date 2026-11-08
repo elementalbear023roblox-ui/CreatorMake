@@ -17,6 +17,7 @@ local EncodingService = game:GetService("EncodingService")
 local StarterGui = game:GetService("StarterGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ScriptEditorService = game:GetService("ScriptEditorService")
 
 local LOCAL_ORIGIN = ${JSON.stringify(CREATORMAKE_BRIDGE_ORIGIN)}
 local CREATORMAKE_APP_VERSION = ${JSON.stringify(CREATORMAKE_APP_VERSION)}
@@ -578,6 +579,11 @@ local function applyManifest(manifest, deployTarget)
     for key,value in pairs(node.attributes or {}) do instance:SetAttribute(key,value) end
     instance:SetAttribute("CreatorMakeId",node.sourceId);instance:SetAttribute("CreatorMakeManaged",true);instance:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest));instance:SetAttribute("CreatorMakeGuiId",manifest.guiId)
     setProperties(instance,node.properties)
+    if instance:IsA("LuaSourceContainer") and type(node.properties.Source)=="string" then
+      local source=node.properties.Source
+      local ok,problem=pcall(function() ScriptEditorService:UpdateSourceAsync(instance,function() return source end) end)
+      if not ok then instance:Destroy();error("CreatorMake could not install the shared button controller: "..tostring(problem)) end
+    end
     local parent=node.parentSourceId and existing[node.parentSourceId] or nil
     instance.Parent=parent or screenGui;existing[node.sourceId]=instance
     local decoratorKeys={}

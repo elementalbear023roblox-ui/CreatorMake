@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, Boxes, Columns3, Grid3X3, PanelTop, Rows3, Scan, X } from "lucide-react";
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, Boxes, Columns3, Grid3X3, MousePointerClick, PanelTop, Rows3, Scan, Settings2, X } from "lucide-react";
 import type { Alignment, AlignmentTarget, BooleanOperation } from "@/lib/editor/types";
 import type { RepeatGridOptions } from "@/lib/editor/operations";
 
@@ -19,6 +19,7 @@ type Props = {
   onGroup: () => void;
   onUngroup: () => void;
   onBoolean: (operation:BooleanOperation) => void;
+  interactiveButton?:{enabled:boolean;onToggle:(enabled:boolean)=>void;onSettings:()=>void}|null;
 };
 
 export function ContextBar(props: Props) {
@@ -31,6 +32,7 @@ export function ContextBar(props: Props) {
   const exact=spacing.trim()===""?undefined:Number(spacing);
   return <div className="context-bar">
     <span>{props.count} selected</span>
+    {props.interactiveButton&&<><span className="context-divider"/><button className={`context-interaction-toggle ${props.interactiveButton.enabled?"active":""}`} aria-label="Toggle interactive button background" aria-pressed={props.interactiveButton.enabled} title="Interactive Background · Normal, Hover and Click" onClick={()=>props.interactiveButton?.onToggle(!props.interactiveButton.enabled)}><MousePointerClick size={13}/><span>Interactive Background</span></button><button className="context-interaction-settings" aria-label="Open interactive background settings" title="Interactive background settings" onClick={props.interactiveButton.onSettings}><Settings2 size={13}/></button></>}
     <label className="align-target"><span>Align to</span><select value={target} onChange={(event)=>setTarget(event.target.value as AlignmentTarget)}><option value="selection">Selection</option><option value="parent">Parent</option><option value="frame">Frame</option><option value="canvas">Canvas</option><option value="key-object">Key · {props.keyObjectName??"active"}</option></select></label>
     {buttons.map(([value,Icon,label]) => <button key={value} aria-label={label} title={`${label} to ${target}`} disabled={target==="selection"&&props.count<2} onClick={() => props.onAlign(value,target)}><Icon size={14}/></button>)}
     <span className="context-divider"/>
