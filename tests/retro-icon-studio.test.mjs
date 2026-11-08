@@ -1,19 +1,29 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createRetroIconElement, RETRO_ICON_CAMERA_PRESETS, RETRO_ICON_LIBRARY, RETRO_ICON_MATERIAL_PRESETS, retroGearProfile } from "../lib/editor/retro-icons.ts";
+import { createRetroIconElement, RETRO_ICON_CAMERA_PRESETS, RETRO_ICON_GEOMETRY_STANDARDS, RETRO_ICON_LIBRARY, RETRO_ICON_MATERIAL_PRESETS, RETRO_ICON_REQUIRED_23, retroGearProfile, validateRetroIconLibrary } from "../lib/editor/retro-icons.ts";
 import { createProject, normalizeProject } from "../lib/editor/project.ts";
 import { normalizeThreeDSettings, threeDGeometryKey, tightThreeDRenderBounds } from "../lib/editor/three-d.ts";
 import { classifyRobloxElement } from "../lib/roblox/classification.ts";
 import { applyColorKeyPixels, colorKeyAlpha } from "../lib/editor/color-key.ts";
 
-test("the expanded retro CGI collection contains 26 distinct editable silhouettes",()=>{
-  const requested=["warning-sign","dice","coin-pile","inverted-dice","shoe","red-buzzer","prize-wheel","golden-ticket","winners-cup","stage-curtains","slot-machine","marquee-sign","vhs-tape","hard-drive","compact-disc","email-envelope","spinning-globe","starburst","mystery-box","puzzle-piece","hourglass","golden-key"];
-  assert.equal(RETRO_ICON_LIBRARY.length,26);
-  assert.ok(requested.every((kind)=>RETRO_ICON_LIBRARY.some((item)=>item.kind===kind)));
+test("the premium retro CGI collection contains all 23 requested models plus compatible legacy icons",()=>{
+  assert.equal(RETRO_ICON_LIBRARY.length,27);
+  assert.equal(RETRO_ICON_REQUIRED_23.length,23);
+  assert.ok(RETRO_ICON_REQUIRED_23.every((kind)=>RETRO_ICON_LIBRARY.some((item)=>item.kind===kind)));
   assert.equal(new Set(RETRO_ICON_LIBRARY.map((item)=>item.silhouette)).size,RETRO_ICON_LIBRARY.length);
   assert.ok(RETRO_ICON_MATERIAL_PRESETS.length>=8);
-  assert.deepEqual(RETRO_ICON_CAMERA_PRESETS.map((item)=>item.id),["front","three-quarter","isometric","low","high"]);
+  assert.deepEqual(RETRO_ICON_CAMERA_PRESETS.slice(0,6).map((item)=>item.id),["front","rear","left","right","top","three-quarter"]);
+  assert.deepEqual(validateRetroIconLibrary(),[]);
+});
+
+test("mathematical icon standards enforce dice, wheel, preview, and export invariants",()=>{
+  assert.ok(RETRO_ICON_GEOMETRY_STANDARDS.diceOpposites.every(([a,b])=>a+b===7));
+  assert.equal(RETRO_ICON_GEOMETRY_STANDARDS.prizeWheelSegments*RETRO_ICON_GEOMETRY_STANDARDS.prizeWheelDegrees,360);
+  assert.deepEqual(RETRO_ICON_GEOMETRY_STANDARDS.smallPreviewSizes,[32,48,64,128]);
+  assert.deepEqual(RETRO_ICON_GEOMETRY_STANDARDS.exportSizes,[64,128,256,512,1024,2048,4096,8192]);
+  const dice=createRetroIconElement({kind:"dice",style:"classic-cgi"}),inverse=createRetroIconElement({kind:"inverted-dice",style:"classic-cgi"});
+  assert.deepEqual([dice.threeD.rotationX,dice.threeD.rotationY,dice.threeD.rotationZ,dice.threeD.depth,dice.threeD.bevel],[inverse.threeD.rotationX,inverse.threeD.rotationY,inverse.threeD.rotationZ,inverse.threeD.depth,inverse.threeD.bevel]);
 });
 
 test("gear profile produces four deliberate corners per tooth without overlap",()=>{
@@ -45,5 +55,5 @@ test("the renderer keeps exactly ten design pixels around projected geometry",()
 });
 
 test("the visible editor exposes the Icon Studio, alpha export, small-size QA, and complete composite models",async()=>{
-  const studio=await readFile(new URL("../components/editor/RetroIconStudio.tsx",import.meta.url),"utf8"),surface=await readFile(new URL("../components/editor/ThreeDObjectSurface.tsx",import.meta.url),"utf8"),library=await readFile(new URL("../components/editor/RetroLibraryPanel.tsx",import.meta.url),"utf8");assert.match(library,/3D Icons/);assert.match(library,/Open 3D Icon Studio/);assert.match(studio,/SMALL-SIZE CHECK/);assert.match(studio,/Search 3D icons/);assert.match(studio,/color transparency/);assert.match(studio,/color transparent/);assert.match(studio,/Make transparent/);assert.match(studio,/ADVANCED CHROMA KEY/);assert.match(studio,/Color key tolerance/);assert.match(studio,/PNG alpha/);assert.match(studio,/WebP alpha/);assert.match(studio,/Insert into canvas/);assert.match(surface,/buildRetroIconModel/);assert.match(surface,/retroGearProfile/);assert.match(surface,/iconScreenContent/);assert.match(surface,/warning-sign/);assert.match(surface,/golden-key/);assert.match(surface,/roleOpacity/);assert.match(surface,/MeshPhysicalMaterial/);assert.match(surface,/clearcoatRoughness/);assert.match(surface,/iridescenceThicknessMinimum/);assert.match(surface,/ring=\(outer/);assert.match(surface,/wedge\.absarc/);assert.match(surface,/puzzle\.bezierCurveTo/);assert.match(surface,/material\.depthWrite=material\.opacity>=\.999/);assert.match(surface,/applyColorKeyPixels/);assert.match(surface,/materialSlots=Math\.max/);assert.match(surface,/getImageData\(x,y,1,1\)\.data\[3\]>8/);
+  const studio=await readFile(new URL("../components/editor/RetroIconStudio.tsx",import.meta.url),"utf8"),surface=await readFile(new URL("../components/editor/ThreeDObjectSurface.tsx",import.meta.url),"utf8"),library=await readFile(new URL("../components/editor/RetroLibraryPanel.tsx",import.meta.url),"utf8");assert.match(library,/3D Icons/);assert.match(library,/Open 3D Icon Studio/);assert.match(studio,/SMALL-SIZE CHECK/);assert.match(studio,/MULTI-ANGLE QA/);assert.match(studio,/Auto rotate/);assert.match(studio,/Reset view/);assert.match(studio,/3D icon zoom/);assert.match(studio,/safe render budget/);assert.match(studio,/Search 3D icons/);assert.match(studio,/color transparency/);assert.match(studio,/color transparent/);assert.match(studio,/Make transparent/);assert.match(studio,/ADVANCED CHROMA KEY/);assert.match(studio,/Color key tolerance/);assert.match(studio,/PNG alpha/);assert.match(studio,/WebP alpha/);assert.match(studio,/Insert into canvas/);assert.match(surface,/buildRetroIconModel/);assert.match(surface,/retroGearProfile/);assert.match(surface,/iconScreenContent/);assert.match(surface,/windows-flag/);assert.match(surface,/pixelText\("GOLDEN"/);assert.match(surface,/pixelText\("SHOWTIME!"/);assert.match(surface,/golden-key/);assert.match(surface,/roleOpacity/);assert.match(surface,/HemisphereLight/);assert.match(surface,/fabricRole/);assert.match(surface,/rubberRole/);assert.match(surface,/MeshPhysicalMaterial/);assert.match(surface,/clearcoatRoughness/);assert.match(surface,/iridescenceThicknessMinimum/);assert.match(surface,/ring=\(outer/);assert.match(surface,/wedge\.absarc/);assert.match(surface,/puzzle\.bezierCurveTo/);assert.match(surface,/material\.depthWrite=material\.opacity>=\.999/);assert.match(surface,/applyColorKeyPixels/);assert.match(surface,/iconMeshCount/);assert.match(surface,/materialSlots=Math\.max/);assert.match(surface,/getImageData\(x,y,1,1\)\.data\[3\]>8/);
 });

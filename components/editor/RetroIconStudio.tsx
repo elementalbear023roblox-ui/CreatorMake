@@ -1,14 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, Box, CircleDollarSign, CircleDot, Clock3, Cog, Coins, Disc3, Dices, Download, Film, Footprints, Gift, Globe2, HardDrive, Hourglass, KeyRound, Mail, Monitor, Plus, Puzzle, Search, Star, Ticket, Trophy, Videotape, X } from "lucide-react";
+import { AlertTriangle, AppWindow, Box, CircleDollarSign, CircleDot, Clock3, Cog, Coins, Disc3, Dices, Download, Film, Footprints, Gift, Globe2, HardDrive, Hourglass, KeyRound, Mail, Monitor, Pause, Play, Plus, Puzzle, RotateCcw, Search, Star, Ticket, Trophy, Videotape, X } from "lucide-react";
 import type { EditorElement, RetroIconKind, RetroIconStyle, ThreeDSettings } from "@/lib/editor/types";
-import { createRetroIconElement, RETRO_ICON_CAMERA_PRESETS, RETRO_ICON_LIBRARY, RETRO_ICON_MATERIAL_PRESETS, type RetroIconInsertOptions } from "@/lib/editor/retro-icons";
+import { createRetroIconElement, RETRO_ICON_CAMERA_PRESETS, RETRO_ICON_GEOMETRY_STANDARDS, RETRO_ICON_LIBRARY, RETRO_ICON_MATERIAL_PRESETS, type RetroIconInsertOptions } from "@/lib/editor/retro-icons";
 import { ThreeDObjectSurface } from "./ThreeDObjectSurface";
 
 type Props={onClose:()=>void;onInsert:(options:RetroIconInsertOptions)=>void};
-const ICONS:Partial<Record<RetroIconKind,typeof Box>>={gear:Cog,dollar:CircleDollarSign,clock:Clock3,monitor:Monitor,"warning-sign":AlertTriangle,dice:Dices,"coin-pile":Coins,"inverted-dice":Dices,shoe:Footprints,"red-buzzer":CircleDot,"prize-wheel":CircleDot,"golden-ticket":Ticket,"winners-cup":Trophy,"stage-curtains":Film,"slot-machine":Gift,"marquee-sign":Star,"vhs-tape":Videotape,"hard-drive":HardDrive,"compact-disc":Disc3,"email-envelope":Mail,"spinning-globe":Globe2,starburst:Star,"mystery-box":Gift,"puzzle-piece":Puzzle,hourglass:Hourglass,"golden-key":KeyRound};
+const ICONS:Partial<Record<RetroIconKind,typeof Box>>={gear:Cog,dollar:CircleDollarSign,clock:Clock3,monitor:Monitor,"warning-sign":AlertTriangle,"windows-flag":AppWindow,dice:Dices,"coin-pile":Coins,"inverted-dice":Dices,shoe:Footprints,"red-buzzer":CircleDot,"prize-wheel":CircleDot,"golden-ticket":Ticket,"winners-cup":Trophy,"stage-curtains":Film,"slot-machine":Gift,"marquee-sign":Star,"vhs-tape":Videotape,"hard-drive":HardDrive,"compact-disc":Disc3,"email-envelope":Mail,"spinning-globe":Globe2,starburst:Star,"mystery-box":Gift,"puzzle-piece":Puzzle,hourglass:Hourglass,"golden-key":KeyRound};
 const THEMES={
   "Mr Creator":{color:"#8b4dff",sideColor:"#3b176f",accentColor:"#fff05a",detailColor:"#21143e",screenColor:"#1a3240"},
   Crextor:{color:"#e23838",sideColor:"#3a1118",accentColor:"#ff755f",detailColor:"#141218",screenColor:"#35131b"},
@@ -31,29 +31,37 @@ export function RetroIconStudio({onClose,onInsert}:Props){
   const [query,setQuery]=useState("");
   const [resolution,setResolution]=useState(512);
   const [format,setFormat]=useState<"png"|"webp">("png");
+  const [spinning,setSpinning]=useState(false);
+  const [exportNotice,setExportNotice]=useState("");
   const previewRef=useRef<HTMLDivElement>(null);
   const definition=useMemo(()=>RETRO_ICON_LIBRARY.find((item)=>item.kind===kind)!,[kind]);
   const filteredIcons=useMemo(()=>{const needle=query.trim().toLowerCase();return needle?RETRO_ICON_LIBRARY.filter((item)=>`${item.name} ${item.shortName} ${item.description}`.toLowerCase().includes(needle)):RETRO_ICON_LIBRARY;},[query]);
   const settings=element.threeD;
   const choose=(next:RetroIconKind)=>{setKind(next);setElement(createRetroIconElement({kind:next,style}));};
   const patch=(next:Partial<ThreeDSettings>)=>setElement((current)=>({...current,threeD:{...current.threeD,...next}}));
+  useEffect(()=>{if(!spinning)return;let frame=0,last=0;const tick=(time:number)=>{if(time-last>32){last=time;setElement((current)=>({...current,threeD:{...current.threeD,rotationY:(current.threeD.rotationY+.7)%360}}));}frame=requestAnimationFrame(tick);};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame);},[spinning]);
   const setMaterialColor=(key:typeof MATERIAL_COLORS[number][1],value:string)=>{if(key==="color")patch({color:value});else if(key==="sideColor")patch({sideColor:value});else if(key==="accentColor")patch({accentColor:value});else if(key==="detailColor")patch({detailColor:value});else patch({screenColor:value});};
   const setMaterialOpacity=(key:typeof MATERIAL_COLORS[number][2],value:number)=>{if(key==="colorOpacity")patch({colorOpacity:value});else if(key==="sideColorOpacity")patch({sideColorOpacity:value});else if(key==="accentColorOpacity")patch({accentColorOpacity:value});else if(key==="detailColorOpacity")patch({detailColorOpacity:value});else patch({screenColorOpacity:value});};
-  const exportImage=()=>{
-    const source=previewRef.current?.querySelector("canvas");
+  const exportImage=async()=>{
+    const stage=previewRef.current,initial=stage?.querySelector("canvas");
+    if(!stage||!initial)return;
+    const maxTexture=Math.max(1024,Number(initial.dataset.maxTextureSize)||RETRO_ICON_GEOMETRY_STANDARDS.safeBrowserExportLimit),safeResolution=Math.min(resolution,maxTexture,RETRO_ICON_GEOMETRY_STANDARDS.safeBrowserExportLimit),exportScale=safeResolution/320;
+    stage.dataset.creatormakeExportScale=String(exportScale);setExportNotice(resolution>safeResolution?`${resolution} × ${resolution} exceeds this browser's safe render budget; exported ${safeResolution} × ${safeResolution} instead.`:`Rendering ${safeResolution} × ${safeResolution}…`);setElement((current)=>({...current}));
+    for(let frame=0;frame<24;frame++){await new Promise<void>((resolve)=>requestAnimationFrame(()=>resolve()));const candidate=stage.querySelector("canvas");if(candidate?.dataset.renderReady==="true"&&candidate.width>=safeResolution*.8)break;}
+    const source=stage.querySelector("canvas");
     if(!source||source.dataset.renderReady!=="true")return;
     const output=document.createElement("canvas"),context=output.getContext("2d",{alpha:true});
     if(!context)return;
-    output.width=resolution;output.height=resolution;context.clearRect(0,0,resolution,resolution);context.imageSmoothingEnabled=style!=="pixelated-cgi";context.imageSmoothingQuality="high";
-    const padding=Math.max(10,Math.round(resolution*10/320)),available=resolution-padding*2,scale=Math.min(available/source.width,available/source.height),width=source.width*scale,height=source.height*scale;
-    context.drawImage(source,(resolution-width)/2,(resolution-height)/2,width,height);
-    const link=document.createElement("a");link.download=`creatormake-${kind}-${resolution}.${format}`;link.href=output.toDataURL(format==="png"?"image/png":"image/webp",.96);link.click();
+    output.width=safeResolution;output.height=safeResolution;context.clearRect(0,0,safeResolution,safeResolution);context.imageSmoothingEnabled=style!=="pixelated-cgi";context.imageSmoothingQuality="high";
+    const padding=Math.max(10,Math.round(safeResolution*10/320)),available=safeResolution-padding*2,scale=Math.min(available/source.width,available/source.height),width=source.width*scale,height=source.height*scale;
+    context.drawImage(source,(safeResolution-width)/2,(safeResolution-height)/2,width,height);
+    const link=document.createElement("a");link.download=`creatormake-${kind}-${safeResolution}.${format}`;link.href=output.toDataURL(format==="png"?"image/png":"image/webp",.96);link.click();delete stage.dataset.creatormakeExportScale;setElement((current)=>({...current}));setExportNotice(resolution>safeResolution?`Safely capped at ${safeResolution} × ${safeResolution}.`:`Exported ${safeResolution} × ${safeResolution} with alpha.`);
   };
   if(typeof document==="undefined")return null;
   return createPortal(<div className="dialog-overlay icon-studio-overlay" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)onClose();}}><section className="retro-icon-studio" role="dialog" aria-modal="true" aria-label="3D Icon Studio">
     <header><span><b><Box size={18}/></b><span><strong>3D ICON STUDIO</strong><small>Editable 1990s CGI geometry · transparent Roblox-ready output</small></span></span><button aria-label="Close 3D Icon Studio" onClick={onClose}><X size={17}/></button></header>
     <aside className="icon-studio-library"><strong>RETRO CGI ICONS · {RETRO_ICON_LIBRARY.length}</strong><p>Editable procedural models with shared cameras, materials, alpha controls, and Roblox-ready export.</p><label className="icon-studio-search"><Search size={12}/><input aria-label="Search 3D icons" placeholder="Search icons…" value={query} onChange={(event)=>setQuery(event.target.value)}/></label>{filteredIcons.map((item)=>{const Icon=ICONS[item.kind]??Box;return <button key={item.kind} className={kind===item.kind?"active":""} onClick={()=>choose(item.kind)}><i><Icon size={24}/></i><span><b>{item.shortName}</b><small>{item.description}</small></span></button>;})}{!filteredIcons.length&&<div className="icon-studio-empty">No 3D icons match “{query}”.</div>}</aside>
-    <main className="icon-studio-preview"><div className="icon-studio-stage" ref={previewRef}><ThreeDObjectSurface element={element}/><i className="icon-studio-grid"/></div><div className="icon-studio-scale-check"><span>SMALL-SIZE CHECK</span>{[32,48,64,128].map((size)=><i key={size} style={{width:size,height:size}}><ThreeDObjectSurface element={{...element,id:`${element.id}-${size}`,width:size,height:size}}/><b>{size}</b></i>)}</div><div className="icon-studio-camera"><strong>CAMERA</strong>{RETRO_ICON_CAMERA_PRESETS.map((preset)=><button key={preset.id} onClick={()=>patch(preset)}>{preset.name}</button>)}</div></main>
+    <main className="icon-studio-preview"><div className="icon-studio-stage" ref={previewRef}><ThreeDObjectSurface element={element}/><i className="icon-studio-grid"/></div><div className="icon-studio-scale-check"><span>SMALL-SIZE CHECK</span>{RETRO_ICON_GEOMETRY_STANDARDS.smallPreviewSizes.map((size)=><i key={size} style={{width:size,height:size}}><ThreeDObjectSurface element={{...element,id:`${element.id}-${size}`,width:size,height:size}}/><b>{size}</b></i>)}</div><div className="icon-studio-camera"><strong>MULTI-ANGLE QA</strong>{RETRO_ICON_CAMERA_PRESETS.map((preset)=><button key={preset.id} onClick={()=>patch(preset)}>{preset.name}</button>)}<button onClick={()=>setSpinning((value)=>!value)}>{spinning?<Pause size={12}/>:<Play size={12}/>} {spinning?"Pause spin":"Auto rotate"}</button><button onClick={()=>{setSpinning(false);patch({rotationX:definition.defaultRotation.x,rotationY:definition.defaultRotation.y,rotationZ:definition.defaultRotation.z,cameraPitch:2,cameraYaw:0,cameraZ:4.8,fitMode:"FIT_OBJECT"});}}><RotateCcw size={12}/> Reset view</button><label><span>Zoom</span><input aria-label="3D icon zoom" type="range" min="3" max="8" step=".1" value={settings.cameraZ} onChange={(event)=>patch({cameraZ:Number(event.target.value),fitMode:"MANUAL"})}/></label></div></main>
     <aside className="icon-studio-properties">
       <div className="icon-studio-title"><span>{definition.name}</span><small>{style==="classic-cgi"?"CLASSIC RETRO CGI":"PIXELATED RETRO 3D"}</small></div>
       <label><span>Render style</span><select value={style} onChange={(event)=>{const iconStyle=event.target.value as RetroIconStyle;setStyle(iconStyle);patch({iconStyle,material:iconStyle==="pixelated-cgi"?"toon":settings.material,previewQuality:iconStyle==="pixelated-cgi"?"BALANCED":"HIGH"});}}><option value="classic-cgi">Classic Retro CGI</option><option value="pixelated-cgi">Pixelated Retro 3D</option></select></label>
@@ -69,6 +77,6 @@ export function RetroIconStudio({onClose,onInsert}:Props){
       {kind==="monitor"&&<label><span>Screen content</span><select value={settings.iconScreenContent} onChange={(event)=>patch({iconScreenContent:event.target.value as ThreeDSettings["iconScreenContent"]})}>{["blank","static","error","warning","smile","desktop"].map((item)=><option key={item}>{item}</option>)}</select></label>}
       <label><span>MCCT color theme</span><select defaultValue="" onChange={(event)=>{const theme=THEMES[event.target.value as keyof typeof THEMES];if(theme)patch(theme);}}><option value="">Custom colors</option>{Object.keys(THEMES).map((theme)=><option key={theme}>{theme}</option>)}</select></label>
     </aside>
-    <footer><div className="icon-studio-materials"><strong>MATERIAL PRESETS</strong>{RETRO_ICON_MATERIAL_PRESETS.map((preset)=><button key={preset.id} onClick={()=>patch(preset)}>{preset.name}</button>)}</div><div className="icon-studio-export"><select aria-label="Icon export resolution" value={resolution} onChange={(event)=>setResolution(Number(event.target.value))}>{[64,128,256,512,1024].map((size)=><option key={size} value={size}>{size} × {size}</option>)}</select><select aria-label="Icon export format" value={format} onChange={(event)=>setFormat(event.target.value as "png"|"webp")}><option value="png">PNG alpha</option><option value="webp">WebP alpha</option></select><button onClick={exportImage}><Download size={14}/> Export</button><button className="primary" onClick={()=>{onInsert({kind,style,settings});onClose();}}><Plus size={14}/> Insert into canvas</button></div></footer>
+    <footer><div className="icon-studio-materials"><strong>MATERIAL PRESETS</strong>{RETRO_ICON_MATERIAL_PRESETS.map((preset)=><button key={preset.id} onClick={()=>patch(preset)}>{preset.name}</button>)}</div><div className="icon-studio-export"><select aria-label="Icon export resolution" value={resolution} onChange={(event)=>setResolution(Number(event.target.value))}>{RETRO_ICON_GEOMETRY_STANDARDS.exportSizes.map((size)=><option key={size} value={size}>{size} × {size}</option>)}</select><select aria-label="Icon export format" value={format} onChange={(event)=>setFormat(event.target.value as "png"|"webp")}><option value="png">PNG alpha</option><option value="webp">WebP alpha</option></select><button onClick={exportImage}><Download size={14}/> Export</button><button className="primary" onClick={()=>{onInsert({kind,style,settings});onClose();}}><Plus size={14}/> Insert into canvas</button>{exportNotice&&<small role="status">{exportNotice}</small>}</div></footer>
   </section></div>,document.body);
 }

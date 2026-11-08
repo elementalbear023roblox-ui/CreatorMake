@@ -127,7 +127,7 @@ export type TypographyComposerSettings = {
 };
 export type RetroIconKind =
   | "gear" | "dollar" | "clock" | "monitor"
-  | "warning-sign" | "dice" | "coin-pile" | "inverted-dice" | "shoe"
+  | "warning-sign" | "windows-flag" | "dice" | "coin-pile" | "inverted-dice" | "shoe"
   | "red-buzzer" | "prize-wheel" | "golden-ticket" | "winners-cup" | "stage-curtains"
   | "slot-machine" | "marquee-sign" | "vhs-tape" | "hard-drive" | "compact-disc"
   | "email-envelope" | "spinning-globe" | "starburst" | "mystery-box" | "puzzle-piece"

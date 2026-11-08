@@ -2,8 +2,11 @@ import { createElement } from "./project.ts";
 import type { EditorElement, RetroIconKind, RetroIconStyle, ThreeDMaterial, ThreeDSettings } from "./types.ts";
 import { MAROLA_THREE_D_FONT } from "./three-d-typography.ts";
 
-export type RetroIconDefinition={kind:RetroIconKind;name:string;shortName:string;description:string;silhouette:string;defaultColors:{front:string;side:string;accent:string;detail:string;screen:string};defaultMaterial:ThreeDMaterial;defaultRotation:{x:number;y:number;z:number}};
+export type RetroIconDefinition={kind:RetroIconKind;name:string;shortName:string;description:string;silhouette:string;defaultColors:{front:string;side:string;accent:string;detail:string;screen:string};defaultMaterial:ThreeDMaterial;defaultRotation:{x:number;y:number;z:number};defaultScale?:number;materialSet?:"studio-plastic"|"metal"|"mixed"|"glass"|"fabric"|"paper"|"electronics";polygonBudget?:"medium"|"high";supportsSpin?:boolean};
 export type RetroIconInsertOptions={kind:RetroIconKind;style:RetroIconStyle;settings?:Partial<ThreeDSettings>};
+
+export const RETRO_ICON_REQUIRED_23:RetroIconKind[]=["warning-sign","windows-flag","dice","coin-pile","inverted-dice","shoe","red-buzzer","prize-wheel","golden-ticket","winners-cup","stage-curtains","slot-machine","marquee-sign","vhs-tape","hard-drive","compact-disc","email-envelope","spinning-globe","starburst","mystery-box","puzzle-piece","hourglass","golden-key"];
+export const RETRO_ICON_GEOMETRY_STANDARDS={diceOpposites:[[1,6],[2,5],[3,4]] as const,prizeWheelSegments:8,prizeWheelDegrees:45,marqueeBulbs:22,smallPreviewSizes:[32,48,64,128] as const,exportSizes:[64,128,256,512,1024,2048,4096,8192] as const,safeBrowserExportLimit:4096} as const;
 
 export const RETRO_ICON_LIBRARY:RetroIconDefinition[]=[
   {kind:"gear",name:"Mechanical Settings Gear",shortName:"Gear",description:"Twelve-tooth extruded mechanism with a true center opening and beveled metal faces.",silhouette:"gear",defaultColors:{front:"#d9dde2",side:"#565d68",accent:"#ffffff",detail:"#1c2330",screen:"#132c35"},defaultMaterial:"metal",defaultRotation:{x:-12,y:24,z:-8}},
@@ -11,6 +14,7 @@ export const RETRO_ICON_LIBRARY:RetroIconDefinition[]=[
   {kind:"clock",name:"Round Countdown Clock",shortName:"Clock",description:"Layered glossy clock body with a raised rim, recessed face, hour marks, and adjustable hands.",silhouette:"clock",defaultColors:{front:"#f4f0d8",side:"#3c1f89",accent:"#8d63ff",detail:"#21173f",screen:"#132c35"},defaultMaterial:"plastic",defaultRotation:{x:-10,y:20,z:0}},
   {kind:"monitor",name:"Beige CRT Monitor",shortName:"CRT",description:"Deep 1990s monitor housing with a recessed screen, substantial bezel, stand, buttons, and status light.",silhouette:"monitor",defaultColors:{front:"#d7cba7",side:"#81775d",accent:"#f2e7c8",detail:"#342f25",screen:"#173541"},defaultMaterial:"plastic",defaultRotation:{x:-9,y:27,z:0}},
   {kind:"warning-sign",name:"Windows Warning Sign",shortName:"Warning",description:"Chunky yellow system-warning triangle with a raised black exclamation mark.",silhouette:"warning-triangle",defaultColors:{front:"#ffd83d",side:"#9b6400",accent:"#fff4a8",detail:"#111111",screen:"#000080"},defaultMaterial:"retro-plastic",defaultRotation:{x:-8,y:18,z:0}},
+  {kind:"windows-flag",name:"Windows 98 Flag",shortName:"Windows Flag",description:"Four independently modeled swept panes with authentic red, green, blue, and yellow retro-computer color roles.",silhouette:"windows-flag",defaultColors:{front:"#f13b32",side:"#7a1b27",accent:"#40a83f",detail:"#2b65d9",screen:"#f4cf37"},defaultMaterial:"retro-plastic",defaultRotation:{x:-10,y:22,z:-6},materialSet:"studio-plastic",polygonBudget:"high"},
   {kind:"dice",name:"Game-Show Dice",shortName:"Dice",description:"Glossy ivory cube with dimensional dark pips and a strong three-quarter silhouette.",silhouette:"dice-cube",defaultColors:{front:"#f4f0dc",side:"#9c9279",accent:"#ffffff",detail:"#17131d",screen:"#000080"},defaultMaterial:"plastic",defaultRotation:{x:-22,y:32,z:8}},
   {kind:"coin-pile",name:"Pile of Coins",shortName:"Coin Pile",description:"Layered stack of individually modeled gold coins with bright beveled rims.",silhouette:"coin-stack",defaultColors:{front:"#ffd33d",side:"#9d5805",accent:"#fff2a1",detail:"#6d3300",screen:"#000080"},defaultMaterial:"brushed-metal",defaultRotation:{x:-18,y:25,z:-3}},
   {kind:"inverted-dice",name:"Inverted Color Dice",shortName:"Inverse Dice",description:"Dark arcade dice with electric contrasting pips for inverted-color graphics.",silhouette:"inverse-dice",defaultColors:{front:"#231443",side:"#0b0718",accent:"#8dffea",detail:"#fff04f",screen:"#000080"},defaultMaterial:"retro-plastic",defaultRotation:{x:-22,y:32,z:8}},
@@ -48,6 +52,10 @@ export const RETRO_ICON_MATERIAL_PRESETS=[
 
 export const RETRO_ICON_CAMERA_PRESETS=[
   {id:"front",name:"Front",rotationX:0,rotationY:0,cameraPitch:0,cameraYaw:0},
+  {id:"rear",name:"Rear",rotationX:0,rotationY:180,cameraPitch:0,cameraYaw:0},
+  {id:"left",name:"Left",rotationX:0,rotationY:-90,cameraPitch:0,cameraYaw:0},
+  {id:"right",name:"Right",rotationX:0,rotationY:90,cameraPitch:0,cameraYaw:0},
+  {id:"top",name:"Top",rotationX:-90,rotationY:0,cameraPitch:0,cameraYaw:0},
   {id:"three-quarter",name:"Three-quarter",rotationX:-12,rotationY:24,cameraPitch:2,cameraYaw:0},
   {id:"isometric",name:"Isometric",rotationX:-28,rotationY:36,cameraPitch:5,cameraYaw:0},
   {id:"low",name:"Low angle",rotationX:10,rotationY:24,cameraPitch:-8,cameraYaw:0},
@@ -58,6 +66,17 @@ export function retroGearProfile(teeth:number,toothDepth:number){
   const count=Math.max(6,Math.min(24,Math.round(teeth))),depth=Math.max(.08,Math.min(.55,toothDepth)),points:Array<{x:number;y:number}>=[];
   for(let tooth=0;tooth<count;tooth++)for(let step=0;step<4;step++){const angle=(tooth*4+step)/(count*4)*Math.PI*2-Math.PI/2,radius=step===1||step===2?1+depth:1;points.push({x:Math.cos(angle)*radius,y:Math.sin(angle)*radius});}
   return points;
+}
+
+export function validateRetroIconLibrary(){
+  const errors:string[]=[],kinds=new Set(RETRO_ICON_LIBRARY.map((item)=>item.kind)),silhouettes=new Set(RETRO_ICON_LIBRARY.map((item)=>item.silhouette));
+  for(const kind of RETRO_ICON_REQUIRED_23)if(!kinds.has(kind))errors.push(`Missing required icon: ${kind}`);
+  if(kinds.size!==RETRO_ICON_LIBRARY.length)errors.push("Icon identifiers must be unique.");
+  if(silhouettes.size!==RETRO_ICON_LIBRARY.length)errors.push("Icon silhouettes must be unique.");
+  if(RETRO_ICON_GEOMETRY_STANDARDS.prizeWheelSegments*RETRO_ICON_GEOMETRY_STANDARDS.prizeWheelDegrees!==360)errors.push("Prize-wheel wedges must cover exactly 360 degrees.");
+  if(!RETRO_ICON_GEOMETRY_STANDARDS.diceOpposites.every(([a,b])=>a+b===7))errors.push("Opposite dice faces must total seven.");
+  const dice=RETRO_ICON_LIBRARY.find((item)=>item.kind==="dice"),inverse=RETRO_ICON_LIBRARY.find((item)=>item.kind==="inverted-dice");if(!dice||!inverse||JSON.stringify(dice.defaultRotation)!==JSON.stringify(inverse.defaultRotation))errors.push("Dice variants must share identical geometry orientation.");
+  return errors;
 }
 
 export function createRetroIconElement(options:RetroIconInsertOptions,index=0):EditorElement{
