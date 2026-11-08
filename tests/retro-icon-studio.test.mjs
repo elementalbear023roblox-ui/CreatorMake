@@ -6,6 +6,8 @@ import { createProject, normalizeProject } from "../lib/editor/project.ts";
 import { normalizeThreeDSettings, threeDGeometryKey, tightThreeDRenderBounds } from "../lib/editor/three-d.ts";
 import { classifyRobloxElement } from "../lib/roblox/classification.ts";
 import { applyColorKeyPixels, colorKeyAlpha } from "../lib/editor/color-key.ts";
+import * as THREE from "three";
+import { buildExtremeRetroIcon, EXTREME_ICON_MINIMUM_MESHES, EXTREME_RETRO_ICON_KINDS } from "../lib/editor/extreme-retro-icons.ts";
 
 test("the premium retro CGI collection contains all 23 requested models plus compatible legacy icons",()=>{
   assert.equal(RETRO_ICON_LIBRARY.length,27);
@@ -24,6 +26,26 @@ test("mathematical icon standards enforce dice, wheel, preview, and export invar
   assert.deepEqual(RETRO_ICON_GEOMETRY_STANDARDS.exportSizes,[64,128,256,512,1024,2048,4096,8192]);
   const dice=createRetroIconElement({kind:"dice",style:"classic-cgi"}),inverse=createRetroIconElement({kind:"inverted-dice",style:"classic-cgi"});
   assert.deepEqual([dice.threeD.rotationX,dice.threeD.rotationY,dice.threeD.rotationZ,dice.threeD.depth,dice.threeD.bevel],[inverse.threeD.rotationX,inverse.threeD.rotationY,inverse.threeD.rotationZ,inverse.threeD.depth,inverse.threeD.bevel]);
+});
+
+test("all 23 reconstructed models have finite, named, material-addressable geometry",()=>{
+  assert.deepEqual(EXTREME_RETRO_ICON_KINDS,RETRO_ICON_REQUIRED_23);
+  for(const kind of EXTREME_RETRO_ICON_KINDS){
+    const element=createRetroIconElement({kind,style:"classic-cgi"}),model=buildExtremeRetroIcon(THREE,element.threeD);
+    assert.ok(model,`${kind} must resolve to the reconstructed model pipeline`);
+    assert.equal(model.userData.reconstructionVersion,2);
+    const meshes=[];model.traverse((object)=>{if(object.isMesh)meshes.push(object);});
+    assert.ok(meshes.length>=(EXTREME_ICON_MINIMUM_MESHES[kind]??1),`${kind} must meet its detail floor`);
+    assert.equal(new Set(meshes.map((mesh)=>mesh.name)).size,meshes.length,`${kind} parts must be uniquely named`);
+    for(const mesh of meshes){
+      const position=mesh.geometry.getAttribute("position");assert.ok(position&&position.count>=3,`${kind}/${mesh.name} needs vertices`);
+      assert.ok(Array.from(position.array).every(Number.isFinite),`${kind}/${mesh.name} cannot contain NaN or infinity`);
+      mesh.geometry.computeBoundingBox();assert.ok(mesh.geometry.boundingBox&&!mesh.geometry.boundingBox.isEmpty(),`${kind}/${mesh.name} needs non-empty bounds`);
+      assert.ok(Array.isArray(mesh.userData.iconMaterialRoles)&&mesh.userData.iconMaterialRoles.length>=1,`${kind}/${mesh.name} needs material roles`);
+    }
+    const bounds=new THREE.Box3().setFromObject(model),size=new THREE.Vector3();bounds.getSize(size);
+    assert.ok(size.x>.1&&size.y>.1&&size.z>.01,`${kind} needs a real three-dimensional silhouette`);
+  }
 });
 
 test("gear profile produces four deliberate corners per tooth without overlap",()=>{
