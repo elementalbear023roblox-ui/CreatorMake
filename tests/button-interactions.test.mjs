@@ -4,9 +4,10 @@ import { createElement, createProject, duplicateProject, exportProjectData, impo
 import { createRobloxExport } from "../lib/roblox/exporter.ts";
 import { DEFAULT_ROBLOX_EXPORT_OPTIONS } from "../lib/roblox/types.ts";
 
-test("new buttons enable interactive backgrounds while migrated projects stay static",()=>{
+test("new and legacy buttons require opt-in for interaction code",()=>{
   const button=createElement("button");
-  assert.equal(button.buttonInteraction.enabled,true);
+  assert.equal(button.buttonInteraction.enabled,false);
+  assert.equal(createElement("image-button").buttonInteraction.enabled,false);
   assert.equal(button.buttonInteraction.hoverDuration,.15);
   assert.equal(button.buttonInteraction.pressedDuration,.1);
   const legacy=createProject("Legacy");legacy.schemaVersion=20;legacy.elements=[structuredClone(button)];delete legacy.elements[0].buttonInteraction;
@@ -17,6 +18,9 @@ test("new buttons enable interactive backgrounds while migrated projects stay st
 
 test("Roblox export uses one shared interaction controller and preserves Activated handlers",()=>{
   const project=createProject("Interactive");project.elements=[createElement("button"),createElement("button")];
+  const staticOutput=createRobloxExport(project,{...DEFAULT_ROBLOX_EXPORT_OPTIONS,visualMode:"NATIVE"});
+  assert.ok(!staticOutput.manifest.nodes.some((node)=>node.className==="LocalScript"));
+  for (const element of project.elements) element.buttonInteraction.enabled=true;
   const output=createRobloxExport(project,{...DEFAULT_ROBLOX_EXPORT_OPTIONS,visualMode:"NATIVE"});
   const controllers=output.manifest.nodes.filter((node)=>node.attributes?.CreatorMakeRole==="SharedButtonInteractionController");
   assert.equal(controllers.length,1);
@@ -30,6 +34,7 @@ test("Roblox export uses one shared interaction controller and preserves Activat
 
 test("project duplication and portable .creatormake packages are independent",async()=>{
   const project=createProject("Shared Project");project.elements=[createElement("button")];
+  project.elements[0].buttonInteraction.enabled=true;
   const duplicate=duplicateProject(project);duplicate.elements[0].text="Changed copy";
   assert.notEqual(duplicate.id,project.id);assert.equal(project.elements[0].text,"Button");
   const packaged=exportProjectData(project);assert.equal(packaged.format,"creatormake-project");assert.equal(packaged.schemaVersion,21);

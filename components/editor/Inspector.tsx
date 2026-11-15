@@ -17,6 +17,7 @@ import { applyDimensionalLighting, applyDimensionalStyle, DIMENSIONAL_LIGHTING, 
 import { RetroContextInspector } from "./RetroContextInspector";
 import { RETRO_ICON_LIBRARY } from "@/lib/editor/retro-icons";
 import { createButtonInteractionSettings } from "@/lib/editor/button-interactions";
+import { getRobloxLayout, resolveRobloxLayout } from "@/lib/editor/roblox-layout";
 
 type Props={project:EditorProject;robloxMode?:boolean;inspectorMode:InspectorMode;inspectorCollapsed:string[];inspectorPinned:string[];editorOptions:Pick<InterfaceSettings,"previewQuality"|"showGeneratedObjects"|"smartGuideDetail"|"optionFavorites">;onInspectorMode:(mode:InspectorMode)=>void;onInspectorSections:(patch:{inspectorCollapsed?:string[];inspectorPinned?:string[]})=>void;onEditorOptions:(patch:Partial<InterfaceSettings>)=>void;onProjectOptions:(patch:Partial<EditorProject["exportOptions"]>)=>void;onUpdate:(patch:Partial<EditorElement>)=>void;onScreenUpdate:(patch:Partial<EditorProject["screen"]>)=>void;onBeginEdit:(label:string)=>void;onCommitEdit:()=>void;onCancelEdit:()=>void;onEditPath:(id:string)=>void;onBooleanOperation:(id:string,operation:Exclude<BooleanOperation,"divide">)=>void;onFlattenBoolean:(id:string)=>void;onReleaseBoolean:(id:string)=>void};
 type NumberProps={label:string;value:number;onChange:(value:number)=>void;min?:number;max?:number;step?:number;unit?:string};
@@ -32,6 +33,52 @@ function NumericControl({label,value,onChange,min,max,step=1,unit}:NumberProps){
 function ColorField({label,value,onChange,opacity,onOpacityChange}:{label:string;value:string;onChange:(value:string)=>void;opacity?:number;onOpacityChange?:(value:number)=>void}){const safe=value.startsWith("#")&&value.length===7?value:"#000000",color=<label className="color-field"><span>{label}</span><input aria-label={`${label} color`} type="color" value={safe} onChange={(event)=>onChange(event.target.value)}/><code>{value}</code></label>;if(opacity===undefined||!onOpacityChange)return color;return <div className="color-field-with-alpha" data-transparent={opacity===0?"true":"false"}>{color}<label className="color-alpha-field"><span>Alpha</span><input aria-label={`${label} color transparency`} type="range" min="0" max="100" value={opacity} onChange={(event)=>onOpacityChange(Number(event.target.value))}/><code>{Math.round(opacity)}%</code></label><button type="button" onClick={()=>onOpacityChange(opacity===0?100:0)}>{opacity===0?"Make opaque":"Make transparent"}</button></div>;}
 const Toggle=({label,checked,onChange,disabled=false}:{label:string;checked:boolean;onChange:(value:boolean)=>void;disabled?:boolean})=><label className={`check-field ${disabled?"disabled":""}`}><input type="checkbox" checked={checked} disabled={disabled} onChange={(event)=>onChange(event.target.checked)}/>{label}</label>;
 const SelectField=({label,value,values,onChange}:{label:string;value:string;values:string[];onChange:(value:string)=>void})=><label className="text-field"><span>{label}</span><select value={value} onChange={(event)=>onChange(event.target.value)}>{values.map((item)=><option key={item} value={item}>{item}</option>)}</select></label>;
+
+function RobloxLayoutInspector({element,parent,onUpdate}:{
+  element:EditorElement;
+  parent:Pick<EditorElement,"x"|"y"|"width"|"height">;
+  onUpdate:(patch:Partial<EditorElement>)=>void;
+}){
+  const current=element.roblox?.nativeLayout;
+  const layout=current??{positionX:0,positionY:0,sizeX:0,sizeY:0,anchorX:element.originX/100,anchorY:element.originY/100};
+  const properties=getRobloxLayout(element,parent,layout);
+  type Axis="X"|"Y";
+  const setAxis=(target:"Position"|"Size",axis:Axis,kind:"Scale"|"Offset",value:number)=>{
+    const key=`${axis.toLowerCase() as "x"|"y"}${kind}` as const;
+    const next={...properties[target],[key]:kind==="Offset"?Math.round(value):value};
+    const position=target==="Position"?next:properties.Position;
+    const size=target==="Size"?next:properties.Size;
+    onUpdate({
+      ...resolveRobloxLayout(parent,position,size,properties.AnchorPoint),
+      roblox:{...element.roblox,nativeLayout:{...layout,positionX:position.xScale,positionY:position.yScale,sizeX:size.xScale,sizeY:size.yScale}},
+    });
+  };
+  const setAnchor=(axis:"x"|"y",value:number)=>{
+    const anchor={...properties.AnchorPoint,[axis]:value};
+    onUpdate({
+      ...resolveRobloxLayout(parent,properties.Position,properties.Size,anchor),
+      roblox:{...element.roblox,nativeLayout:{...layout,anchorX:anchor.x,anchorY:anchor.y}},
+    });
+  };
+  return <details><summary>Roblox Position &amp; Size</summary><div className="inspector-section">
+    <Toggle label="Explicit UDim2 and AnchorPoint" checked={Boolean(current)} onChange={(checked)=>onUpdate({
+      roblox:{...element.roblox,nativeLayout:checked?layout:undefined},
+    })}/>
+    {current&&<>
+      {(["Position","Size"] as const).map((target)=><div className="compact-grid" key={target}>
+        {(["X","Y"] as const).map((axis)=><div key={axis}>
+          <NumericControl label={`${target} ${axis} Scale`} value={properties[target][axis==="X"?"xScale":"yScale"]} step={.01} onChange={(value)=>setAxis(target,axis,"Scale",value)}/>
+          <NumericControl label={`${target} ${axis} Offset`} value={properties[target][axis==="X"?"xOffset":"yOffset"]} unit="px" onChange={(value)=>setAxis(target,axis,"Offset",value)}/>
+        </div>)}
+      </div>)}
+      <div className="compact-grid">
+        <NumericControl label="AnchorPoint X" value={layout.anchorX} step={.01} onChange={(value)=>setAnchor("x",value)}/>
+        <NumericControl label="AnchorPoint Y" value={layout.anchorY} step={.01} onChange={(value)=>setAnchor("y",value)}/>
+      </div>
+      <p className="inspector-note">Scale is relative to the parent. Moving or resizing on the canvas changes the pixel offset.</p>
+    </>}
+  </div></details>;
+}
 
 function ButtonInteractionInspector({selected,project,onUpdate}:{selected:EditorElement;project:EditorProject;onUpdate:(patch:Partial<EditorElement>)=>void}){
   const settings=selected.buttonInteraction,change=(patch:Partial<typeof settings>)=>onUpdate({buttonInteraction:{...settings,...patch}}),changeState=(key:"normal"|"hover"|"pressed",patch:Partial<typeof settings.normal>)=>change({[key]:{...settings[key],...patch}}),stateEditor=(key:"normal"|"hover"|"pressed",label:string)=><section className="button-state-card" data-state={key}><header><strong>{label}</strong><small>{key==="normal"?"Resting background":key==="hover"?"Pointer over":"Pointer or touch down"}</small></header><ColorField label="Color" value={settings[key].color} onChange={(color)=>changeState(key,{color})}/><NumericControl label="Transparency" value={settings[key].transparency} min={0} max={100} onChange={(transparency)=>changeState(key,{transparency})} unit="%"/><Toggle label="Gradient" checked={settings[key].gradientEnabled} onChange={(gradientEnabled)=>changeState(key,{gradientEnabled})}/>{settings[key].gradientEnabled&&<><NumericControl label="Gradient angle" value={settings[key].gradientAngle} min={-180} max={360} onChange={(gradientAngle)=>changeState(key,{gradientAngle})} unit="°"/><div className="compact-grid"><ColorField label="Start" value={settings[key].gradientStops[0]?.color??settings[key].color} onChange={(color)=>changeState(key,{gradientStops:settings[key].gradientStops.map((stop,index)=>index===0?{...stop,color}:stop)})}/><ColorField label="End" value={settings[key].gradientStops.at(-1)?.color??settings[key].color} onChange={(color)=>changeState(key,{gradientStops:settings[key].gradientStops.map((stop,index)=>index===settings[key].gradientStops.length-1?{...stop,color}:stop)})}/></div></>}</section>;
@@ -124,6 +171,7 @@ function InspectorBody({project,robloxMode=false,inspectorMode:mode,inspectorCol
       <ButtonInteractionInspector selected={selected} project={project} onUpdate={onUpdate}/>
     )}
     {selected.type!=="three-d"&&<EffectsSection selected={selected} onUpdate={onUpdate} onBeginEdit={onBeginEdit} onCommitEdit={onCommitEdit} onCancelEdit={onCancelEdit}/>}
+    {robloxMode&&project.selectedIds.length===1&&<RobloxLayoutInspector element={selected} parent={parentBounds} onUpdate={onUpdate}/>}
     <details><summary>Compositing & Clipping</summary><div className="inspector-section"><div className="inspector-subsection"><strong>Compositing</strong><SelectField label="Blend" value={selected.blendMode} values={["normal","multiply","screen","overlay","darken","lighten","difference","exclusion"]} onChange={(blendMode)=>onUpdate({blendMode:blendMode as EditorElement["blendMode"]})}/><NumericControl label="Padding" value={selected.padding} min={0} max={120} onChange={(padding)=>onUpdate({padding,...((selected.type==="text"||selected.type==="button")?{textPadding:{top:padding,right:padding,bottom:padding,left:padding}}:{})})}/></div>{canClipContents&&<div className="inspector-subsection clip-contents-control"><strong>Content clipping</strong><Toggle label={isScrolling?"Clip Contents (required for scrolling)":"Clip Contents"} checked={isScrolling||selected.clipContent} disabled={isScrolling} onChange={(clipContent)=>onUpdate({clipContent})}/><p>Hide child objects that extend outside this object&apos;s bounds.</p>{robloxMode&&<code>Roblox: ClipsDescendants = {String(isScrolling||selected.clipContent)}</code>}</div>}</div></details>
     {(selected.type==="image"||selected.type==="image-button")&&<details open><summary>Image</summary><div className="inspector-section image-inspector">{(()=>{const asset=project.assets.find((item)=>item.id===selected.imageAssetId);return asset?<div className="image-source-card"><img src={asset.thumbnailDataUrl||asset.dataUrl} alt=""/><span><strong>{asset.name}</strong><small>{asset.width} × {asset.height} · {asset.format}</small></span></div>:<p className="inspector-warning">Missing source asset. Relink or replace this image from the Assets panel.</p>;})()}<SelectField label="Fit" value={selected.imageFit} values={["fit","fill","stretch","tile","original"]} onChange={(imageFit)=>onUpdate({imageFit:imageFit as EditorElement["imageFit"]})}/><SelectField label="Roblox class" value={selected.type} values={["image","image-button"]} onChange={(type)=>onUpdate({type:type as EditorElement["type"],roblox:{...selected.roblox,className:type==="image-button"?"ImageButton":"ImageLabel"}})}/><label className="text-field"><span>Roblox asset ID</span><input placeholder="rbxassetid://123" value={selected.roblox?.imageAssetId??""} onChange={(event)=>onUpdate({roblox:{...selected.roblox,imageAssetId:event.target.value}})}/></label><div className="compact-grid"><NumericControl label="Offset X" value={selected.imageOffsetX} min={-100} max={100} onChange={(imageOffsetX)=>onUpdate({imageOffsetX})}/><NumericControl label="Offset Y" value={selected.imageOffsetY} min={-100} max={100} onChange={(imageOffsetY)=>onUpdate({imageOffsetY})}/></div><NumericControl label="Image scale" value={selected.imageScale} min={.05} max={10} step={.05} onChange={(imageScale)=>onUpdate({imageScale})}/><NumericControl label="Image rotation" value={selected.imageRotation} min={-180} max={180} onChange={(imageRotation)=>onUpdate({imageRotation})} unit="°"/><div className="compact-grid"><NumericControl label="Brightness" value={selected.imageBrightness} min={0} max={300} onChange={(imageBrightness)=>onUpdate({imageBrightness})}/><NumericControl label="Contrast" value={selected.imageContrast} min={0} max={300} onChange={(imageContrast)=>onUpdate({imageContrast})}/><NumericControl label="Saturation" value={selected.imageSaturation} min={0} max={300} onChange={(imageSaturation)=>onUpdate({imageSaturation})}/><NumericControl label="Hue" value={selected.imageHue} min={-180} max={180} onChange={(imageHue)=>onUpdate({imageHue})}/></div><NumericControl label="Blur" value={selected.imageBlur} min={0} max={40} step={.25} onChange={(imageBlur)=>onUpdate({imageBlur})}/><ColorField label="Tint" value={selected.imageTint} onChange={(imageTint)=>onUpdate({imageTint})}/><p className="inspector-note">Unpublished or adjusted images stay pixel-accurate. Add a Roblox asset ID to export an unadjusted image as a native ImageLabel/ImageButton.</p></div></details>}
     {(selected.type==="text"||selected.type==="button")&&<details><summary>Advanced Text Export</summary><div className="inspector-section roblox-text-export"><Toggle label="Dynamic text" checked={selected.dynamicText} onChange={(dynamicText)=>onUpdate({dynamicText})}/><Toggle label="Rich text" checked={selected.richText} onChange={(richText)=>onUpdate({richText})}/><Toggle label="Editable TextBox" checked={selected.textInput} onChange={(textInput)=>onUpdate({textInput})}/>{(()=>{const decision=classifyTextExport(selected);return <div className={`text-export-decision ${decision.mode.toLowerCase()}`}><strong>{decision.className}</strong><span>{decision.fontExact?"Native editable text is preserved by Auto and Original.":"Native text uses the declared compatibility fallback when no exact Roblox font exists."}</span>{decision.reasons.length>0&&<small>{decision.reasons.join(" · ")}</small>}</div>;})()}</div></details>}

@@ -1,4 +1,20 @@
+import type { RobloxManifestNode, RobloxPropertyValue } from "../roblox/types.ts";
+
 export type ElementType = "frame" | "container" | "scrolling-frame" | "text" | "rectangle" | "roundRect" | "ellipse" | "line" | "polygon" | "star" | "button" | "image" | "image-button" | "vector" | "three-d";
+
+export type RobloxLayoutScale = {
+  positionX: number;
+  positionY: number;
+  sizeX: number;
+  sizeY: number;
+  anchorX: number;
+  anchorY: number;
+};
+
+export type StudioElementSource = {
+  node: RobloxManifestNode;
+  baseline: Partial<EditorElement>;
+};
 
 export type ImageFitMode = "fit" | "fill" | "stretch" | "original" | "tile";
 export type ImageState = "default" | "hover" | "pressed" | "disabled" | "selected";
@@ -437,6 +453,8 @@ export type EditorElement = {
     className?: "Frame" | "TextLabel" | "TextButton" | "ImageLabel" | "ImageButton" | "ScrollingFrame" | "ViewportFrame";
     layout?: "horizontal" | "vertical" | "grid";
     imageAssetId?: string;
+    nativeLayout?: RobloxLayoutScale;
+    studioSource?: StudioElementSource;
   };
 };
 
@@ -509,6 +527,7 @@ export type EditorProject = {
   threeDFonts: ProjectThreeDFont[];
   fontPolicy: { allowSyntheticWeight: boolean; allowSyntheticItalic: boolean };
   exportOptions:ProjectExportOptions;
+  studioSource?: { settings: Record<string,RobloxPropertyValue>; warnings: string[] };
 };
 
 export type EditorHistoryCommand = {

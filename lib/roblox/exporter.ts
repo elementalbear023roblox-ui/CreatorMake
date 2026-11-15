@@ -4,11 +4,16 @@ import { classifyRobloxElement, classifyRobloxElements, classifyTextExport, hasV
 import { assetMappingKey, planPixelAccurateAssets } from "./render-assets.ts";
 import { designFontSize, responsiveTextBounds, textPadding, textSizingMode } from "../editor/text-sizing.ts";
 import { resolveCaptionGeometry, type TextRotationResolution } from "../editor/visual-transform.ts";
+import { getRobloxLayout } from "../editor/roblox-layout.ts";
+import { sanitizeStudioNode, sanitizeStudioProperties } from "./studio-selection.ts";
 import type { EditorElement, EditorProject } from "../editor/types.ts";
 import type { RobloxCompatibilityIssue, RobloxExportOptions, RobloxImageManifestEntry, RobloxManifest, RobloxManifestNode, RobloxPropertyValue, RobloxRenderAsset } from "./types.ts";
 
 const round=(value:number,places=4)=>Number(value.toFixed(places));
-const quote=(value:string)=>JSON.stringify(value.replace(/\r\n/g,"\n"));
+const quote = (value: string) => '"' + value.replace(/["\\\x00-\x1f\x7f]/g, (character) => {
+  if (character === "\\" || character === '"') return "\\" + character;
+  return "\\" + String(character.charCodeAt(0)).padStart(3, "0");
+}) + '"';
 const varName=(value:string,index:number)=>{const safe=value.replace(/[^a-zA-Z0-9_]/g,"_").replace(/^[^a-zA-Z_]/,"_$&")||"instance";return`${safe.charAt(0).toLowerCase()}${safe.slice(1)}_${index+1}`;};
 const rgb=(value:string)=>{const match=value.match(/^#([0-9a-f]{6})$/i);if(!match)return[255,255,255]as const;const parsed=Number.parseInt(match[1],16);return[(parsed>>16)&255,(parsed>>8)&255,parsed&255]as const;};
 const colorValue=(value:string)=>{const[r,g,b]=rgb(value);return{kind:"Color3",r,g,b}as const;};
@@ -72,16 +77,33 @@ function layoutProperties(element:EditorElement,project:EditorProject,options:Ro
   const parent=element.parentId?byId.get(element.parentId):undefined,parentWidth=parent?.width??project.screen.width,parentHeight=parent?.height??project.screen.height;
   const localX=element.x-(parent?.x??0),localY=element.y-(parent?.y??0),originX=element.originX/100,originY=element.originY/100,positionX=localX+element.width*originX,positionY=localY+element.height*originY;
   const anchorX=(element.width*originX-bounds.x)/Math.max(1,bounds.width),anchorY=(element.height*originY-bounds.y)/Math.max(1,bounds.height);
+  const native=element.roblox?.nativeLayout;
+  if(native){
+    return {
+      ...getRobloxLayout({x:element.x+bounds.x,y:element.y+bounds.y,width:bounds.width,height:bounds.height},
+        parent??{x:0,y:0,width:parentWidth,height:parentHeight},native),
+      Rotation:round(element.rotation,2),Visible:!element.hidden,ZIndex:Math.max(1,element.zIndex*2+1),
+      LayoutOrder:Math.max(1,element.zIndex),ClipsDescendants:element.clipContent,
+    } satisfies RobloxManifestNode["properties"];
+  }
   return{Position:udim2(positionX,positionY,parentWidth,parentHeight,options.sizingMode),Size:udim2(bounds.width,bounds.height,parentWidth,parentHeight,options.sizingMode,true),AnchorPoint:{kind:"Vector2",x:round(anchorX),y:round(anchorY)},Rotation:round(element.rotation,2),Visible:!element.hidden,ZIndex:Math.max(1,element.zIndex*2+1),LayoutOrder:Math.max(1,element.zIndex),ClipsDescendants:element.clipContent} satisfies RobloxManifestNode["properties"];
 }
 
 function pixelLayoutProperties(element:EditorElement,project:EditorProject,byId:Map<string,EditorElement>,visibleIds:ReadonlySet<string>):RobloxManifestNode["properties"]{
   const parent=element.parentId&&visibleIds.has(element.parentId)?byId.get(element.parentId):undefined,localX=element.x-(parent?.x??0),localY=element.y-(parent?.y??0),originX=element.originX/100,originY=element.originY/100;
+  if(element.roblox?.nativeLayout){
+    return {
+      ...getRobloxLayout(element,parent??{x:0,y:0,width:project.screen.width,height:project.screen.height},element.roblox.nativeLayout),
+      Rotation:round(element.rotation,2),Visible:!element.hidden,ZIndex:Math.max(2,element.zIndex*2+2),
+      LayoutOrder:Math.max(1,element.zIndex),ClipsDescendants:element.clipContent,
+    };
+  }
   return{Position:offsetUdim2(localX+element.width*originX,localY+element.height*originY),Size:offsetUdim2(element.width,element.height),AnchorPoint:{kind:"Vector2",x:round(originX,6),y:round(originY,6)},Rotation:round(element.rotation,2),Visible:!element.hidden,ZIndex:Math.max(2,element.zIndex*2+2),LayoutOrder:Math.max(1,element.zIndex),ClipsDescendants:element.clipContent};
 }
 
 const uniformObjectScale=(element:EditorElement)=>Number.isFinite(element.scaleX)&&element.scaleX>0&&Math.abs(element.scaleX-element.scaleY)<.0001?element.scaleX:1;
 function objectScaledLayout(element:EditorElement,properties:RobloxManifestNode["properties"]):RobloxManifestNode["properties"]{
+  if(element.roblox?.nativeLayout)return properties;
   const scale=uniformObjectScale(element);if(Math.abs(scale-1)<.0001)return properties;
   const position=properties.Position as {kind?:string;xScale?:number;xOffset?:number;yScale?:number;yOffset?:number}|undefined,anchor=properties.AnchorPoint as {kind?:string;x?:number;y?:number}|undefined;
   if(position?.kind!=="UDim2"||anchor?.kind!=="Vector2"||typeof position.xOffset!=="number"||typeof position.yOffset!=="number"||typeof anchor.x!=="number"||typeof anchor.y!=="number")return properties;
@@ -89,6 +111,23 @@ function objectScaledLayout(element:EditorElement,properties:RobloxManifestNode[
   return{...properties,Position:{kind:"UDim2",xScale:position.xScale??0,xOffset:round(position.xOffset+element.width*(originX-anchor.x),4),yScale:position.yScale??0,yOffset:round(position.yOffset+element.height*(originY-anchor.y),4)},AnchorPoint:{kind:"Vector2",x:round(originX,6),y:round(originY,6)}};
 }
 const objectScaleDecorator=(element:EditorElement):RobloxManifestNode["decorators"][number]|undefined=>{const scale=uniformObjectScale(element);return Math.abs(scale-1)<.0001?undefined:{className:"UIScale",name:"CreatorMakeObjectScale",properties:{Scale:round(scale)}};};
+
+function nativeGradient(element: EditorElement): RobloxManifestNode["decorators"][number] {
+  const stops=element.gradientStops.map((stop)=>({...stop,time:Math.max(0,Math.min(100,stop.position))/100}))
+    .sort((a,b)=>a.time-b.time);
+  if(stops[0].time>0) stops.unshift({...stops[0],time:0});
+  const last=stops.at(-1)!;
+  if(last.time<1) stops.push({...last,time:1});
+  // Roblox sequences accept at most 20 keypoints.
+  const points=stops.length<=20?stops:Array.from({length:20},(_,index)=>stops[Math.round(index*(stops.length-1)/19)]);
+  return {
+    className:"UIGradient",name:"UIGradient",properties:{
+      Color:{kind:"ColorSequence",keypoints:points.map((point)=>({time:point.time,color:colorValue(point.color)}))},
+      Transparency:{kind:"NumberSequence",keypoints:points.map((point)=>({time:point.time,value:round(1-point.opacity/100)}))},
+      Rotation:round(element.gradientAngle,2),
+    },
+  };
+}
 
 function nativeNodeFor(element:EditorElement,project:EditorProject,options:RobloxExportOptions,byId:Map<string,EditorElement>):RobloxManifestNode{
   const properties:RobloxManifestNode["properties"]={...objectScaledLayout(element,layoutProperties(element,project,options,byId)),BackgroundColor3:colorValue(element.fill),BackgroundTransparency:transparent(element.fill)?1:round(1-element.opacity/100)};
@@ -103,7 +142,7 @@ function nativeNodeFor(element:EditorElement,project:EditorProject,options:Roblo
   if(textInstance)decorators.push(...textDecorators(element));
   if(options.includeStroke&&element.borderWidth>0&&!transparent(element.borderColor))decorators.push({className:"UIStroke",name:"UIStroke",properties:{Color:colorValue(element.borderColor),Thickness:round(element.borderWidth,2),Transparency:0}});
   const radius=Math.max(element.corners.tl,element.corners.tr,element.corners.br,element.corners.bl,element.cornerRadius);if(options.includeCorners&&radius>0)decorators.push({className:"UICorner",name:"UICorner",properties:{CornerRadius:{kind:"UDim",scale:0,offset:round(radius,2)}}});
-  if(options.includeGradients&&element.gradientType!=="none"&&element.gradientStops.length>=2){const stops=element.gradientStops.slice(0,6);decorators.push({className:"UIGradient",name:"UIGradient",properties:{Color:{kind:"ColorSequence",keypoints:stops.map((stop)=>({time:round(stop.position/100),color:colorValue(stop.color)}))},Transparency:{kind:"NumberSequence",keypoints:stops.map((stop)=>({time:round(stop.position/100),value:round(1-stop.opacity/100)}))},Rotation:round(element.gradientAngle,2)}});}
+  if(options.includeGradients&&element.gradientType!=="none"&&element.gradientStops.length>=2)decorators.push(nativeGradient(element));
   if(options.includeLayouts)decorators.push(...layoutDecorators(element,project.elements.filter((child)=>child.parentId===element.id)).filter((decorator)=>!textInstance||decorator.className!=="UIPadding"));
   const scaleDecorator=options.includeConstraints?objectScaleDecorator(element):undefined;if(scaleDecorator)decorators.push(scaleDecorator);
   if(options.includeConstraints&&element.constraints.horizontal==="scale"&&element.constraints.vertical==="scale")decorators.push({className:"UIAspectRatioConstraint",name:"UIAspectRatioConstraint",properties:{AspectRatio:round(element.width/Math.max(1,element.height),4),DominantAxis:enumValue("DominantAxis","Width")}});
@@ -112,7 +151,24 @@ function nativeNodeFor(element:EditorElement,project:EditorProject,options:Roblo
   return{sourceId:element.id,name:element.name,className,parentSourceId:element.parentId,properties,attributes:{CreatorMakeSourceId:element.id,CreatorMakeRole:"Native",CreatorMakeElementType:element.type,...(textDecision?textAttributes(element,1,rotation??resolveCaptionGeometry(element,project.elements)):{}),...(rotation?textRotationAttributes(rotation):{})},decorators};
 }
 
-function orderedVisible(elements:EditorElement[]){const visible=elements.filter((element)=>!element.hidden),ordered:EditorElement[]=[],pending=new Map(visible.map((element)=>[element.id,element]));while(pending.size){let progressed=false;for(const[id,element]of pending){if(!element.parentId||!pending.has(element.parentId)){ordered.push(element);pending.delete(id);progressed=true;}}if(!progressed){ordered.push(...pending.values());break;}}return ordered;}
+function orderedVisible(elements: EditorElement[], preserveStudioNodes = false) {
+  const pending = new Map(elements.map((element) => [element.id, element]));
+  const omitted = new Set<string>();
+  const ordered: EditorElement[] = [];
+  while (pending.size) {
+    let progressed = false;
+    for (const [id, element] of pending) {
+      if (element.parentId && pending.has(element.parentId)) continue;
+      const hidden = element.hidden && !(preserveStudioNodes && element.roblox?.studioSource);
+      if (hidden || (preserveStudioNodes && element.parentId && omitted.has(element.parentId))) omitted.add(id);
+      else ordered.push(element);
+      pending.delete(id);
+      progressed = true;
+    }
+    if (!progressed) throw new Error("The export hierarchy contains a circular parent relationship.");
+  }
+  return ordered;
+}
 
 const assetElementId=(asset:RobloxRenderAsset)=>asset.sourceElementId??asset.sourceId;
 const assetLookup=(assets:RobloxRenderAsset[])=>new Map(assets.map((asset)=>[`${assetElementId(asset)}:${asset.visualPart??"full"}`,asset]));
@@ -142,7 +198,46 @@ function splitTextNodes(element:EditorElement,project:EditorProject,parentSource
 
 function nativeSemanticNodes(project:EditorProject,options:RobloxExportOptions){
   const byId=new Map(project.elements.map((element)=>[element.id,element])),nodes:RobloxManifestNode[]=[];
-  for(const element of orderedVisible(project.elements)){
+  for(const item of orderedVisible(project.elements,true)){
+    // Older saved projects can reference a parent that has already been deleted.
+    const element = item.parentId && !byId.has(item.parentId) ? {...item,parentId:null} : item;
+    const source = element.roblox?.studioSource;
+    if(source){
+      const original=sanitizeStudioNode(source.node);
+      const edited=nativeNodeFor(element,project,options,byId);
+      const properties={...original.properties,Position:edited.properties.Position,Size:edited.properties.Size,AnchorPoint:edited.properties.AnchorPoint};
+      const changed=(field:keyof EditorElement)=>JSON.stringify(source.baseline?.[field])!==JSON.stringify(element[field]);
+      const mappings:Partial<Record<keyof EditorElement,string[]>>={
+        rotation:["Rotation"],hidden:["Visible"],clipContent:["ClipsDescendants"],zIndex:["ZIndex","LayoutOrder"],
+        fill:["BackgroundColor3","BackgroundTransparency"],opacity:["BackgroundTransparency","TextTransparency","ImageTransparency"],
+        text:["Text"],textColor:["TextColor3"],fontSizeDesign:["TextSize"],fontFamily:["FontFace"],fontWeight:["FontFace"],fontStyle:["FontFace"],
+        richText:["RichText"],textSizingMode:["TextScaled"],textBoxMode:["TextWrapped","AutomaticSize"],
+        textAlign:["TextXAlignment"],verticalAlign:["TextYAlignment"],lineHeight:["LineHeight"],
+      };
+      for(const [field,keys] of Object.entries(mappings)){
+        if(!changed(field as keyof EditorElement))continue;
+        for(const key of keys){
+          if(Object.hasOwn(edited.properties,key)) (properties as RobloxManifestNode["properties"])[key]=edited.properties[key];
+        }
+      }
+      if(element.roblox?.imageAssetId!==undefined && "Image" in properties){
+        (properties as RobloxManifestNode["properties"]).Image=element.roblox.imageAssetId;
+      }
+      const decoratorEdits=[
+        {className:"UICorner",edit:changed("cornerRadius")},
+        {className:"UIStroke",edit:changed("borderWidth")||changed("borderColor")},
+        {className:"UIGradient",edit:changed("gradientType")||changed("gradientStops")},
+        {className:"UITextSizeConstraint",edit:changed("textSizingMode")},
+      ];
+      const decorators=original.decorators.filter((item)=>!decoratorEdits.some((change)=>change.edit&&change.className===item.className));
+      decorators.push(...edited.decorators.filter((item)=>decoratorEdits.some((change)=>change.edit&&change.className===item.className)));
+      if(changed("gradientAngle")){
+        const gradient=decorators.find((item)=>item.className==="UIGradient"&&item.properties.Enabled!==false);
+        if(gradient) gradient.properties.Rotation=round(element.gradientAngle,2);
+      }
+      nodes.push({...original,sourceId:element.id,parentSourceId:element.parentId,name:element.name,properties,decorators});
+      continue;
+    }
     if(element.type!=="text"&&element.type!=="button"){nodes.push(nativeNodeFor(element,project,options,byId));continue;}
     if(element.type==="text"&&!hasVisibleTextBackground(element)){nodes.push(nativeNodeFor(element,project,options,byId));continue;}
     const surface=nativeNodeFor(element,project,options,byId),layout=layoutProperties(element,project,options,byId),split=splitTextNodes(element,project,element.parentId,layout,undefined,undefined,2),root=split[0];
@@ -154,8 +249,8 @@ function nativeSemanticNodes(project:EditorProject,options:RobloxExportOptions){
 }
 
 function adaptiveNodes(project:EditorProject,options:RobloxExportOptions,assets:RobloxRenderAsset[]){
-  const projectDefault=project.exportOptions?.defaultRobloxExportMode??"AUTO",byId=new Map(project.elements.map((element)=>[element.id,element])),visibleElements=project.elements.filter((element)=>!element.hidden),visibleIds=new Set(visibleElements.map((element)=>element.id)),assetsByPart=assetLookup(assets),nodes:RobloxManifestNode[]=[viewportNode(project)];
-  for(const element of orderedVisible(project.elements)){
+  const projectDefault=project.exportOptions?.defaultRobloxExportMode??"AUTO",byId=new Map(project.elements.map((element)=>[element.id,element])),visibleElements=orderedVisible(project.elements),visibleIds=new Set(visibleElements.map((element)=>element.id)),assetsByPart=assetLookup(assets),nodes:RobloxManifestNode[]=[viewportNode(project)];
+  for(const element of visibleElements){
     const classification=classifyRobloxElement(element,projectDefault),sourceParent=element.parentId&&visibleIds.has(element.parentId)?byId.get(element.parentId):undefined,parentSourceId=sourceParent?(sourceParent.type==="scrolling-frame"&&classifyRobloxElement(sourceParent,projectDefault).classification!=="NATIVE"?pixelScrollId(sourceParent.id):sourceParent.id):PIXEL_VIEWPORT_ID,baseLayout=pixelLayoutProperties(element,project,byId,visibleIds),layout=baseLayout,backgroundAsset=assetsByPart.get(`${element.id}:background`),textAsset=assetsByPart.get(`${element.id}:text`),asset=assetsByPart.get(`${element.id}:${classification.rasterPart??"full"}`),diagnosticAsset=asset??backgroundAsset??textAsset,visualBounds=diagnosticAsset?.visualBounds??{x:0,y:0,width:element.width,height:element.height},architecture=resolveRobloxVisualArchitecture(element,projectDefault,visualBounds,diagnosticAsset?.internalScale??diagnosticAsset?.scale??0),debug={CreatorMakeElementType:element.type,CreatorMakeGeometryType:geometryKindForElement(element),CreatorMakeExportMode:classification.requestedMode,CreatorMakeExportResolved:classification.resolvedLabel,CreatorMakeExportClassification:classification.classification,CreatorMakeRenderStrategy:classification.classification==="NATIVE"?"Native Roblox":"Transparent PNG",CreatorMakeLayoutX:round(element.x-(element.parentId&&visibleIds.has(element.parentId)?byId.get(element.parentId)?.x??0:0),3),CreatorMakeLayoutY:round(element.y-(element.parentId&&visibleIds.has(element.parentId)?byId.get(element.parentId)?.y??0:0),3),CreatorMakeLayoutWidth:round(element.width,3),CreatorMakeLayoutHeight:round(element.height,3),CreatorMakeLayoutAspect:round(element.width/Math.max(1,element.height),6),CreatorMakeVisualOffsetX:round(visualBounds.x,3),CreatorMakeVisualOffsetY:round(visualBounds.y,3),CreatorMakeVisualWidth:round(visualBounds.width,3),CreatorMakeVisualHeight:round(visualBounds.height,3),CreatorMakeRenderPixelWidth:diagnosticAsset?.renderPixelWidth??0,CreatorMakeRenderPixelHeight:diagnosticAsset?.renderPixelHeight??0,CreatorMakeAlphaEdgeSafety:diagnosticAsset?.fidelity?.alphaEdgeSafety??false,...architectureAttributes(architecture)};
     if(classification.requestedMode==="ORIGINAL"&&(element.type==="button"||element.type==="text"&&hasVisibleTextBackground(element))){
       const surface=nativeNodeFor(element,project,{...options,sizingMode:"SCALE"},byId),split=splitTextNodes(element,project,parentSourceId,baseLayout,undefined,undefined,3),root=split[0];
@@ -424,7 +519,7 @@ export function assertRenderedLayoutFidelity(project:EditorProject,nodes:RobloxM
   return result.diagnostics;
 }
 
-function luaValue(value:RobloxPropertyValue):string{if(typeof value==="string")return quote(value);if(typeof value!=="object")return String(value);if(value.kind==="Color3")return`Color3.fromRGB(${value.r}, ${value.g}, ${value.b})`;if(value.kind==="Vector2")return`Vector2.new(${value.x}, ${value.y})`;if(value.kind==="UDim")return`UDim.new(${value.scale}, ${value.offset})`;if(value.kind==="UDim2")return`UDim2.new(${value.xScale}, ${value.xOffset}, ${value.yScale}, ${value.yOffset})`;if(value.kind==="Rect")return`Rect.new(${value.minX}, ${value.minY}, ${value.maxX}, ${value.maxY})`;if(value.kind==="Enum")return`Enum.${value.enumType}.${value.item}`;if(value.kind==="ColorSequence")return`ColorSequence.new({${value.keypoints.map((point)=>`ColorSequenceKeypoint.new(${point.time}, Color3.fromRGB(${point.color.r}, ${point.color.g}, ${point.color.b}))`).join(", ")}})`;if(value.kind==="NumberSequence")return`NumberSequence.new({${value.keypoints.map((point)=>`NumberSequenceKeypoint.new(${point.time}, ${point.value})`).join(", ")}})`;if(value.family)return`Font.new(${quote(value.family)}, Enum.FontWeight.${value.weight}, Enum.FontStyle.${value.style})`;return`Font.fromEnum(Enum.Font.${value.enumName})`;}
+function luaValue(value:RobloxPropertyValue):string{if(typeof value==="string")return quote(value);if(typeof value!=="object")return String(value);if(value.kind==="Color3")return`Color3.fromRGB(${value.r}, ${value.g}, ${value.b})`;if(value.kind==="Vector3")return`Vector3.new(${value.x}, ${value.y}, ${value.z})`;if(value.kind==="Vector2")return`Vector2.new(${value.x}, ${value.y})`;if(value.kind==="UDim")return`UDim.new(${value.scale}, ${value.offset})`;if(value.kind==="UDim2")return`UDim2.new(${value.xScale}, ${value.xOffset}, ${value.yScale}, ${value.yOffset})`;if(value.kind==="Rect")return`Rect.new(${value.minX}, ${value.minY}, ${value.maxX}, ${value.maxY})`;if(value.kind==="Enum")return`Enum.${value.enumType}.${value.item}`;if(value.kind==="ColorSequence")return`ColorSequence.new({${value.keypoints.map((point)=>`ColorSequenceKeypoint.new(${point.time}, Color3.fromRGB(${point.color.r}, ${point.color.g}, ${point.color.b}))`).join(", ")}})`;if(value.kind==="NumberSequence")return`NumberSequence.new({${value.keypoints.map((point)=>`NumberSequenceKeypoint.new(${point.time}, ${point.value}, ${point.envelope??0})`).join(", ")}})`;if(value.family)return`Font.new(${quote(value.family)}, Enum.FontWeight.${value.weight}, Enum.FontStyle.${value.style})`;return`Font.fromEnum(Enum.Font.${value.enumName})`;}
 const writeProperty=(target:string,key:string,value:RobloxPropertyValue)=>`${target}.${key} = ${luaValue(value)}`;
 const attributeValue=(value:string|number|boolean)=>typeof value==="string"?quote(value):String(value);
 
@@ -484,16 +579,42 @@ export function createRobloxExport(project:EditorProject,options:RobloxExportOpt
   attachButtonInteractions(project,nodes);
   const manifestAssets=assets.map((asset)=>{const manifestAsset={...asset};delete manifestAsset.sourceDataUrl;delete manifestAsset.differenceDataUrl;return manifestAsset;});
   const projectId=project.id||options.screenGuiName,projectName=project.name||options.screenGuiName,guiId=`${projectId}:screen`,projectObjectIds=project.elements.map((element)=>element.id),exportedProjectObjectCount=project.elements.filter((element)=>!element.hidden).length;
-  const manifest:RobloxManifest={kind:"project",messageType:"PROJECT_MANIFEST",schema:"creatormake.roblox-manifest",version:2,textExportArchitecture:3,projectId,projectName,guiId,manifestVersion:`${projectId}:${project.updatedAt??0}:${project.elements.length}`,projectObjectIds,exportDiagnostics:{projectObjectCount:project.elements.length,exportedProjectObjectCount,exportNodeCount:nodes.length,presetsExported:0,presetDefinitionsIncluded:false},screenGuiName:options.screenGuiName,deployTarget:"STARTER_GUI",screenGuiSettings:{enabled:true,displayOrder:options.displayOrder,ignoreGuiInset:renderedMode,resetOnSpawn:options.resetOnSpawn,zIndexBehavior:options.zIndexBehavior},referenceResolution:{width:renderedMode?project.screen.width:options.resolution.width,height:renderedMode?project.screen.height:options.resolution.height},sizingMode:renderedMode?"OFFSET":options.sizingMode,visualMode:options.visualMode,renderScale:options.renderScale,viewportScaleMode:renderedMode?"FIT":undefined,assets:manifestAssets,imageManifest,nodes};
+  const manifest:RobloxManifest={kind:"project",messageType:"PROJECT_MANIFEST",schema:"creatormake.roblox-manifest",version:2,textExportArchitecture:3,projectId,projectName,guiId,manifestVersion:`${projectId}:${project.updatedAt??0}:${project.elements.length}`,projectObjectIds,exportDiagnostics:{projectObjectCount:project.elements.length,exportedProjectObjectCount,exportNodeCount:nodes.length,presetsExported:0,presetDefinitionsIncluded:false},screenGuiName:options.screenGuiName,deployTarget:"STARTER_GUI",screenGuiSettings:{enabled:project.studioSource?.settings?.Enabled!==false,displayOrder:options.displayOrder,ignoreGuiInset:renderedMode||project.studioSource?.settings?.IgnoreGuiInset===true,resetOnSpawn:options.resetOnSpawn,zIndexBehavior:options.zIndexBehavior},screenGuiSafeArea:renderedMode?undefined:sanitizeStudioProperties(project.studioSource?.settings,["ScreenInsets","ClipToDeviceSafeArea"]),referenceResolution:{width:renderedMode?project.screen.width:options.resolution.width,height:renderedMode?project.screen.height:options.resolution.height},sizingMode:renderedMode?"OFFSET":options.sizingMode,visualMode:options.visualMode,renderScale:options.renderScale,viewportScaleMode:renderedMode?"FIT":undefined,assets:manifestAssets,imageManifest,nodes};
   const layoutValidation=renderedMode?validateRenderedLayoutFidelity(project,nodes,assets):{diagnostics:[] as RobloxLayoutDiagnostic[],problems:[] as string[]},layoutDiagnostics=layoutValidation.diagnostics,textValidation=validateTextRotationFidelity(project,nodes),textRotationDiagnostics=textValidation.diagnostics;
   if(renderedMode&&typeof window!=="undefined"&&typeof console.table==="function")console.table(layoutDiagnostics.map((row)=>({name:row.name,exportAs:row.exportAs,architecture:row.resolvedArchitecture,logical:`${row.creatorMake.width}×${row.creatorMake.height}`,visual:`${row.visual.width}×${row.visual.height}`,visualOffset:`${row.visual.offsetX}, ${row.visual.offsetY}`,requiresOverflowWrapper:row.requiresVisualWrapper?"YES":"NO",hasInnerVisual:row.hasInnerVisual?"YES":"NO",validation:row.validation,raster:`${row.raster.pixelWidth}×${row.raster.pixelHeight} @ ${round(row.raster.scale,3)}x`})));
   if(layoutValidation.problems.length&&typeof window!=="undefined")console.error("[CreatorMake] Export layout validation found object-specific issues; the editor remains available.",layoutValidation.problems);
   if(typeof window!=="undefined"&&typeof console.table==="function")console.table(textRotationDiagnostics.map((row)=>({object:row.name,exportAs:row.exportAs,architecture:row.resolvedArchitecture,textBaked:row.textBaked,hasNativeText:row.hasNativeText,captionValidation:row.captionValidation,result:row.validationResult,orientation:row.captionOrientation,backgroundGeometryAngle:round(row.pixelVisualRotation,4),captionAngle:round(row.expectedTextVisualRotation,4),exportedTextRotation:row.captionValidation==="NATIVE"?round(row.textLabelRotationApplied,4):"N/A",captionCenter:`${round(row.captionCenter.x,3)}, ${round(row.captionCenter.y,3)}`,exportedTextCenter:row.captionValidation==="NATIVE"?`${round(row.textLabelCenter.x,3)}, ${round(row.textLabelCenter.y,3)}`:"N/A",centerError:round(row.centerError,4),angleError:round(row.angleError,4),source:row.visualRotationSource})));
   if(textValidation.warnings.length&&typeof window!=="undefined")console.warn("[CreatorMake] Roblox caption fidelity warnings are non-blocking.",textValidation.warnings);
   if(textValidation.problems.length&&typeof window!=="undefined")console.error("[CreatorMake] Roblox caption fidelity found repairable export errors; the editor remains available.",textValidation.problems);
-  const variables=new Map<string,string>();nodes.forEach((node,index)=>variables.set(node.sourceId,varName(node.name,index)));
-  const lines=["-- Generated by CreatorMake",`-- Visual mode: ${options.visualMode}`,"-- Permanent CreatorMake ScreenGuis are installed in StarterGui so Roblox copies them to every player's PlayerGui.","local StarterGui = game:GetService(\"StarterGui\")","","local screenGui = Instance.new(\"ScreenGui\")",`screenGui.Name = ${quote(options.screenGuiName)}`,`screenGui.ResetOnSpawn = ${options.resetOnSpawn}`,`screenGui.IgnoreGuiInset = ${renderedMode?"true":"false"}`,"screenGui.Enabled = true",`screenGui.DisplayOrder = ${Math.round(options.displayOrder)}`,`screenGui.ZIndexBehavior = Enum.ZIndexBehavior.${options.zIndexBehavior}`,`screenGui:SetAttribute("CreatorMakeManaged", true)`,`screenGui:SetAttribute("CreatorMakeProjectId", ${quote(projectId)})`,`screenGui:SetAttribute("CreatorMakeGuiId", ${quote(guiId)})`,`screenGui:SetAttribute("CreatorMakeDeployTarget", "StarterGui")`,"screenGui.Parent = StarterGui",""];
-  nodes.forEach((node)=>{const variable=variables.get(node.sourceId)!;lines.push(`local ${variable} = Instance.new(${quote(node.className)})`,`${variable}.Name = ${quote(node.name)}`,`${variable}:SetAttribute("CreatorMakeId", ${quote(node.sourceId)})`);Object.entries(node.attributes??{}).forEach(([key,value])=>lines.push(`${variable}:SetAttribute(${quote(key)}, ${attributeValue(value)})`));Object.entries(node.properties).forEach(([key,value])=>lines.push(writeProperty(variable,key,value)));lines.push(`${variable}.Parent = ${node.parentSourceId?variables.get(node.parentSourceId)??"screenGui":"screenGui"}`);node.decorators.forEach((decorator,decoratorIndex)=>{const decoratorVar=`${variable}_${decorator.className.charAt(0).toLowerCase()}${decorator.className.slice(1)}_${decoratorIndex+1}`;lines.push(`local ${decoratorVar} = Instance.new(${quote(decorator.className)})`,`${decoratorVar}.Name = ${quote(decorator.name)}`);Object.entries(decorator.properties).forEach(([key,value])=>lines.push(writeProperty(decoratorVar,key,value)));lines.push(`${decoratorVar}.Parent = ${variable}`);});lines.push("");});
+  const variables=new Map(nodes.map((node,index)=>[node.sourceId,`instances[${index+1}]`]));
+  const lines=["-- Generated by CreatorMake",`-- Visual mode: ${options.visualMode}`,"-- Permanent CreatorMake ScreenGuis are installed in StarterGui so Roblox copies them to every player's PlayerGui.","local StarterGui = game:GetService(\"StarterGui\")","","local screenGui = Instance.new(\"ScreenGui\")",`screenGui.Name = ${quote(options.screenGuiName)}`,`screenGui.ResetOnSpawn = ${options.resetOnSpawn}`,`screenGui.IgnoreGuiInset = ${manifest.screenGuiSettings!.ignoreGuiInset}`,`screenGui.Enabled = ${manifest.screenGuiSettings!.enabled}`,`screenGui.DisplayOrder = ${Math.round(options.displayOrder)}`,`screenGui.ZIndexBehavior = Enum.ZIndexBehavior.${options.zIndexBehavior}`,`screenGui:SetAttribute("CreatorMakeManaged", true)`,`screenGui:SetAttribute("CreatorMakeProjectId", ${quote(projectId)})`,`screenGui:SetAttribute("CreatorMakeGuiId", ${quote(guiId)})`,`screenGui:SetAttribute("CreatorMakeDeployTarget", "StarterGui")`,"local instances = {}",""];
+  for(const [key,value] of Object.entries(manifest.screenGuiSafeArea??{})) lines.push(writeProperty("screenGui",key,value));
+  nodes.forEach((node,index)=>{
+    const variable = varName(node.name,index);
+    const parent = node.parentSourceId ? variables.get(node.parentSourceId) : "screenGui";
+    if (!parent) throw new Error(`Missing export parent for ${node.name}.`);
+    lines.push("do", `  local ${variable} = Instance.new(${quote(node.className)})`,
+      `  ${variable}.Name = ${quote(node.name)}`,
+      `  ${variable}:SetAttribute("CreatorMakeId", ${quote(node.sourceId)})`,
+      `  ${variable}:SetAttribute("CreatorMakeManaged", true)`);
+    for (const [key,value] of Object.entries(node.attributes ?? {})) {
+      lines.push(`  ${variable}:SetAttribute(${quote(key)}, ${attributeValue(value)})`);
+    }
+    for (const [key,value] of Object.entries(node.properties)) {
+      lines.push(`  ${writeProperty(variable,key,value)}`);
+    }
+    lines.push(`  ${variable}.Parent = ${parent}`, `  instances[${index+1}] = ${variable}`);
+    for (const decorator of node.decorators) {
+      lines.push("  do", `    local decorator = Instance.new(${quote(decorator.className)})`,
+        `    decorator.Name = ${quote(decorator.name)}`,
+        `    decorator:SetAttribute("CreatorMakeDecorator", ${quote(`${decorator.className}:${decorator.name}`)})`);
+      for (const [key,value] of Object.entries(decorator.properties)) {
+        lines.push(`    ${writeProperty("decorator",key,value)}`);
+      }
+      lines.push(`    decorator.Parent = ${variable}`, "  end");
+    }
+    lines.push("end", "");
+  });
   if(renderedMode){const viewport=variables.get(PIXEL_VIEWPORT_ID)!;lines.push(
     "local creatorMakeViewportConnection = nil",
     "local function updateCreatorMakeScale()",
@@ -509,14 +630,33 @@ export function createRobloxExport(project:EditorProject,options:RobloxExportOpt
     "  updateCreatorMakeScale()",
     "end",
     "bindCreatorMakeCamera()",
-    "workspace:GetPropertyChangedSignal(\"CurrentCamera\"):Connect(bindCreatorMakeCamera)",
+    "local creatorMakeCameraConnection = workspace:GetPropertyChangedSignal(\"CurrentCamera\"):Connect(bindCreatorMakeCamera)",
+    "screenGui.Destroying:Once(function()",
+    "  creatorMakeCameraConnection:Disconnect()",
+    "  if creatorMakeViewportConnection then creatorMakeViewportConnection:Disconnect() end",
+    "end)",
     "",
   );}
-  lines.push("return screenGui");
+  lines.push("screenGui.Parent = StarterGui","return screenGui");
   const classifications=classifyRobloxElements(project.elements,project.exportOptions?.defaultRobloxExportMode??"AUTO"),assetCompatibility=renderedMode?assets.flatMap((asset):RobloxCompatibilityIssue[]=>{const elementId=assetElementId(asset),classification=classifications.get(elementId);return asset.status==="error"?[{elementId,elementName:asset.elementName,level:"unsupported",feature:"Transparent PNG render",message:asset.error??"The visual could not be rendered."}]:adaptive?[{elementId,elementName:asset.elementName,level:"approximation",feature:`${classification?.classification??"RASTERIZED"} export`,message:`${classification?.reasons.join(", ")||"This visual needs exact raster output"}. CreatorMake keeps ${asset.visualPart==="text"?"the pixel-text fallback":"the visual background"} as a separate transparent image.`}]:!asset.robloxAssetId?[{elementId,elementName:asset.elementName,level:"approximation",feature:"Studio Preview",message:"PNG is staged for instant EditableImage preview. Publish explicitly through CreatorMake when a permanent Roblox asset ID is needed."}]:[];}):[],layoutCompatibility=layoutDiagnostics.filter((row)=>row.validation==="FAIL").map((row):RobloxCompatibilityIssue=>({elementId:row.sourceId,elementName:row.name,level:"unsupported",feature:"Export layout",message:layoutValidation.problems.filter((problem)=>problem.startsWith(`${row.name}:`)).join(" · ")||"The resolved export structure is invalid. Use Auto for this object while keeping the CreatorMake design unchanged."})),textCompatibility=textRotationDiagnostics.filter((row)=>row.validationResult==="WARNING"||row.validationResult==="ERROR").map((row):RobloxCompatibilityIssue=>({elementId:row.sourceId,elementName:row.name,level:row.validationResult==="ERROR"?"unsupported":"approximation",feature:"Caption fidelity",message:`${row.validationMessage} Expected ${round(row.expectedTextVisualRotation,4)}°, exported ${round(row.finalTextVisualRotation,4)}°, center delta ${round(row.centerError,4)}.`})),compatibility=[...checkRobloxCompatibility(project.elements),...assetCompatibility,...layoutCompatibility,...textCompatibility];
   return{lua:lines.join("\n"),manifest,compatibility,hierarchy:createHierarchyText(options.screenGuiName,nodes),assets,layoutDiagnostics,layoutFidelityIssues:layoutValidation.problems,textRotationDiagnostics,textFidelitySummary:textValidation.summary,textFidelityWarnings:textValidation.warnings,textFidelityIssues:textValidation.problems};
 }
 
 function createHierarchyText(screenGuiName:string,nodes:RobloxManifestNode[]){const children=new Map<string|null,RobloxManifestNode[]>();nodes.forEach((node)=>{const key=node.parentSourceId&&nodes.some((item)=>item.sourceId===node.parentSourceId)?node.parentSourceId:null,list=children.get(key)??[];list.push(node);children.set(key,list);});const lines=[`${screenGuiName} [ScreenGui]`],walk=(parent:string|null,depth:number)=>{(children.get(parent)??[]).forEach((node)=>{lines.push(`${"  ".repeat(depth)}${node.name} [${node.className}]`);node.decorators.forEach((item)=>lines.push(`${"  ".repeat(depth+1)}${item.name} [${item.className}]`));walk(node.sourceId,depth+1);});};walk(null,1);return lines.join("\n");}
 
-export function verifyGeneratedLua(lua:string){const errors:string[]=[];if(lua.includes("undefined")||lua.includes("NaN"))errors.push("Output contains an invalid JavaScript value.");if(!lua.includes('Instance.new("ScreenGui")'))errors.push("ScreenGui root is missing.");if(!lua.trim().endsWith("return screenGui"))errors.push("Generated script does not return the ScreenGui.");let depth=0;for(const char of lua){if(char==="(")depth++;if(char===")")depth--;if(depth<0){errors.push("Closing parenthesis appears before an opening parenthesis.");break;}}if(depth!==0)errors.push("Parentheses are unbalanced.");return{valid:errors.length===0,errors};}
+export function verifyGeneratedLua(lua: string) {
+  const errors: string[] = [];
+  // Ignore parentheses and words inside user text, Source strings, and comments.
+  const code = lua.replace(/"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|--[^\n]*/g, '""');
+  if (/\b(?:undefined|NaN|Infinity)\b/.test(code)) errors.push("Output contains an invalid JavaScript value.");
+  if (!code.includes('local screenGui = Instance.new("")')) errors.push("ScreenGui root is missing.");
+  if (!code.trim().endsWith("return screenGui")) errors.push("Generated script does not return the ScreenGui.");
+  let depth = 0;
+  for (const character of code) {
+    if (character === "(") depth++;
+    if (character === ")") depth--;
+    if (depth < 0) break;
+  }
+  if (depth !== 0) errors.push("Parentheses are unbalanced.");
+  return { valid: errors.length === 0, errors };
+}

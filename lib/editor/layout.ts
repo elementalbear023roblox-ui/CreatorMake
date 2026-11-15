@@ -11,7 +11,7 @@ const crossSizing=(element:EditorElement,horizontal:boolean)=>horizontal?element
 
 function setMainSize(element:EditorElement,horizontal:boolean,value:number){if(horizontal)element.width=clamp(value,element.minWidth,element.maxWidth);else element.height=clamp(value,element.minHeight,element.maxHeight);}
 function setCrossSize(element:EditorElement,horizontal:boolean,value:number){if(horizontal)element.height=clamp(value,element.minHeight,element.maxHeight);else element.width=clamp(value,element.minWidth,element.maxWidth);}
-function resolveHug(element:EditorElement){if(element.type!=="text"&&element.type!=="button")return;if(element.sizingX==="hug"||element.textBoxMode==="auto-width")element.width=clamp(textWidth(element),element.minWidth,element.maxWidth);if(element.sizingY==="hug"||element.textBoxMode==="auto-height")element.height=clamp(textHeight(element),element.minHeight,element.maxHeight);}
+function resolveHug(element:EditorElement){if(element.roblox?.nativeLayout||(element.type!=="text"&&element.type!=="button"))return;if(element.sizingX==="hug"||element.textBoxMode==="auto-width")element.width=clamp(textWidth(element),element.minWidth,element.maxWidth);if(element.sizingY==="hug"||element.textBoxMode==="auto-height")element.height=clamp(textHeight(element),element.minHeight,element.maxHeight);}
 function childrenOf(project:EditorProject,parentId:string){return project.elements.filter((element)=>element.parentId===parentId&&!element.hidden);}
 function translateDescendants(project:EditorProject,parentId:string,dx:number,dy:number){if(!dx&&!dy)return;const direct=project.elements.filter((element)=>element.parentId===parentId);direct.forEach((child)=>{child.x+=dx;child.y+=dy;translateDescendants(project,child.id,dx,dy);});}
 

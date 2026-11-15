@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Archive, Copy, Download, FolderOpen, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import type { ProjectKind, ProjectSummary, RecoverySnapshot } from "@/lib/editor/types";
+import { STUDIO_SELECTION_FORMAT } from "@/lib/roblox/studio-selection-schema";
 
 type MaybePromise=void|Promise<void>;
 type Props = {
@@ -14,10 +15,18 @@ type Props = {
 export function ProjectDialog(props:Props){
   const[newName,setNewName]=useState("New UI Project"),[projectKind,setProjectKind]=useState<ProjectKind>("blank"),[error,setError]=useState(""),[busy,setBusy]=useState(false);
   const importInput=useRef<HTMLInputElement>(null),renameInput=useRef<HTMLInputElement>(null);
+  const [studioJson,setStudioJson]=useState("");
   if(!props.open)return null;
   const run=async(action:()=>MaybePromise,close=false)=>{setBusy(true);setError("");try{await action();if(close)props.onOpenChange(false);}catch(problem){setError(problem instanceof Error?problem.message:"CreatorMake could not complete that project action.");}finally{setBusy(false);}};
   const importFile=async(file:File|undefined)=>{if(!file)return;await run(async()=>{const value=JSON.parse(await file.text()) as unknown;await props.onImport(value);},true);if(importInput.current)importInput.current.value="";};
   const active=props.projects.filter((project)=>!project.archived),archived=props.projects.filter((project)=>project.archived);
+  let studioSelection:{format?:string;name?:string;nodes?:unknown[];warnings?:string[]}|undefined;
+  if(studioJson) {
+    try {
+      const candidate=JSON.parse(studioJson);
+      if(candidate?.format===STUDIO_SELECTION_FORMAT && Array.isArray(candidate.nodes)) studioSelection=candidate;
+    } catch { /* The user may still be entering JSON. */ }
+  }
   const cards=(items:ProjectSummary[])=>items.map((project)=><article key={project.id} className={`project-card ${project.id===props.activeId?"active":""}`}>
     <button className="project-card-open" onClick={()=>void run(()=>props.onOpen(project.id),true)} disabled={busy}>
       <img src={project.thumbnail} alt=""/><span className="project-card-title"><strong>{project.name}</strong><em>{project.projectKind==="commission"?"Commission":project.status}</em></span>
@@ -31,6 +40,19 @@ export function ProjectDialog(props:Props){
     <header><h2 id="project-dialog-title">Projects</h2><p>Local-first CreatorMake projects stored in IndexedDB, with automatic saves and recovery. Google account backup is optional and never replaces these local copies.</p></header>
     <div className="project-kind"><button className={projectKind==="blank"?"active":""} onClick={()=>setProjectKind("blank")}><strong>Blank Project</strong><small>Empty canvas · design tools only</small></button><button className={projectKind==="commission"?"active":""} onClick={()=>setProjectKind("commission")}><strong>Commission Project</strong><small>Empty canvas · brief, references, and delivery helpers</small></button></div>
     <div className="project-create"><input value={newName} onChange={(event)=>setNewName(event.target.value)} aria-label="New project name"/><button disabled={busy} onClick={()=>void run(()=>props.onCreate(newName,projectKind),true)}><Plus size={14}/> Create {projectKind==="commission"?"Commission":"Blank"}</button><button disabled={busy} onClick={()=>importInput.current?.click()}><Upload size={14}/> Import .creatormake</button><input ref={importInput} className="visually-hidden" type="file" accept=".creatormake,.creator,.creatormake-project,.json,application/json,application/x-creatormake+json,application/x-creator+json" onChange={(event)=>void importFile(event.target.files?.[0])}/></div>
+    <details className="project-archive">
+      <summary>Import Studio selection</summary>
+      <p>Select a ScreenGui in Studio and copy the JSON from the CreatorMake plugin.</p>
+      <textarea aria-label="Studio selection JSON" rows={4} maxLength={8*1024*1024} value={studioJson} onChange={(event)=>setStudioJson(event.target.value)}/>
+      {studioSelection&&<div><strong>{studioSelection.name}</strong> · {studioSelection.nodes?.length} objects
+        {Array.isArray(studioSelection.warnings)&&studioSelection.warnings.length>0&&<ul>{studioSelection.warnings.filter((warning)=>typeof warning==="string").slice(0,8).map((warning,index)=><li key={index}>{warning}</li>)}</ul>}
+      </div>}
+      {studioJson&&!studioSelection&&<p role="status">Paste a CreatorMake Studio selection export.</p>}
+      <button disabled={busy||!studioSelection} onClick={()=>void run(async()=>{
+        await props.onImport(studioSelection);
+        setStudioJson("");
+      },true)}>Import as new project</button>
+    </details>
     {error&&<output className="project-error">{error}</output>}
     <div className="project-rename"><input ref={renameInput} defaultValue={props.currentName} aria-label="Current project name"/><button disabled={busy} onClick={()=>void run(()=>props.onRename(renameInput.current?.value??props.currentName))}>Rename current</button><button disabled={busy} onClick={()=>void run(props.onDuplicate,true)}><Copy size={14}/> Duplicate</button></div>
     <div className="project-card-grid">{cards(active)}{active.length===0&&<p className="project-empty">No active projects. Restore one from Archive.</p>}</div>

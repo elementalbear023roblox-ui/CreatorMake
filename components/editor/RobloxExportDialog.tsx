@@ -16,6 +16,8 @@ import { SYSTEM_PRESETS } from "@/lib/design-intelligence/system-presets";
 import { classifyRobloxElement } from "@/lib/roblox/classification";
 import { assetMappingKey, normalizeRobloxAssetId, planPixelAccurateAssets, renderPixelAccurateAssets } from "@/lib/roblox/render-assets";
 import { creatorMakePluginFilename } from "@/lib/roblox/plugin";
+import { createStudioTransferFile } from "@/lib/roblox/studio-transfer";
+import { studioSourceExportOptions } from "@/lib/roblox/studio-selection";
 import { DEFAULT_ROBLOX_EXPORT_OPTIONS, ROBLOX_RESOLUTIONS } from "@/lib/roblox/types";
 import type { EditorElement, EditorProject } from "@/lib/editor/types";
 import type { RobloxAssetMappings } from "@/lib/roblox/render-assets";
@@ -24,7 +26,7 @@ import { resolveProjectRenderScale, resolveProjectResolution, resolveProjectVisu
 import { exportProjectData } from "@/lib/editor/project";
 
 export type StudioConnectionSummary={status:"disconnected"|"pairing"|"connected"|"error";pluginOnline:boolean;pendingChanges:number;lastSeenAt:number|null};
-type Props={open:boolean;project:EditorProject;onClose:()=>void;onStudioStatusChange?:(summary:StudioConnectionSummary)=>void;quickSyncToken?:number;onQuickSyncFeedback?:(message:string)=>void};
+type Props={open:boolean;startView?:"studio"|"compatibility";project:EditorProject;onClose:()=>void;onStudioStatusChange?:(summary:StudioConnectionSummary)=>void;quickSyncToken?:number;onQuickSyncFeedback?:(message:string)=>void};
 type SyncState={id:string;mode?:"preview"|"install-starter-gui"|"apply-published";status:"pending"|"running"|"completed"|"failed";message?:string;error?:string|null;plan?:{nodes:number;totalAssets:number;uniqueVisuals:number;previewAssets:number;changedVisuals:number;publishAssets:number;publishedAssets:number;reusedAssets:number;changedNodes:number;deletedNodes:number};result?:{projectId?:string;projectName?:string;manifestVersion?:string;created?:number;reused?:number;nodes?:number;screenGuiName?:string;previewImages?:number;permanent?:boolean;localAssetImport?:boolean;deployTarget?:"StarterGui"|"PlayerGuiPreview";multiPlayerReady?:boolean}|null};
 type PublishingJob={id:string;phase:"Preparing"|"Uploading"|"Processing"|"Sharing"|"Ready"|"Failed";status:"pending"|"running"|"completed"|"failed";message:string;error:string|null;total:number;completed:number;published:number;reused:number;universeId?:number;requestedAt:string;completedAt:string|null};
 type PublishingStatus={status?:string;config:{configured:boolean;authMode:"api-key"|"oauth"|"not-configured";creatorType:string|null;creatorId:string|null;assetAccess?:"current-experience";missing:string[];oauth?:{status:string;scopes:string[]}};totalAssets:number;uniqueVisuals:number;needsPublish:number;publishedVisuals:number;previewOnlyAssets:number;publishingOwner?:string|null;experienceOwner?:string|null;sharingUniverseId?:number|null;crossOwnerPublishing?:boolean;job:PublishingJob|null};
@@ -46,9 +48,10 @@ const displayStatus=(asset:RobloxRenderAsset)=>asset.status==="needs-render"?"Ne
 const renderAssetElementId=(asset:RobloxRenderAsset)=>asset.sourceElementId??asset.sourceId;
 const exportMapping=(element:EditorElement,mode:RobloxVisualMode,projectDefault:EditorProject["exportOptions"]["defaultRobloxExportMode"]="AUTO")=>{if(mode==="NATIVE")return element.type==="scrolling-frame"?"Native ScrollingFrame + layout instances":"Native Roblox object";if(mode==="PIXEL_ACCURATE")return element.type==="scrolling-frame"?"Frame + _Visual + ScrollingFrame + layout instances":element.type==="frame"||element.type==="container"?"Frame + _Visual ImageLabel":"ImageLabel";return classifyRobloxElement(element,projectDefault).resolvedLabel;};
 
-export function RobloxExportDialog({open,project,onClose,onStudioStatusChange,quickSyncToken=0,onQuickSyncFeedback}:Props){
-  const [options,setOptions]=useState<RobloxExportOptions>(()=>({...DEFAULT_ROBLOX_EXPORT_OPTIONS,screenGuiName:`${project.name.replace(/[^a-z0-9]+/gi,"")}Gui`||"CreatorMakeGui",visualMode:resolveProjectVisualMode(project.exportOptions),renderScale:resolveProjectRenderScale(project.exportOptions),imageResampling:project.exportOptions.imageResampling,effectsQuality:project.exportOptions.effectsQuality,resolution:resolveProjectResolution(project.exportOptions),sizingMode:project.exportOptions.robloxScreenScaling==="ORIGINAL"?"OFFSET":project.exportOptions.robloxScreenScaling==="RESPONSIVE"?"SCALE":"AUTO"}));
+export function RobloxExportDialog({open,startView="studio",project,onClose,onStudioStatusChange,quickSyncToken=0,onQuickSyncFeedback}:Props){
+  const [options,setOptions]=useState<RobloxExportOptions>(()=>({...DEFAULT_ROBLOX_EXPORT_OPTIONS,screenGuiName:`${project.name.replace(/[^a-z0-9]+/gi,"")}Gui`||"CreatorMakeGui",...studioSourceExportOptions(project),visualMode:resolveProjectVisualMode(project.exportOptions),renderScale:resolveProjectRenderScale(project.exportOptions),imageResampling:project.exportOptions.imageResampling,effectsQuality:project.exportOptions.effectsQuality,resolution:resolveProjectResolution(project.exportOptions),sizingMode:project.exportOptions.robloxScreenScaling==="ORIGINAL"?"OFFSET":project.exportOptions.robloxScreenScaling==="RESPONSIVE"?"SCALE":"AUTO"}));
   const [view,setView]=useState<View>("studio"),[notice,setNotice]=useState(""),[busy,setBusy]=useState(false),[rendering,setRendering]=useState(false),[syncPhase,setSyncPhase]=useState("");
+  useEffect(()=>{if(open)setView(startView);},[open,startView]);
   const [compareGeometry,setCompareGeometry]=useState(false),[compareOpacity,setCompareOpacity]=useState(50),[showDifference,setShowDifference]=useState(false);
   const [localStatus,setLocalStatus]=useState<"disconnected"|"connecting"|"connected"|"error">("disconnected"),[health,setHealth]=useState<LocalHealth|null>(null),[publishing,setPublishing]=useState<PublishingStatus|null>(null),[lastSeenAt,setLastSeenAt]=useState<number|null>(null);
   const [mappings,setMappings]=useState<RobloxAssetMappings>(()=>loadMappings(project.id)),[renderAssets,setRenderAssets]=useState<RobloxRenderAsset[]>([]);
@@ -151,6 +154,14 @@ export function RobloxExportDialog({open,project,onClose,onStudioStatusChange,qu
       {view==="lua"&&<><div className={`lua-status ${verification.valid?"valid":"invalid"}`}><CheckCircle2 size={13}/>{verification.valid?"Structural syntax checks passed":verification.errors.join(" ")}</div><textarea className="lua-output" readOnly value={output.lua} aria-label="Generated Roblox Lua"/></>}
       {view==="compatibility"&&<div className="compatibility-list">{output.compatibility.length?output.compatibility.map((issue,index)=><article key={`${issue.elementId}-${issue.feature}-${index}`} className={issue.level}><span>{issue.level}</span><div><strong>{issue.elementName} · {issue.feature}</strong><p>{issue.message}</p></div></article>):<div className="compatibility-clear"><ShieldCheck size={28}/><strong>All inspected features are ready.</strong></div>}<section className="unsupported-options"><strong>{options.visualMode==="PIXEL_ACCURATE"?"Studio Preview truth":options.visualMode==="ADAPTIVE"?"Adaptive export plan":"Native compatibility"}</strong><p>{options.visualMode==="PIXEL_ACCURATE"?"CreatorMake preserves every element as a retained EditableImage. Permanent asset IDs are only created by explicit Open Cloud publishing.":options.visualMode==="ADAPTIVE"?"Native-safe layers stay editable. Unsupported geometry is rendered as a cropped transparent PNG inside a responsive Roblox container.":"Native export remains an editable approximation for complex visuals."}</p></section></div>}
     </main>
-    <footer><output>{notice}</output><button onClick={()=>void copyLua()}><Clipboard size={13}/> Copy Lua</button><button onClick={()=>download(output.lua,`${safeName(options.screenGuiName)}.lua`,"text/plain")}><Download size={13}/> Lua</button><button onClick={()=>download(JSON.stringify(exportProjectData(project),null,2),`${project.name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()}.creatormake`,"application/x-creatormake+json")}><FileJson size={13}/> Project .creatormake</button></footer>
+    <footer><output aria-live="polite">{notice}</output><button onClick={()=>void copyLua()}><Clipboard size={13}/> Copy Lua</button><button onClick={()=>download(output.lua,`${safeName(options.screenGuiName)}.lua`,"text/plain")}><Download size={13}/> Lua</button><button onClick={()=>{
+      try {
+        const file = createStudioTransferFile(output.manifest);
+        download(file,`${safeName(options.screenGuiName)}.studio.json`,"application/json");
+        setNotice("Open Studio JSON in the CreatorMake plugin, then choose where to import it.");
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "Studio JSON export failed.");
+      }
+    }}><FileJson size={13}/> Studio JSON</button><button onClick={()=>download(JSON.stringify(exportProjectData(project),null,2),`${project.name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()}.creatormake`,"application/x-creatormake+json")}><FileJson size={13}/> Project .creatormake</button></footer>
   </section></div>;
 }

@@ -3,6 +3,7 @@ import { copyFile, mkdir, readFile, readdir, unlink, writeFile } from "node:fs/p
 import { basename, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
+import { STUDIO_SELECTION_DECORATOR_PROPERTIES, STUDIO_SELECTION_GUI_PROPERTIES } from "../lib/roblox/studio-selection-schema.ts";
 import {
   CREATORMAKE_APP_VERSION,
   CREATORMAKE_BRIDGE_ORIGIN,
@@ -62,8 +63,8 @@ function sendJson(response, statusCode, value, origin) {
   response.end(body);
 }
 
-const SUPPORTED_NODE_CLASSES = new Set(["Frame", "ImageLabel", "ImageButton", "TextLabel", "TextButton", "TextBox", "ScrollingFrame", "LocalScript"]);
-const SUPPORTED_DECORATOR_CLASSES = new Set(["UIAspectRatioConstraint", "UICorner", "UIGradient", "UIGridLayout", "UIListLayout", "UIPadding", "UIScale", "UISizeConstraint", "UIStroke", "UITextSizeConstraint"]);
+const SUPPORTED_NODE_CLASSES = new Set([...Object.keys(STUDIO_SELECTION_GUI_PROPERTIES).filter((className) => className !== "ScreenGui"), "LocalScript"]);
+const SUPPORTED_DECORATOR_CLASSES = new Set(Object.keys(STUDIO_SELECTION_DECORATOR_PROPERTIES));
 const plainObject = (value) => Boolean(value && typeof value === "object" && !Array.isArray(value));
 const manifestFieldError = (node, index, field, reason) => new Error(`Manifest validation failed: Object: ${node?.sourceId || `nodes[${index}]`} | Type: ${node?.attributes?.CreatorMakeElementType || node?.className || "Unknown"} | Field: ${field} | Reason: ${reason}`);
 

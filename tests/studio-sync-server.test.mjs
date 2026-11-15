@@ -101,9 +101,9 @@ test("local Studio Sync rejects legacy PixelText glyph assets",async(context)=>{
 test("local Studio Sync identifies the exact malformed manifest object and field",async(context)=>{
   const outputDir=await mkdtemp(join(tmpdir(),"creatormake-invalid-object-")),{server,url}=await startStudioSyncServer({port:0,quiet:true,outputDir});
   context.after(async()=>{await new Promise((resolve)=>server.close(resolve));await rm(outputDir,{recursive:true,force:true});});
-  const malformed=asProjectManifest({schema:"creatormake.roblox-manifest",version:2,screenGuiName:"InvalidGui",referenceResolution:{width:960,height:600},sizingMode:"OFFSET",visualMode:"NATIVE",nodes:[{sourceId:"root-frame",name:"Root",className:"Frame",parentSourceId:null,properties:{},attributes:{CreatorMakeElementType:"frame"},decorators:[]},{sourceId:"broken-child",name:"Broken",className:"ViewportFrame",parentSourceId:"root-frame",properties:{},attributes:{CreatorMakeElementType:"image"},decorators:[]}],assets:[]});
+  const malformed=asProjectManifest({schema:"creatormake.roblox-manifest",version:2,screenGuiName:"InvalidGui",referenceResolution:{width:960,height:600},sizingMode:"OFFSET",visualMode:"NATIVE",nodes:[{sourceId:"root-frame",name:"Root",className:"Frame",parentSourceId:null,properties:{},attributes:{CreatorMakeElementType:"frame"},decorators:[]},{sourceId:"broken-child",name:"Broken",className:"Part",parentSourceId:"root-frame",properties:{},attributes:{CreatorMakeElementType:"image"},decorators:[]}],assets:[]});
   const response=await fetch(`${url}/project/current/manifest`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(malformed)}),result=await response.json();
-  assert.equal(response.status,400);assert.match(result.error,/Object: broken-child/);assert.match(result.error,/Type: image/);assert.match(result.error,/Field: className/);assert.match(result.error,/unsupported Roblox GUI class ViewportFrame/);
+  assert.equal(response.status,400);assert.match(result.error,/Object: broken-child/);assert.match(result.error,/Type: image/);assert.match(result.error,/Field: className/);assert.match(result.error,/unsupported Roblox GUI class Part/);
 });
 
 test("local Studio Sync writes rendered PNGs and strips embedded data from the plugin manifest",async(context)=>{

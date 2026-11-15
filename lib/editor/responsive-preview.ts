@@ -1,12 +1,15 @@
 import type { EditorElement, EditorProject } from "./types.ts";
 import { resizeElementWithConstraints } from "./transforms.ts";
 import { applyAutoLayout } from "./layout.ts";
+import { resizeRobloxLayout } from "./roblox-layout.ts";
 
 export type ResponsivePreviewIssue={elementId:string;severity:"warning"|"error";kind:"offscreen"|"small-target"|"text-clipping";message:string};
 
 const clamp=(value:number,min:number|null,max:number|null)=>Math.max(min??4,Math.min(max??Infinity,value));
 
 function resizeRoot(element:EditorElement,screen:EditorProject["screen"],width:number,height:number){
+  const native = resizeRobloxLayout(element, {x:0,y:0,width:screen.width,height:screen.height}, {x:0,y:0,width,height});
+  if (native) return native;
   const next={x:element.x,y:element.y,width:element.width,height:element.height};
   const right=screen.width-(element.x+element.width),bottom=screen.height-(element.y+element.height),centerX=element.x+element.width/2-screen.width/2,centerY=element.y+element.height/2-screen.height/2;
   if(element.constraints.horizontal==="right")next.x=width-right-element.width;

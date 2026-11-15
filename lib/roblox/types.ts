@@ -115,12 +115,13 @@ export type RobloxCompatibilityIssue = { elementId:string;elementName:string;lev
 export type RobloxPropertyValue = string|number|boolean|
   {kind:"Color3";r:number;g:number;b:number}|
   {kind:"Vector2";x:number;y:number}|
+  {kind:"Vector3";x:number;y:number;z:number}|
   {kind:"UDim";scale:number;offset:number}|
   {kind:"UDim2";xScale:number;xOffset:number;yScale:number;yOffset:number}|
   {kind:"Rect";minX:number;minY:number;maxX:number;maxY:number}|
   {kind:"Enum";enumType:string;item:string}|
   {kind:"ColorSequence";keypoints:Array<{time:number;color:{r:number;g:number;b:number}}>}|
-  {kind:"NumberSequence";keypoints:Array<{time:number;value:number}>}|
+  {kind:"NumberSequence";keypoints:Array<{time:number;value:number;envelope?:number}>}|
   {kind:"Font";family:string|null;enumName:string;weight:string;style:string};
 export type RobloxManifestNode = {
   sourceId:string;
@@ -131,7 +132,7 @@ export type RobloxManifestNode = {
   attributes?:Record<string,string|number|boolean>;
   decorators:Array<{className:string;name:string;properties:Record<string,RobloxPropertyValue>}>;
 };
-export type RobloxManifest = { kind:"project";messageType:"PROJECT_MANIFEST";schema:"creatormake.roblox-manifest";version:1|2;textExportArchitecture?:2|3;projectId:string;projectName:string;guiId:string;manifestVersion:string;projectObjectIds:string[];exportDiagnostics:{projectObjectCount:number;exportedProjectObjectCount:number;exportNodeCount:number;presetsExported:0;presetDefinitionsIncluded:false};screenGuiName:string;deployTarget?:RobloxDeployTarget;screenGuiSettings?:{enabled:boolean;displayOrder:number;ignoreGuiInset:boolean;resetOnSpawn:boolean;zIndexBehavior:"Global"|"Sibling"};referenceResolution:{width:number;height:number};sizingMode:RobloxSizingMode;visualMode?:RobloxVisualMode;renderScale?:RobloxRenderScale;viewportScaleMode?:"FIT";assets?:RobloxRenderAsset[];imageManifest?:RobloxImageManifestEntry[];nodes:RobloxManifestNode[] };
+export type RobloxManifest = { kind:"project";messageType:"PROJECT_MANIFEST";schema:"creatormake.roblox-manifest";version:1|2;textExportArchitecture?:2|3;projectId:string;projectName:string;guiId:string;manifestVersion:string;projectObjectIds:string[];exportDiagnostics:{projectObjectCount:number;exportedProjectObjectCount:number;exportNodeCount:number;presetsExported:0;presetDefinitionsIncluded:false};screenGuiName:string;deployTarget?:RobloxDeployTarget;screenGuiSettings?:{enabled:boolean;displayOrder:number;ignoreGuiInset:boolean;resetOnSpawn:boolean;zIndexBehavior:"Global"|"Sibling"};screenGuiSafeArea?:Record<string,RobloxPropertyValue>;referenceResolution:{width:number;height:number};sizingMode:RobloxSizingMode;visualMode?:RobloxVisualMode;renderScale?:RobloxRenderScale;viewportScaleMode?:"FIT";assets?:RobloxRenderAsset[];imageManifest?:RobloxImageManifestEntry[];nodes:RobloxManifestNode[] };
 
 export type RobloxSyncOperation =
   | {type:"create";sourceId:string}

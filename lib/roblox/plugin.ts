@@ -5,7 +5,13 @@ import {
   CREATORMAKE_PLUGIN_VERSION,
   CREATORMAKE_PROTOCOL_VERSION,
 } from "../creatormake-version.js";
+import { STUDIO_FILE_FORMAT, STUDIO_FILE_MAX_BYTES, STUDIO_FILE_VERSION, STUDIO_GUI_CLASSES, STUDIO_UI_CLASSES } from "./studio-transfer.ts";
+import { STUDIO_SELECTION_DECORATOR_PROPERTIES, STUDIO_SELECTION_FORMAT, STUDIO_SELECTION_GUI_PROPERTIES } from "./studio-selection-schema.ts";
 
+const luaSet=(values:readonly string[])=>"{"+values.map((value)=>`[${JSON.stringify(value)}]=true`).join(",")+"}";
+const luaPropertyLists=(lists:Record<string,string[]>)=>"{"+Object.entries(lists).map(([key,values])=>
+  `[${JSON.stringify(key)}]={${values.map((value)=>JSON.stringify(value)).join(",")}}`,
+).join(",")+"}";
 const safeOrigin=(origin:string)=>{const url=new URL(origin);if(url.protocol!=="https:"&&!(["localhost","127.0.0.1"].includes(url.hostname)&&url.protocol==="http:"))throw new Error("CreatorMake Studio plugin downloads require HTTPS or localhost.");return url.origin;};
 const creatorMakeBridgePort=new URL(CREATORMAKE_BRIDGE_ORIGIN).port;
 
@@ -18,12 +24,17 @@ local StarterGui = game:GetService("StarterGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ScriptEditorService = game:GetService("ScriptEditorService")
+local ChangeHistoryService = game:GetService("ChangeHistoryService")
+local StudioService = game:GetService("StudioService")
+local Selection = game:GetService("Selection")
 
 local LOCAL_ORIGIN = ${JSON.stringify(CREATORMAKE_BRIDGE_ORIGIN)}
 local CREATORMAKE_APP_VERSION = ${JSON.stringify(CREATORMAKE_APP_VERSION)}
 local EXPECTED_BRIDGE_VERSION = ${JSON.stringify(CREATORMAKE_BRIDGE_VERSION)}
 local PLUGIN_VERSION = ${CREATORMAKE_PLUGIN_VERSION}
 local SUPPORTED_PROTOCOL_VERSION = ${CREATORMAKE_PROTOCOL_VERSION}
+local GUI_CLASSES = ${luaSet(STUDIO_GUI_CLASSES)}
+local UI_CLASSES = ${luaSet(STUDIO_UI_CLASSES)}
 local INSTANCE_ID = HttpService:GenerateGUID(false)
 local toolbar = plugin:CreateToolbar("CreatorMake")
 -- Keep the icon empty until CreatorMake has a valid published Roblox ContentId.
@@ -40,7 +51,7 @@ local function make(className, properties, parent)
   return instance
 end
 
-local root = make("Frame", {Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(17,19,28),BorderSizePixel=0}, widget)
+local root = make("ScrollingFrame", {Size=UDim2.fromScale(1,1),CanvasSize=UDim2.fromOffset(0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=5,BackgroundColor3=Color3.fromRGB(17,19,28),BorderSizePixel=0}, widget)
 make("UIPadding", {PaddingTop=UDim.new(0,14),PaddingRight=UDim.new(0,14),PaddingBottom=UDim.new(0,14),PaddingLeft=UDim.new(0,14)}, root)
 make("UIListLayout", {Padding=UDim.new(0,9),SortOrder=Enum.SortOrder.LayoutOrder}, root)
 local function label(text, size, color)
@@ -62,6 +73,15 @@ local previewButton=button("PREVIEW CURRENT CREATORMAKE PROJECT")
 local installButton=button("IMPORT CURRENT CREATORMAKE PROJECT")
 local repairButton=button("REPAIR CREATORMAKE GUIS")
 local disconnectButton=button("DISCONNECT")
+local openFileButton=button("OPEN STUDIO JSON")
+local filePreview=label("", 126, Color3.fromRGB(190,196,216))
+filePreview.Visible=false
+local createFileButton=button("CREATE IN STARTERGUI")
+local updateFileButton=button("UPDATE MATCHING GUI")
+local duplicateFileButton=button("DUPLICATE AS NEW")
+local cancelFileButton=button("CANCEL FILE IMPORT")
+local exportSelectionButton=button("EXPORT SELECTED SCREENGUI")
+local exportSelectionText=make("TextBox", {Size=UDim2.new(1,0,0,64),MultiLine=true,TextWrapped=true,ClearTextOnFocus=false,TextEditable=false,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,Font=Enum.Font.Code,TextSize=12,TextColor3=Color3.fromRGB(222,226,239),BackgroundColor3=Color3.fromRGB(28,32,44),Visible=false},root)
 local detailLabel=label("Preview uses a temporary PlayerGui copy. Permanent sync updates only the CreatorMake-managed StarterGui source used for every player.", 90, Color3.fromRGB(154,160,180))
 
 local connected = false
@@ -148,7 +168,7 @@ local function request(method, path, body)
   if not requestOk then
     local raw=tostring(response)
     if string.find(string.lower(raw),"http requests are not enabled",1,true) or string.find(string.lower(raw),"not allowed to access",1,true) or string.find(string.lower(raw),"permission",1,true) then
-      error("HTTP_PERMISSION_REQUIRED: Roblox Studio is blocking CreatorMake's local connection. Enable HTTP Requests in Experience Settings > Security and allow the CreatorMake plugin to access 127.0.0.1. Studio reported: "..raw)
+      error("HTTP_PERMISSION_REQUIRED: Allow CreatorMake to access 127.0.0.1 in Studio's plugin permissions, or use Open Studio JSON. Studio reported: "..raw)
     end
     if string.find(raw,"ConnectFail",1,true) then error("SERVER_NOT_RUNNING_OR_BLOCKED: Studio could not reach "..LOCAL_ORIGIN..". CreatorMake may be closed, the bridge port may be unavailable, or local HTTP access may be blocked. Studio reported: "..raw) end
     error("LOCAL_HTTP_ERROR: Could not reach "..LOCAL_ORIGIN..path..". Studio reported: "..raw)
@@ -184,8 +204,19 @@ local function validateManifest(manifest)
   local projectObjects={}
   for _,sourceId in ipairs(manifest.projectObjectIds) do if type(sourceId)=="string" and sourceId~="" then projectObjects[sourceId]=true end end
   for _,node in ipairs(manifest.nodes) do
-    if node.sourceId~="__creatormake_viewport" then
-      local attributes=type(node.attributes)=="table" and node.attributes or {}
+    local attributes=type(node.attributes)=="table" and node.attributes or {}
+    local sharedController=node.sourceId=="creatormake::button-interaction-controller"
+      and node.className=="LocalScript" and attributes.CreatorMakeRole=="SharedButtonInteractionController"
+      and node.parentSourceId==nil
+    if not GUI_CLASSES[node.className] and not UI_CLASSES[node.className] and not sharedController then
+      error("Unsupported Studio class: "..tostring(node.className))
+    end
+    for _,decorator in ipairs(node.decorators or {}) do
+      if not UI_CLASSES[decorator.className] then
+        error("Unsupported Studio decorator: "..tostring(decorator.className))
+      end
+    end
+    if node.sourceId~="__creatormake_viewport" and not sharedController then
       local owner=attributes.CreatorMakeSourceElementId or attributes.CreatorMakeLayoutSourceId or attributes.CreatorMakeSourceId or attributes.CreatorMakeLogicalParentId or node.sourceId
       owner=string.match(tostring(owner),"^(.-)::") or tostring(owner)
       if not projectObjects[owner] then error("CreatorMake sync error: received object "..tostring(node.sourceId).." outside current project "..manifest.projectId..". Preset libraries cannot be imported.") end
@@ -211,7 +242,7 @@ local function validateManifest(manifest)
     local rootAttributes=type(rootNode.attributes)=="table" and rootNode.attributes or {}
     local textBaked=rootAttributes.CreatorMakeTextBaked==true or rootAttributes.CreatorMakeCaptionBaked==true
     local expectsNativeText=rootAttributes.CreatorMakeHasNativeText==true
-    local standaloneNative=(rootNode.className=="TextLabel" or rootNode.className=="TextBox") and type(rootNode.properties)=="table" and type(rootNode.properties.Text)=="string"
+    local standaloneNative=(rootNode.className=="TextLabel" or rootNode.className=="TextBox" or rootNode.className=="TextButton") and type(rootNode.properties)=="table" and type(rootNode.properties.Text)=="string"
     local nativeChild=false
     local exactChild=false
     local combinedVisual=false
@@ -304,20 +335,23 @@ local function decodeValue(value)
   if type(value)~="table" or not value.kind then return value end
   if value.kind=="Color3" then return Color3.fromRGB(value.r,value.g,value.b) end
   if value.kind=="Vector2" then return Vector2.new(value.x,value.y) end
+  if value.kind=="Vector3" then return Vector3.new(value.x,value.y,value.z) end
   if value.kind=="UDim" then return UDim.new(value.scale,value.offset) end
   if value.kind=="UDim2" then return UDim2.new(value.xScale,value.xOffset,value.yScale,value.yOffset) end
   if value.kind=="Rect" then return Rect.new(value.minX,value.minY,value.maxX,value.maxY) end
   if value.kind=="Enum" then return Enum[value.enumType][value.item] end
   if value.kind=="ColorSequence" then local points={};for _,point in ipairs(value.keypoints) do table.insert(points,ColorSequenceKeypoint.new(point.time,Color3.fromRGB(point.color.r,point.color.g,point.color.b))) end;return ColorSequence.new(points) end
-  if value.kind=="NumberSequence" then local points={};for _,point in ipairs(value.keypoints) do table.insert(points,NumberSequenceKeypoint.new(point.time,point.value)) end;return NumberSequence.new(points) end
+  if value.kind=="NumberSequence" then local points={};for _,point in ipairs(value.keypoints) do table.insert(points,NumberSequenceKeypoint.new(point.time,point.value,point.envelope or 0)) end;return NumberSequence.new(points) end
   if value.kind=="Font" then if value.family then return Font.new(value.family,Enum.FontWeight[value.weight],Enum.FontStyle[value.style]) end;return Font.fromEnum(Enum.Font[value.enumName]) end
   return nil
 end
 
 local function setProperties(instance, properties)
   for key,value in pairs(properties or {}) do
+    if key=="Source" and instance:IsA("LocalScript") then continue end
+    if key=="Parent" or key=="Name" or key=="Source" then error("Invalid manifest property "..key) end
     local ok,problem=pcall(function() instance[key]=decodeValue(value) end)
-    if not ok then warn("CreatorMake skipped "..instance.Name.."."..key..": "..tostring(problem)) end
+    if not ok then error("CreatorMake could not set "..instance.Name.."."..key..": "..tostring(problem)) end
   end
 end
 
@@ -549,7 +583,7 @@ local function destroyPreviewScreenGui()
   if previewScopeKey then releaseImageScope(previewScopeKey);releaseViewportScale(previewScopeKey);previewScopeKey=nil end
 end
 
-local function applyManifest(manifest, deployTarget)
+local function applyManifest(manifest, deployTarget, createOnly)
   manifest=validateManifest(manifest)
   for index,node in ipairs(manifest.nodes) do
     if type(node)~="table" then error("MANIFEST_INSTANCE_INVALID: nodes["..tostring(index).."] is not an object.") end
@@ -562,19 +596,31 @@ local function applyManifest(manifest, deployTarget)
   local parent,previewFallback=StarterGui,false
   if deployTarget=="PlayerGuiPreview" then parent,previewFallback=previewParent() end
   local previousScreenGui=findManagedScreenGui(parent,manifest,deployTarget)
+  if createOnly and previousScreenGui then error("This project is already installed. Choose Update or Duplicate.") end
   local screenGui=Instance.new("ScreenGui")
+  local success,existing=pcall(function()
   local settings=manifest.screenGuiSettings or {}
   screenGui.Name=deployTarget=="PlayerGuiPreview" and previewFallback and (manifest.screenGuiName.."_Preview") or manifest.screenGuiName
-  screenGui.Enabled=previousScreenGui and previousScreenGui.Enabled or settings.enabled~=false
+  if previousScreenGui then screenGui.Enabled=previousScreenGui.Enabled else screenGui.Enabled=settings.enabled~=false end
   screenGui.DisplayOrder=tonumber(settings.displayOrder) or 0
   screenGui.ResetOnSpawn=settings.resetOnSpawn==true
   screenGui.IgnoreGuiInset=settings.ignoreGuiInset==true or ((manifest.visualMode=="PIXEL_ACCURATE" or manifest.visualMode=="ADAPTIVE") and settings.ignoreGuiInset~=false)
   screenGui.ZIndexBehavior=settings.zIndexBehavior=="Sibling" and Enum.ZIndexBehavior.Sibling or Enum.ZIndexBehavior.Global
+  local safeArea=manifest.screenGuiSafeArea or {}
+  if safeArea.ScreenInsets~=nil then screenGui.ScreenInsets=decodeValue(safeArea.ScreenInsets) end
+  if safeArea.ClipToDeviceSafeArea~=nil then screenGui.ClipToDeviceSafeArea=decodeValue(safeArea.ClipToDeviceSafeArea) end
   screenGui.Archivable=deployTarget=="StarterGui"
   screenGui:SetAttribute("CreatorMakeManaged",true);screenGui:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest));screenGui:SetAttribute("CreatorMakeProjectName",manifest.projectName);screenGui:SetAttribute("CreatorMakeGuiId",manifest.guiId);screenGui:SetAttribute("CreatorMakeSchemaVersion",manifest.schemaVersion or manifest.version);screenGui:SetAttribute("CreatorMakeManifestVersion",manifest.manifestVersion);screenGui:SetAttribute("CreatorMakeLastSync",DateTime.now():ToIsoDate());screenGui:SetAttribute("CreatorMakeDeployTarget",deployTarget);screenGui:SetAttribute("CreatorMakeVisualMode",manifest.visualMode or "NATIVE");screenGui:SetAttribute("CreatorMakeLocal",nil)
   local existing={}
   for _,node in ipairs(manifest.nodes) do
+    if existing[node.sourceId] then error("Duplicate CreatorMake ID: "..node.sourceId) end
+    local nodeParent=screenGui
+    if node.parentSourceId~=nil then
+      nodeParent=existing[node.parentSourceId]
+      if not nodeParent then error("Missing or out-of-order parent "..tostring(node.parentSourceId).." for "..node.sourceId) end
+    end
     local instance=Instance.new(node.className)
+    instance.Parent=nodeParent
     instance.Name=node.name
     for key,value in pairs(node.attributes or {}) do instance:SetAttribute(key,value) end
     instance:SetAttribute("CreatorMakeId",node.sourceId);instance:SetAttribute("CreatorMakeManaged",true);instance:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest));instance:SetAttribute("CreatorMakeGuiId",manifest.guiId)
@@ -584,24 +630,87 @@ local function applyManifest(manifest, deployTarget)
       local ok,problem=pcall(function() ScriptEditorService:UpdateSourceAsync(instance,function() return source end) end)
       if not ok then instance:Destroy();error("CreatorMake could not install the shared button controller: "..tostring(problem)) end
     end
-    local parent=node.parentSourceId and existing[node.parentSourceId] or nil
-    instance.Parent=parent or screenGui;existing[node.sourceId]=instance
-    local decoratorKeys={}
+    existing[node.sourceId]=instance
     for _,decorator in ipairs(node.decorators or {}) do
-      local key=decorator.className..":"..decorator.name;decoratorKeys[key]=true
-      local child=Instance.new(decorator.className);child:SetAttribute("CreatorMakeDecorator",key)
+      local key=decorator.className..":"..decorator.name
+      local child=Instance.new(decorator.className)
+      child.Parent=instance
+      child:SetAttribute("CreatorMakeDecorator",key)
       child:SetAttribute("CreatorMakeManaged",true);child:SetAttribute("CreatorMakeProjectId",manifestProjectId(manifest));child:SetAttribute("CreatorMakeGuiId",manifest.guiId)
-      child.Name=decorator.name;setProperties(child,decorator.properties);child.Parent=instance
+      child.Name=decorator.name;setProperties(child,decorator.properties)
     end
   end
+    return existing
+  end)
+  if not success then screenGui:Destroy();error(existing) end
   return screenGui,existing,previousScreenGui,parent,managedScopeKey(manifest,deployTarget)
 end
 
 local function commitManifest(manifest, deployTarget, screenGui, instances, previousScreenGui, parent, scopeKey)
-  screenGui.Parent=parent
-  local scaleOk,binding=pcall(function() return configureViewportScale(manifest,instances) end)
-  if not scaleOk then screenGui:Destroy();error(binding) end
-  if previousScreenGui and previousScreenGui~=screenGui then previousScreenGui:Destroy() end
+  local attachments = {}
+  local function planAttachments(old, replacement)
+    for _, child in ipairs(old:GetChildren()) do
+      local id = child:GetAttribute("CreatorMakeId")
+      local decoratorId = child:GetAttribute("CreatorMakeDecorator")
+      local owned = child:GetAttribute("CreatorMakeManaged") == true
+        or type(id) == "string" or type(decoratorId) == "string"
+      if owned then
+        local target = id and instances[id] or nil
+        if decoratorId and replacement then
+          for _, decorator in ipairs(replacement:GetChildren()) do
+            if decorator:GetAttribute("CreatorMakeDecorator") == decoratorId then
+              target = decorator
+              break
+            end
+          end
+        end
+        planAttachments(child, target)
+      else
+        if not replacement or old.ClassName ~= replacement.ClassName then
+          error("Cannot preserve "..child:GetFullName()..". Its parent was removed or changed class. Duplicate the import or move the Studio object first.")
+        end
+        table.insert(attachments, {child=child, from=old, to=replacement})
+      end
+    end
+  end
+  local recording, binding
+  local applied = 0
+  local ok, problem = pcall(function()
+    if previousScreenGui and deployTarget=="StarterGui" then
+      planAttachments(previousScreenGui, screenGui)
+      for key, value in pairs(previousScreenGui:GetAttributes()) do
+        if string.sub(key,1,11)~="CreatorMake" and screenGui:GetAttribute(key)==nil then
+          screenGui:SetAttribute(key,value)
+        end
+      end
+    end
+    if deployTarget=="StarterGui" then
+      recording=ChangeHistoryService:TryBeginRecording("CreatorMakeImport","CreatorMake · "..manifest.projectName)
+      if not recording then error("Studio is recording another change. Finish it, then retry the import.") end
+    end
+    binding=configureViewportScale(manifest,instances)
+    screenGui.Parent=parent
+    for index, attachment in ipairs(attachments) do
+      attachment.child.Parent=attachment.to
+      applied=index
+    end
+    if previousScreenGui then previousScreenGui.Parent=nil end
+    if recording then ChangeHistoryService:FinishRecording(recording,Enum.FinishRecordingOperation.Commit) end
+  end)
+  if not ok then
+    disconnectViewportBinding(binding)
+    for index=applied,1,-1 do
+      local attachment=attachments[index]
+      attachment.child.Parent=attachment.from
+    end
+    if previousScreenGui and previousScreenGui.Parent==nil then previousScreenGui.Parent=parent end
+    screenGui:Destroy()
+    if recording then
+      pcall(function() ChangeHistoryService:FinishRecording(recording,Enum.FinishRecordingOperation.Cancel) end)
+    end
+    error(problem)
+  end
+  if previousScreenGui and not recording then previousScreenGui:Destroy() end
   commitViewportBinding(scopeKey,binding)
   if deployTarget=="PlayerGuiPreview" then previewScreenGui=screenGui;previewScopeKey=scopeKey end
   printTextScaleDiagnostics(manifest,instances)
@@ -706,6 +815,199 @@ local function assignPreviewContent(manifest, instances, contentBySource)
   return assigned
 end
 
+local function decodeStudioFile(contents)
+  if #contents > ${STUDIO_FILE_MAX_BYTES} then error("Studio JSON file exceeds the size limit.") end
+  local file=HttpService:JSONDecode(contents)
+  if type(file)~="table" or file.format~=${JSON.stringify(STUDIO_FILE_FORMAT)} or file.formatVersion~=${STUDIO_FILE_VERSION} or type(file.manifest)~="table" then
+    error("Choose a CreatorMake Studio JSON file from the export dialog.")
+  end
+  local manifest=file.manifest
+  if type(manifest.nodes)~="table" or #manifest.nodes>10000 then error("Invalid GUI hierarchy or too many objects.") end
+  for _,node in ipairs(manifest.nodes) do
+    if type(node)~="table" or node.className=="LocalScript" then
+      error("Studio JSON only supports visual GUI instances. Use Studio Sync for enabled interactions.")
+    end
+  end
+  for _,asset in ipairs(manifest.assets or {}) do
+    if not validAssetId(asset.robloxAssetId) then error("This file needs permanent Roblox image IDs.") end
+  end
+  manifest.protocolVersion=SUPPORTED_PROTOCOL_VERSION
+  manifest.schemaVersion=manifest.version
+  manifest.importDiagnostics={schemaVersion="valid",project="valid",instances="valid",assets="valid"}
+  return validateManifest(manifest)
+end
+
+local SELECTION_PROPERTIES = ${luaPropertyLists(STUDIO_SELECTION_GUI_PROPERTIES)}
+local SELECTION_DECORATORS = ${luaPropertyLists(STUDIO_SELECTION_DECORATOR_PROPERTIES)}
+
+local function encodeStudioValue(value)
+  local kind=typeof(value)
+  if kind=="number" or kind=="string" or kind=="boolean" then return value end
+  if kind=="Color3" then return {kind=kind,r=value.R*255,g=value.G*255,b=value.B*255} end
+  if kind=="Vector2" then return {kind=kind,x=value.X,y=value.Y} end
+  if kind=="Vector3" then return {kind=kind,x=value.X,y=value.Y,z=value.Z} end
+  if kind=="UDim" then return {kind=kind,scale=value.Scale,offset=value.Offset} end
+  if kind=="UDim2" then return {kind=kind,xScale=value.X.Scale,xOffset=value.X.Offset,yScale=value.Y.Scale,yOffset=value.Y.Offset} end
+  if kind=="Rect" then return {kind=kind,minX=value.Min.X,minY=value.Min.Y,maxX=value.Max.X,maxY=value.Max.Y} end
+  if kind=="EnumItem" then return {kind="Enum",enumType=tostring(value.EnumType),item=value.Name} end
+  if kind=="Font" then return {kind=kind,family=value.Family,weight=value.Weight.Name,style=value.Style.Name,enumName=""} end
+  if kind=="ColorSequence" or kind=="NumberSequence" then
+    local keypoints={}
+    for _,point in ipairs(value.Keypoints) do
+      if kind=="ColorSequence" then
+        local color=point.Value
+        table.insert(keypoints,{time=point.Time,color={r=color.R*255,g=color.G*255,b=color.B*255}})
+      else
+        table.insert(keypoints,{time=point.Time,value=point.Value,envelope=point.Envelope})
+      end
+    end
+    return {kind=kind,keypoints=keypoints}
+  end
+  return nil
+end
+
+local function readStudioProperties(instance, keys)
+  local properties={}
+  for _,key in ipairs(keys) do
+    local ok,value=pcall(function() return instance[key] end)
+    if ok then properties[key]=encodeStudioValue(value) end
+  end
+  return properties
+end
+
+local function captureStudioGui(screen)
+  local nodes,warnings,ids={},{},{}
+  local function recordWarning(instance)
+    table.insert(warnings,instance:GetFullName().." ["..instance.ClassName.."] stays in Studio.")
+  end
+  local function capture(container,parentId,path,decorators)
+    for index,child in ipairs(container:GetChildren()) do
+      local keys=SELECTION_PROPERTIES[child.ClassName]
+      local decoratorKeys=SELECTION_DECORATORS[child.ClassName]
+      local childPath=path.."_"..tostring(index)
+      if child:IsA("GuiObject") and keys then
+        local stored=child:GetAttribute("CreatorMakeId")
+        local id=type(stored)=="string" and not string.find(stored,"::",1,true) and stored or "studio"..childPath
+        while ids[id] do id=id.."_" end
+        ids[id]=true
+        local node={sourceId=id,parentSourceId=parentId,name=child.Name,className=child.ClassName,
+          properties=readStudioProperties(child,keys),attributes={},decorators={}}
+        for key,value in pairs(child:GetAttributes()) do
+          local kind=typeof(value)
+          if not string.match(key,"^CreatorMake") then
+            if kind=="string" or kind=="number" or kind=="boolean" then node.attributes[key]=value
+            else table.insert(warnings,child:GetFullName().." attribute "..key.." ["..kind.."] stays in Studio.") end
+          end
+        end
+        table.insert(nodes,node)
+        capture(child,id,childPath,node.decorators)
+      elseif decoratorKeys and decorators then
+        table.insert(decorators,{className=child.ClassName,name=child.Name,properties=readStudioProperties(child,decoratorKeys)})
+        for _,nested in ipairs(child:GetChildren()) do recordWarning(nested) end
+      else
+        recordWarning(child)
+      end
+    end
+  end
+  capture(screen,nil,"",nil)
+  if #nodes==0 then error("This ScreenGui has no supported GUI children.") end
+  local size=screen.AbsoluteSize
+  local resolution={width=size.X>20 and size.X or 1920,height=size.Y>20 and size.Y or 1080}
+  return {format=${JSON.stringify(STUDIO_SELECTION_FORMAT)},formatVersion=1,name=screen.Name,
+    resolution=resolution,settings=readStudioProperties(screen,SELECTION_PROPERTIES.ScreenGui),
+    nodes=nodes,warnings=warnings}
+end
+
+exportSelectionButton.Activated:Connect(function()
+  local selected=Selection:Get()
+  local item=#selected==1 and selected[1] or nil
+  if not item or not item:IsA("ScreenGui") then
+    detailLabel.Text="Select one ScreenGui in Explorer, then export it."
+    return
+  end
+  local ok,result=pcall(function() return HttpService:JSONEncode(captureStudioGui(item)) end)
+  if not ok then detailLabel.Text="Selection export: "..tostring(result);return end
+  if #result>${STUDIO_FILE_MAX_BYTES} then detailLabel.Text="This selection is too large to copy in one transfer.";return end
+  exportSelectionText.Visible=true
+  exportSelectionText.Text=result
+  exportSelectionText:CaptureFocus()
+  exportSelectionText.CursorPosition=#result+1
+  exportSelectionText.SelectionStart=1
+  detailLabel.Text="Copy the JSON, then paste it in CreatorMake → Projects → Import Studio selection."
+end)
+
+local stagedFile
+local function showStudioFile(manifest)
+  stagedFile=manifest
+  filePreview.Visible=manifest~=nil
+  createFileButton.Visible=manifest~=nil
+  updateFileButton.Visible=manifest~=nil
+  duplicateFileButton.Visible=manifest~=nil
+  cancelFileButton.Visible=manifest~=nil
+  if not manifest then return end
+  local previous=findManagedScreenGui(StarterGui,manifest,"StarterGui")
+  createFileButton.Visible=not previous
+  updateFileButton.Visible=previous~=nil
+  duplicateFileButton.Visible=previous~=nil
+  local lines={manifest.screenGuiName.."  ·  "..tostring(#manifest.nodes).." objects","Destination: StarterGui"}
+  local limit=math.min(#manifest.nodes,4)
+  for index=1,limit do
+    local node=manifest.nodes[index]
+    table.insert(lines,(node.parentSourceId and "   " or "  ")..node.name.." ["..node.className.."]")
+  end
+  if #manifest.nodes>limit then table.insert(lines,"… "..tostring(#manifest.nodes-limit).." more") end
+  filePreview.Text=table.concat(lines,"\\n")
+end
+
+showStudioFile(nil)
+openFileButton.Activated:Connect(function()
+  if busy then return end
+  busy=true
+  showStudioFile(nil)
+  local ok,manifest=pcall(function()
+    local file=StudioService:PromptImportFileAsync({"json"})
+    if not file then return nil end
+    return decodeStudioFile(file:GetBinaryContents())
+  end)
+  busy=false
+  if not ok then detailLabel.Text="Studio JSON: "..tostring(manifest);return end
+  showStudioFile(manifest)
+end)
+
+local function installStudioFile(mode)
+  if busy or not stagedFile then return end
+  busy=true
+  local pending
+  local ok,result=pcall(function()
+    local manifest=table.clone(stagedFile)
+    if mode=="duplicate" then
+      manifest.projectId=HttpService:GenerateGUID(false)
+      manifest.guiId=manifest.projectId..":screen"
+      manifest.manifestVersion=manifest.guiId..":file"
+      manifest.screenGuiName..="_Copy"
+    elseif mode=="update" and not findManagedScreenGui(StarterGui,manifest,"StarterGui") then
+      error("The matching GUI is no longer in StarterGui. Reopen the file to refresh its destination.")
+    end
+    local screenGui,instances,previous,parent,scopeKey=applyManifest(manifest,"StarterGui",mode~="update")
+    pending=screenGui
+    screenGui:SetAttribute("CreatorMakeMultiPlayerReady",true)
+    return commitManifest(manifest,"StarterGui",screenGui,instances,previous,parent,scopeKey)
+  end)
+  busy=false
+  if not ok then
+    if pending and not pending.Parent then pending:Destroy() end
+    detailLabel.Text="Studio JSON: "..tostring(result)
+    return
+  end
+  showStudioFile(nil)
+  detailLabel.Text="Installed "..result.Name.." in StarterGui. You can undo this import from Studio."
+end
+
+createFileButton.Activated:Connect(function() installStudioFile("create") end)
+updateFileButton.Activated:Connect(function() installStudioFile("update") end)
+duplicateFileButton.Activated:Connect(function() installStudioFile("duplicate") end)
+cancelFileButton.Activated:Connect(function() showStudioFile(nil) end)
+
 local function connectLocal()
   if busy then return false end
   busy=true;connected=false;showStatus("CreatorMake: Connecting…",Color3.fromRGB(255,194,92));detailLabel.Text="Testing "..LOCAL_ORIGIN.."/health…"
@@ -761,8 +1063,7 @@ local function runImport(jobId, jobMode)
     if starterGuiImport and not publishedAssets then error("MULTIPLAYER_VISIBILITY_BLOCKED: Required CreatorMake visuals do not have persistent Roblox asset IDs. StarterGui was left unchanged.") end
     local localAssetImport=false
     local contentBySource,created,reused={},0,0
-    if starterGuiImport then destroyPreviewScreenGui() end
-    if not starterGuiImport then destroyPreviewScreenGui() end
+    local previousPreview,previousPreviewScope=previewScreenGui,previewScopeKey
     if publishedAssets then pendingImageScope={scopeKey=managedScopeKey(manifest,deployTarget),entries={}} else contentBySource,created,reused,pendingImageScope=preparePreviewContent(manifest,jobId,deployTarget) end
     detailLabel.Text=starterGuiImport and ("Installing project "..manifest.projectName.." into StarterGui with multiplayer-safe assets…") or ("Building PlayerGui preview for project "..manifest.projectName.."…")
     local gui,instances,previous,parent,scopeKey=applyManifest(manifest,deployTarget)
@@ -772,6 +1073,13 @@ local function runImport(jobId, jobMode)
     local textArchitecture=verifyTextArchitecture(manifest,instances)
     commitManifest(manifest,deployTarget,gui,instances,previous,parent,scopeKey)
     commitImageScope(pendingImageScope);pendingImageScope=nil;pendingScreenGui=nil
+    if starterGuiImport then
+      destroyPreviewScreenGui()
+    elseif previousPreview and previousPreview~=gui and previousPreviewScope~=scopeKey then
+      if previousPreview.Parent then previousPreview:Destroy() end
+      releaseImageScope(previousPreviewScope)
+      releaseViewportScale(previousPreviewScope)
+    end
     return {gui=gui,projectId=manifest.projectId,projectName=manifest.projectName,manifestVersion=manifest.manifestVersion,count=#manifest.nodes,created=created,reused=reused,assigned=assigned,permanent=starterGuiImport,localAssetImport=localAssetImport,multiPlayerReady=starterGuiImport and publishedAssets,textArchitecture=textArchitecture,installedProjects=installedCreatorMakeProjects()}
   end)
   busy=false

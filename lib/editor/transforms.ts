@@ -1,4 +1,5 @@
 import type { EditorElement, EditorProject, ResizeCorner } from "./types";
+import { resizeRobloxLayout } from "./roblox-layout.ts";
 
 export type Bounds={left:number;top:number;right:number;bottom:number;width:number;height:number;cx:number;cy:number};
 export type TransformSource={id:string;x:number;y:number;width:number;height:number};
@@ -10,6 +11,8 @@ export function resizeElementWithConstraints(draft:EditorProject,before:EditorPr
   Object.assign(root,next);
   const visit=(parentBefore:EditorElement,parentAfter:EditorElement)=>{const children=before.elements.filter((item)=>item.parentId===parentBefore.id);children.forEach((childBefore)=>{const child=draftById.get(childBefore.id);if(!child)return;const left=childBefore.x-parentBefore.x,right=parentBefore.x+parentBefore.width-(childBefore.x+childBefore.width),top=childBefore.y-parentBefore.y,bottom=parentBefore.y+parentBefore.height-(childBefore.y+childBefore.height),centerX=childBefore.x+childBefore.width/2-(parentBefore.x+parentBefore.width/2),centerY=childBefore.y+childBefore.height/2-(parentBefore.y+parentBefore.height/2);
       if(parentBefore.layoutMode==="none"){
+        const native=resizeRobloxLayout(childBefore,parentBefore,parentAfter);
+        if(native){Object.assign(child,native);visit(childBefore,child);return;}
         if(childBefore.constraints.horizontal==="right")child.x=parentAfter.x+parentAfter.width-right-childBefore.width;
         else if(childBefore.constraints.horizontal==="left-right"){child.x=parentAfter.x+left;child.width=clamp(parentAfter.width-left-right,child.minWidth,child.maxWidth);}
         else if(childBefore.constraints.horizontal==="center")child.x=parentAfter.x+parentAfter.width/2+centerX-childBefore.width/2;
